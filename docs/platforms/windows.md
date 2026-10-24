@@ -45,4 +45,4 @@ Tauri 번들러 기반 사용자별 설치 프로그램을 우선 검토하고 W
 
 ## 6. Windows 테스트 패키지 만들기
 
-Windows 11 x64 PC에서 `packaging/windows/build.ps1`을 실행한다. 현재 사용자용 NSIS, WebView2 다운로드 부트스트래퍼와 엔진·MCP 동봉 설정을 적용하며 산출물·해시·빌드 로그를 새 폴더에 모은다. [준비·설치·검증 절차](../../packaging/windows/README.md)를 따른다. 스크립트 준비와 Windows에서의 실제 빌드·설치 통과는 구분하며 현재 후자는 미검증이다.
+Windows 11 x64 PC에서 `packaging/windows/build.ps1`을 실행한다. 현재 사용자용 NSIS, WebView2 다운로드 부트스트래퍼와 엔진·MCP 동봉 설정을 적용하며 산출물·해시·빌드 로그를 새 폴더에 모은다. [준비·설치·검증 절차](../../packaging/windows/README.md)를 따른다. Windows 네이티브 검사·설치 파일 생성·현재 사용자 설치와 실행·트레이 유지·종료와 재실행, Private 프로필에서 Mac 한 대와의 CLI 엔진 양방향 파일·무결성·동일 이름 보존을 확인했으며 [검증 기록](../implementation-status.md)에 환경과 결과를 남겼다. 다른 기기 조합·GUI 드롭·알림 표시와 클릭·자동 발견·자동 실행·제거는 추가 검증이 필요하다.

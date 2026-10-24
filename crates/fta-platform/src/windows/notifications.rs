@@ -86,7 +86,9 @@ pub fn register(
             "invalid notification application name",
         ));
     }
-    let executable = executable.canonicalize()?;
+    // std canonicalize adds a verbatim prefix that IShellLinkW::SetPath rejects even for short paths.
+    // Resolve links first, then simplify only when ordinary DOS/UNC syntax preserves the same target.
+    let executable = dunce::canonicalize(executable)?;
     if !executable.is_file() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -204,11 +206,14 @@ fn register_shortcut(executable: &Path, app_id: &str) -> io::Result<()> {
     // SAFETY: COM is initialized on this thread and ShellLink is the registered in-process class.
     let link: IShellLinkW = unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER) }
         .map_err(native_error)?;
+    // Keep the failing shell operation in diagnostics: several APIs return the same E_INVALIDARG.
     // SAFETY: both UTF-16 strings are valid and remain live during synchronous calls.
-    unsafe { link.SetPath(PCWSTR(executable.as_ptr())) }.map_err(native_error)?;
+    unsafe { link.SetPath(PCWSTR(executable.as_ptr())) }
+        .map_err(|error| io::Error::other(format!("set notification shortcut target: {error}")))?;
     let properties: IPropertyStore = link.cast().map_err(native_error)?;
-    // This variant borrows the HSTRING only while SetValue copies the property value.
-    let id_variant = PROPVARIANT {
+    // PROPVARIANT's Drop frees its string; suppress it for this borrowed HSTRING so registration
+    // cannot free the HSTRING's interior buffer and corrupt the heap after SetValue copies it.
+    let id_variant = std::mem::ManuallyDrop::new(PROPVARIANT {
         Anonymous: PROPVARIANT_0 {
             Anonymous: std::mem::ManuallyDrop::new(PROPVARIANT_0_0 {
                 vt: VT_LPWSTR,
@@ -220,9 +225,10 @@ fn register_shortcut(executable: &Path, app_id: &str) -> io::Result<()> {
                 },
             }),
         },
-    };
+    });
     // SAFETY: the property key and borrowed string variant remain valid until SetValue returns.
-    unsafe { properties.SetValue(&APP_USER_MODEL_ID, &id_variant) }.map_err(native_error)?;
+    unsafe { properties.SetValue(&APP_USER_MODEL_ID, &*id_variant) }
+        .map_err(|error| io::Error::other(format!("set notification shortcut AUMID: {error}")))?;
     // SAFETY: activator is a valid GUID and the API allocates an owned PROPVARIANT.
     let mut activator_variant =
         unsafe { InitPropVariantFromCLSID(&activator) }.map_err(native_error)?;
@@ -230,13 +236,18 @@ fn register_shortcut(executable: &Path, app_id: &str) -> io::Result<()> {
     let result = unsafe { properties.SetValue(&APP_TOAST_ACTIVATOR, &activator_variant) };
     // SAFETY: this is exactly the owned variant returned by InitPropVariantFromCLSID.
     let cleared = unsafe { PropVariantClear(&mut activator_variant) };
-    result.map_err(native_error)?;
+    result.map_err(|error| {
+        io::Error::other(format!("set notification shortcut activator: {error}"))
+    })?;
     cleared.map_err(native_error)?;
     // SAFETY: the store and link are initialized COM objects in this thread's apartment.
-    unsafe { properties.Commit() }.map_err(native_error)?;
+    unsafe { properties.Commit() }.map_err(|error| {
+        io::Error::other(format!("commit notification shortcut properties: {error}"))
+    })?;
     let persist: IPersistFile = link.cast().map_err(native_error)?;
     // SAFETY: shortcut is a live absolute path to this application's Start-menu link.
-    unsafe { persist.Save(PCWSTR(shortcut.as_ptr()), true) }.map_err(native_error)
+    unsafe { persist.Save(PCWSTR(shortcut.as_ptr()), true) }
+        .map_err(|error| io::Error::other(format!("save notification shortcut: {error}")))
 }
 
 /// Submit a protocol-activation toast whose click is handled by Windows after this process exits.
@@ -330,9 +341,58 @@ mod tests {
             key.get_value::<String, _>("FTAApplicationId")?,
             fixture.app_id
         );
+        // The OS protocol launcher must receive the same shell-compatible path as the saved link.
+        let command: String = key.open_subkey("shell\\open\\command")?.get_value("")?;
+        assert!(!command.contains(r"\\?\"));
         let programs =
             super::super::known_folder(&windows_sys::Win32::UI::Shell::FOLDERID_Programs)?;
         assert!(programs.join(format!("{}.lnk", fixture.app_id)).is_file());
+        Ok(())
+    }
+
+    // NSIS creates an unowned handler before first launch. Canonical path aliases must identify
+    // our executable, while extra arguments and explicit foreign ownership must still be rejected.
+    #[test]
+    fn installer_protocol_alias_is_adopted_without_relaxing_ownership() -> io::Result<()> {
+        use winreg::{RegKey, enums::HKEY_CURRENT_USER};
+        let fixture = fixture();
+        let executable = std::env::current_exe()?;
+        let alias = executable.canonicalize()?;
+        let command = format!("\"{}\" \"%1\"", alias.display());
+        let expected = format!("\"{}\" \"%1\"", dunce::canonicalize(&executable)?.display());
+        assert!(can_update_protocol(
+            None,
+            Some(&command),
+            &fixture.app_id,
+            &expected
+        ));
+        assert!(!can_update_protocol(
+            None,
+            Some(&format!("{command} --unexpected")),
+            &fixture.app_id,
+            &expected,
+        ));
+        assert!(!can_update_protocol(
+            Some("another.application"),
+            Some(&command),
+            &fixture.app_id,
+            &expected,
+        ));
+        let root = RegKey::predef(HKEY_CURRENT_USER);
+        let (key, _) = root.create_subkey(format!("Software\\Classes\\{}", fixture.scheme))?;
+        key.create_subkey("shell\\open\\command")?
+            .0
+            .set_value("", &command)?;
+        register(
+            &executable,
+            &fixture.app_id,
+            "FTA notification test",
+            &fixture.scheme,
+        )?;
+        assert_eq!(
+            key.get_value::<String, _>("FTAApplicationId")?,
+            fixture.app_id
+        );
         Ok(())
     }
 

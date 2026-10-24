@@ -1,6 +1,6 @@
 # Windows 11 x64 설치와 검증
 
-대상: Windows 11 / AMD Ryzen 5 5600X(x86-64). 이 문서는 Windows PC에서 직접 빌드하는 절차다. 현재 Mac에서 Windows 설치 파일을 생성·실행한 것으로 표시하지 않는다.
+대상: Windows 11 / AMD Ryzen 5 5600X(x86-64). 이 문서는 Windows PC에서 직접 빌드하는 절차다. Windows 네이티브 검사·설치 파일 생성·설치·첫 실행·트레이 유지와 종료·재실행, Mac 한 대와의 실제 LAN 양방향 파일·해시·동일 이름 보존을 확인했다. GUI 드롭과 나머지 OS 통합 검증은 별도다. [검증 기록](../../docs/implementation-status.md)을 따른다.
 
 ## 1. 빌드 PC 준비
 
@@ -12,6 +12,13 @@
 - Microsoft Edge WebView2 Runtime: Windows 11에 있는지 확인한다. 설치 프로그램은 없을 때 다운로드 부트스트래퍼를 사용하므로 최초 설치 시 인터넷이 필요할 수 있다. 앱의 실제 전송은 집 LAN에서 동작한다.
 
 도구 설치 뒤 터미널을 새로 연다. 소스 ZIP을 로컬 쓰기 가능한 폴더에 모두 압축 해제한다. `node_modules`, Mac의 `target`·실행 파일을 복사할 필요는 없다. 빌드 중 의존성과 NSIS 도구를 다운로드하므로 인터넷과 충분한 디스크 공간이 필요하다.
+
+기존 Rust가 GNU 호스트라면 MSVC 도구 모음을 추가하고 이 PowerShell 세션에서만 선택한다. 다른 프로젝트의 Rust 기본 설정은 바꾸지 않는다. 버전은 `rust-toolchain.toml`과 일치시킨다.
+
+```powershell
+rustup toolchain install 1.99.1-x86_64-pc-windows-msvc --profile minimal --component rustfmt --component clippy
+$env:RUSTUP_TOOLCHAIN = '1.99.1-x86_64-pc-windows-msvc'
+```
 
 ## 2. 한 번에 검사하고 설치 파일 만들기
 
@@ -106,4 +113,4 @@ Linux 테스트는 서버 배포판·CPU를 확인하고 [Linux 설치](../linux
 
 실패하면 다음을 기록한다: 실패한 검증 행, Windows 버전, `build-info.json`, `build.log`의 첫 오류, CLI 상태, 전송 ID와 오류 코드. 로그에 개인 경로·기기 ID가 포함될 수 있으므로 공유 전에 확인한다. 연결 오류에는 엔진 중복 실행보다 앱 설정의 서비스 재시작을 먼저 사용한다.
 
-업데이트·제거는 전송이 없는 때 수행한다. Windows 설치된 앱에서 제거하고 수신 파일·기존 설정의 보존 여부를 확인한다. 설치·제거·알림 등록·자동 실행·방화벽 동작은 **아직 Windows 실기 미검증**이며 이 검증표의 결과로 갱신한다.
+업데이트·제거는 전송이 없는 때 수행한다. Windows 설치된 앱에서 제거하고 수신 파일·기존 설정의 보존 여부를 확인한다. 현재 사용자 설치·재설치·실행·프로토콜과 알림 바로가기 등록, Private 프로필의 엔진·집 대역 한정 규칙을 통한 Mac 양방향 파일 송수신은 확인했다. 제거·실제 알림 표시와 클릭·로그인 시 자동 실행·Public 프로필 차단 동작은 **아직 Windows 실기 미검증**이며 이 검증표의 결과로 갱신한다.

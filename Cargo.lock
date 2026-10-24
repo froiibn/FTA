@@ -1529,8 +1529,10 @@ name = "fta-platform"
 version = "0.1.0"
 dependencies = [
  "dirs 6.0.0",
+ "dunce",
  "libc",
  "rustix",
+ "same-file",
  "security-framework",
  "tokio",
  "uuid",

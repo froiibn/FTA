@@ -394,7 +394,8 @@ pub fn set_autostart(executable: &Path, enabled: bool) -> io::Result<()> {
     use winreg::{RegKey, enums::HKEY_CURRENT_USER};
     let (key, _) = RegKey::predef(HKEY_CURRENT_USER).create_subkey(RUN_KEY)?;
     if enabled {
-        let executable = executable.canonicalize()?;
+        // Like notification shortcuts, Explorer's login launcher needs a shell-compatible target.
+        let executable = dunce::canonicalize(executable)?;
         let value = executable.to_str().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,

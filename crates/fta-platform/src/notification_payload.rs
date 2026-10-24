@@ -83,7 +83,32 @@ pub(crate) fn can_update_protocol(
 ) -> bool {
     match owner {
         Some(owner) => owner == app_id,
-        None => command == Some(expected_command),
+        None => {
+            let Some(command) = command else {
+                return false;
+            };
+            if command == expected_command {
+                return true;
+            }
+            #[cfg(windows)]
+            {
+                // NSIS and canonicalization may spell the same executable differently. File identity
+                // accepts those aliases without trusting case-folded paths on case-sensitive volumes.
+                fn executable(command: &str) -> Option<&str> {
+                    let path = command.strip_prefix('"')?.strip_suffix("\" \"%1\"")?;
+                    // Keep the fixed URI argument contract; extra arguments must never gain ownership.
+                    (!path.is_empty() && !path.contains('"')).then_some(path)
+                }
+                match (executable(command), executable(expected_command)) {
+                    (Some(actual), Some(expected)) => {
+                        same_file::is_same_file(actual, expected).unwrap_or(false)
+                    }
+                    _ => false,
+                }
+            }
+            #[cfg(not(windows))]
+            false
+        }
     }
 }
 

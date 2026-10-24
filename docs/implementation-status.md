@@ -33,7 +33,7 @@
 
 ## 수행한 검증
 
-최종 로컬 검사: `cargo test --workspace` 73개 통과. 자식 프로세스 전용 fixture 1개는 직접 실행 대상에서 제외되며 상위 lifecycle 테스트가 실제로 호출한다. `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`, TypeScript 프로덕션 빌드도 통과했다. 엔진·CLI·macOS 데스크톱 개발 실행 파일의 네이티브 빌드를 확인했다.
+초기 전체 로컬 검사: `cargo test --workspace` 73개 통과. 자식 프로세스 전용 fixture 1개는 직접 실행 대상에서 제외되며 상위 lifecycle 테스트가 실제로 호출한다. `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`, TypeScript 프로덕션 빌드도 통과했다. 엔진·CLI·macOS 데스크톱 개발 실행 파일의 네이티브 빌드를 확인했다. 이후 UI·플랫폼 변경의 검사는 아래 기록과 UI 검증 문서를 따른다.
 
 - `rust-skills` 기준으로 오류 전파, 비동기 잠금, 스트리밍·메모리, 신뢰 경계와 상태 전이를 검토했다.
 - macOS에서 공통 Rust·CLI·플랫폼 테스트, 실제 localhost TLS 기기 등록과 파일·텍스트·URL 송수신을 실행했다.
@@ -63,12 +63,32 @@
 - 현재 Mac 검증 환경은 macOS 26.6.2 arm64다. 다른 Mac의 OS·CPU, Linux 서버의 배포판·CPU는 아직 확인되지 않았다.
 - 실제 4대 간 12방향 전송, 실제 LAN의 multicast 발견, Linux systemd·SSH 종료·부팅 후 수신을 추가 검증해야 한다.
 - 재개 후 macOS 네이티브 화면 조회·새로고침·정상 종료와 IPC를 확인했다. 시작 직후 일시적인 IPC 연결 실패 뒤 복구되어도 오류 문구가 남는 문제를 수정했다. 알림 권한 승인·콜드 스타트 알림 클릭은 아직 검증하지 않았으며 브라우저 시각 검증과 구분한다.
-- 최소 macOS 배포 타깃 11.0은 API 기준이며 최소 OS 실기 통과를 뜻하지 않는다. Windows 설치 프로그램·macOS 서명·notarization과 다중 모니터 복원은 추가 검증이 필요하다.
+- 최소 macOS 배포 타깃 11.0은 API 기준이며 최소 OS 실기 통과를 뜻하지 않는다. Windows 제거·macOS Developer ID 배포 서명·notarization과 다중 모니터 복원은 추가 검증이 필요하다. 개인용 Mac DMG는 ad-hoc 서명과 번들 무결성을 확인했다.
 - 원격 CI는 실행하지 않았다. Rust 툴체인은 로컬 검증한 1.99.1로 고정한다.
 
 ## Windows 테스트용 준비
 
 Windows PC에서 직접 실행하는 x64 MSVC 빌드 스크립트와 현재 사용자용 NSIS 설정을 추가했다. 전체 검사 후 설치 파일·CLI·엔진·MCP·해시·빌드 정보를 수집한다. [Windows 절차](../packaging/windows/README.md)를 따른다. Mac에서 Windows 빌드를 실행한 것은 아니다. Windows 측 빌드·설치·기본 실행은 Windows 에이전트의 별도 검증 결과와 구분하며 실제 LAN 공동 시험은 아래 기록을 따른다.
+
+## Windows 네이티브 검증
+
+2026-10-25 Windows 11 Pro x64(빌드 26300)에서 Rust 1.99.1 MSVC, Node.js 24.14.1, Visual Studio Build Tools 2022와 Windows SDK로 검사했다. 기존 GNU Rust 기본 설정은 유지하고 빌드 프로세스의 `RUSTUP_TOOLCHAIN`만 MSVC로 지정했다.
+
+- headless 테스트 63개와 데스크톱 테스트 4개가 통과했다. 실제 localhost TLS 파일·텍스트·URL 송수신, 충돌·무결성·복구, DPAPI, 사용자 전용 named pipe, 알림 바로가기 등록·재등록을 포함한다.
+- `cargo fmt --all --check`, headless·데스크톱 Clippy(`--all-targets -- -D warnings`), `cargo check -p fta-desktop`, TypeScript/Vite 빌드가 통과했다.
+- 첫 네이티브 테스트에서 알림 바로가기 대상의 `\\?\` 경로를 Windows Shell이 거부하는 문제와 borrowed HSTRING을 PROPVARIANT가 해제하는 힙 손상을 확인해 수정했다. Shell에 전달하는 알림·자동 실행 경로를 안전하게 정규화하고, borrowed variant의 소유권 해제를 막았다. 기존 등록·재등록 테스트와 프로토콜 명령 경로 검증으로 재확인했다.
+- `packaging/windows/build.ps1`이 정상 종료했고 `FTA_0.1.0_x64-setup.exe`를 생성했다. 엔진·MCP를 동봉한 현재 사용자용 NSIS이며, CLI·엔진·MCP·해시·빌드 로그·환경 정보를 `output/windows-x64/20261024T184504Z/`에 수집했다. 배포용 CLI·엔진·MCP의 `--help` 실행도 확인했다. 설치 프로그램 생성과 설치 후 동작 검증은 구분한다.
+- 당시 Windows 수정 직후에는 macOS·Linux 검사를 다시 실행하지 않았다. macOS 최종 릴리즈 검사는 별도 기록을 따른다. 설치·실행과 Windows↔Mac 실제 LAN 파일 검증 결과는 아래에 기록한다. 나머지 기기 조합과 네이티브 알림 표시·클릭·로그인 시 자동 실행은 추가 검증이 필요하다.
+
+## Windows 설치와 실행 확인
+
+2026-10-25 위 Windows PC에서 NSIS 현재 사용자 설치가 종료 코드 0으로 완료됐다. `%LOCALAPPDATA%\FTA`에 데스크톱·엔진·MCP와 제거 프로그램이 설치되고 Windows 제거 목록에 FTA 0.1.0이 등록됐다.
+
+- 설치 앱의 실제 WebView 화면, 설정 화면의 기기 이름·수신 폴더, 동봉 엔진의 자동 시작을 확인했다. 배포 CLI의 `status --json`과 `config show --json`이 성공했다. 기본 수신 폴더는 Known Folder Downloads 아래 `FTA`이며, 재설치 후 기존 기기 ID와 설정이 유지됐다.
+- 창의 X 버튼으로 숨긴 뒤에도 같은 엔진의 IPC 응답이 유지됐다. 재실행하면 기존 창이 열리고 데스크톱·엔진은 각각 하나만 유지됐다. 앱의 종료 버튼으로 소유 엔진까지 종료되고 재시작되는 것을 확인했다.
+- 첫 설치 실행에서 NSIS가 등록한 프로토콜 실행 경로와 런타임의 경로 별칭이 달라 자기 등록을 다른 앱으로 오인하는 오류를 확인했다. 소유자 표식이 없는 기존 명령은 고정된 `"실행 파일" "%1"` 형식을 검사한 뒤 파일 ID로 같은 실행 파일인지 확인한다. 명시적 타 앱 소유자나 추가 인자가 있는 명령은 계속 거부한다.
+- 회귀 테스트를 추가한 수정본에서 headless 64개·데스크톱 4개 테스트, 포맷·Clippy·데스크톱 검사·TypeScript 빌드를 통과했다. 새 산출물은 `output/windows-x64/20261024T185852Z/`다. 수정본을 재설치한 뒤 시작 stderr가 비어 있고, FTA 프로토콜 소유자 표식과 AUMID 바로가기가 생성되는 것을 확인했다. 엔진·MCP 설치 파일 해시도 산출물과 일치했다.
+- 설치·실행 확인 시점에는 앱과 엔진을 loopback 수신·기기 미등록 상태로 남겼다. 이후 LAN 설정·Mac 등록과 전송 검증은 다음 절차에서 수행했다. 알림 표시·클릭, 로그인 시 자동 실행, Explorer 드롭, 제거는 설치·실행 확인에 포함하지 않았다.
 
 ## 검증 명령
 
