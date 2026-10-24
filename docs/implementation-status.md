@@ -59,7 +59,7 @@
 
 ## 남은 실기 검증과 배포 한계
 
-- Windows 11 / AMD Ryzen 5 5600X(x86-64)는 사용자에게 확인했다. Windows에서 설치·방화벽·네이티브 알림·앱 종료 후 알림 클릭·드롭·자동 실행은 아직 실행하지 않았다.
+- Windows 11 / AMD Ryzen 5 5600X(x86-64)는 사용자에게 확인했다. Windows 에이전트가 설치·재설치·기본 실행을 확인했고, 이후 공동 LAN 시험에서 방화벽 설정과 양방향 파일 전송을 확인했다. 네이티브 알림 표시·앱 종료 후 알림 클릭·드롭·자동 실행은 아직 미검증이다.
 - 현재 Mac 검증 환경은 macOS 26.6.2 arm64다. 다른 Mac의 OS·CPU, Linux 서버의 배포판·CPU는 아직 확인되지 않았다.
 - 실제 4대 간 12방향 전송, 실제 LAN의 multicast 발견, Linux systemd·SSH 종료·부팅 후 수신을 추가 검증해야 한다.
 - 재개 후 macOS 네이티브 화면 조회·새로고침·정상 종료와 IPC를 확인했다. 시작 직후 일시적인 IPC 연결 실패 뒤 복구되어도 오류 문구가 남는 문제를 수정했다. 알림 권한 승인·콜드 스타트 알림 클릭은 아직 검증하지 않았으며 브라우저 시각 검증과 구분한다.
@@ -68,7 +68,7 @@
 
 ## Windows 테스트용 준비
 
-Windows PC에서 직접 실행하는 x64 MSVC 빌드 스크립트와 현재 사용자용 NSIS 설정을 추가했다. 전체 검사 후 설치 파일·CLI·엔진·MCP·해시·빌드 정보를 수집한다. [Windows 절차](../packaging/windows/README.md)를 따른다. 현재 Mac에서는 Windows 빌드 스크립트 실행·설치 파일 생성·설치 검증을 수행하지 않았다.
+Windows PC에서 직접 실행하는 x64 MSVC 빌드 스크립트와 현재 사용자용 NSIS 설정을 추가했다. 전체 검사 후 설치 파일·CLI·엔진·MCP·해시·빌드 정보를 수집한다. [Windows 절차](../packaging/windows/README.md)를 따른다. Mac에서 Windows 빌드를 실행한 것은 아니다. Windows 측 빌드·설치·기본 실행은 Windows 에이전트의 별도 검증 결과와 구분하며 실제 LAN 공동 시험은 아래 기록을 따른다.
 
 ## 검증 명령
 
@@ -86,3 +86,7 @@ npm --prefix apps/desktop run build
 ```
 
 `cargo test` 기본 멤버는 headless 구성으로 Tauri·WebView 빌드를 요구하지 않는다. 데스크톱 검사는 Windows·macOS에서 별도로 실행한다. Linux 설치·명령은 [서버 문서](../packaging/linux/README.md)를 따른다.
+
+## 실제 Mac ↔ Windows LAN 시험 (2026-10-25)
+
+실제 기기의 양방향 파일 전송과 해시 대조, 양쪽 수신의 기존 파일 보존을 확인했다. 시험 환경·전송 ID·검증 범위는 [실기 결과](lan-test-2026-10-25.md)를 따른다. 이는 전체 4대 12방향·GUI 드롭·OS 알림 검증을 대체하지 않는다.

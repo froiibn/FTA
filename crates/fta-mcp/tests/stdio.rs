@@ -237,6 +237,9 @@ mod private_ipc {
                 Err(error) => panic!("MCP did not call private IPC: {error}"),
             }
         };
+        // macOS inherits the listener's O_NONBLOCK; framed IPC reads need blocking accepted streams.
+        // Keep the listener nonblocking for deadlines and rejection checks without racing client writes.
+        stream.set_nonblocking(false).unwrap();
         stream.set_read_timeout(Some(PROCESS_TIMEOUT)).unwrap();
         let mut header = [0; 4];
         stream.read_exact(&mut header).unwrap();

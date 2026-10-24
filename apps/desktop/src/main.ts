@@ -10,6 +10,10 @@ const HISTORY_LIMIT = 100;
 const LAST_DEVICE_KEY = "fta:last-device";
 const PINNED_KEY = "fta:pinned";
 type JsonObject = Record<string, unknown>;
+// Each native window loads one view; only main owns delivery acknowledgements and engine startup.
+const requestedView = new URLSearchParams(window.location.search).get("view");
+const view = requestedView === "inbox" || requestedView === "settings" ? requestedView : "main";
+const isMain = view === "main";
 interface Device {
   device_id: string;
   display_name: string;
@@ -44,36 +48,53 @@ interface ReceiptEvent {
   record: TransferRecord;
 }
 
-// This HTML is static. All device names, received messages and errors use textContent below.
+// Native views share trusted static templates; received content remains textContent and unused view controls are removed.
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("앱 화면을 찾을 수 없습니다");
 root.innerHTML = `
   <main class="shell">
-    <header class="app-header">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4 4-4-4 4-4"/></svg></span><h1>FTA</h1><span class="app-title">파일 전송</span></div>
-      <button id="pin" class="quiet icon-label" aria-pressed="false" title="항상 위에 표시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 6 0-1 6 4 4H6l4-4-1-6Zm3 10v8"/></svg>고정</button>
+    <header class="app-header" data-drag-handle>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4 4-4-4 4-4"/></svg></span><h1>FTA</h1></div>
+      <div class="window-actions"><button data-window="inbox" class="quiet icon-label" aria-label="기록" title="기록"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6M12 7v5l3 2"/></svg></button><button data-window="settings" class="quiet icon-label" aria-label="설정" title="설정"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 1-1h4l1 3 2 1 3-1 2 4-2 2v2l2 2-2 4-3-1-2 1-1 3h-4l-1-3-2-1-3 1-2-4 2-2v-2L2 9l2-4 3 1 2-1Z"/><circle cx="12" cy="12" r="3"/></svg></button><button id="fold-window" class="quiet icon-label" aria-label="접기" title="접기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button><button id="pin" class="quiet icon-label" aria-pressed="false" title="항상 위에 표시" aria-label="항상 위에 표시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 6 0-1 6 4 4H6l4-4-1-6Zm3 10v8"/></svg></button><button id="close-app-window" class="quiet icon-label" aria-label="창 닫기" title="창 닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     </header>
-    <section class="connection" aria-label="연결 상태"><span id="status-dot" class="status-dot"></span><div class="connection-info"><strong id="device-name">연결 확인 중</strong><p id="connection-description">전송 서비스를 확인합니다.</p></div><button id="refresh" class="quiet icon-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg>새로고침</button></section>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
-    <nav class="tabs" aria-label="앱 메뉴"><button data-tab="send" aria-current="page">보내기</button><button data-tab="inbox">전송 기록</button><button data-tab="settings">설정</button></nav>
     <section id="send-panel" class="panel send-board">
-      <aside class="target-rail"><div class="section-heading"><h2>받는 기기</h2><button id="add-device" class="quiet small">기기 등록</button></div><div id="devices" class="devices" role="group" aria-label="전송 대상"></div></aside>
-      <div class="send-workspace"><div class="destination-line"><span>전송 대상</span><strong id="selected-target">기기를 선택하세요</strong></div>
-        <section class="file-section" aria-labelledby="file-heading"><div class="section-heading"><h2 id="file-heading">파일</h2><span class="section-caption">문서, 사진, 영상</span></div><div id="drop-zone" class="drop-zone"><span class="drop-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6M12 17v-5m-3 3 3-3 3 3"/></svg></span><div class="drop-copy"><h3>파일을 끌어 놓으세요</h3><p>선택한 기기로 바로 전송합니다.</p></div><button id="choose-files" class="secondary">파일 선택</button></div><div id="file-selection" class="file-selection" hidden><ul id="file-list"></ul><div class="selection-actions"><button id="clear-files" class="quiet">선택 해제</button><button id="send-files" class="primary">파일 보내기</button></div></div></section>
-        <section class="composer" aria-labelledby="message-heading"><div class="section-heading"><h2 id="message-heading">텍스트 · 링크</h2><span id="message-count" class="section-caption">0 B</span></div><label class="sr-only" for="message">전송할 텍스트 또는 URL</label><textarea id="message" rows="5" placeholder="텍스트나 URL을 입력하세요"></textarea><div class="message-actions"><p>수신 승인 없이 전달됩니다.</p><button id="send-message" class="primary" disabled>보내기</button></div></section>
+      <aside class="target-rail"><div class="section-heading"><h2>기기</h2><div class="device-tools"><button id="refresh" class="quiet icon-label" aria-label="새로고침" title="새로고침"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button><button id="add-device" class="quiet small" aria-label="기기 등록" title="기기 등록">+</button></div></div><div id="devices" class="devices" role="group" aria-label="전송 대상"></div></aside>
+      <div class="send-workspace">
+        <section class="file-section" aria-labelledby="file-heading"><h2 id="file-heading" class="sr-only">파일</h2><button id="choose-files" class="quiet small" aria-label="파일 선택">파일 선택</button><div id="file-selection" class="file-selection" hidden><ul id="file-list"></ul><div class="selection-actions"><button id="clear-files" class="quiet">선택 해제</button><button id="send-files" class="primary">파일 보내기</button></div></div></section>
+        <section class="composer" aria-labelledby="message-heading"><h2 id="message-heading" class="sr-only">텍스트 · 링크</h2><label class="sr-only" for="message">전송할 텍스트 또는 URL</label><div class="message-input"><textarea id="message" rows="2" placeholder="텍스트 또는 URL"></textarea><button id="send-message" class="primary send-arrow" aria-label="보내기" title="보내기" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div></section>
         <div class="transfer-progress"><div id="transfer-status" class="transfer-status" role="status" hidden></div><progress id="transfer-progress-bar" value="0" max="100" aria-label="파일 전송 진행률" hidden></progress><button id="cancel-transfer" class="quiet" hidden>전송 취소</button></div>
       </div>
     </section>
-    <section id="inbox-panel" class="panel" hidden><div class="section-heading"><h2>최근 전송</h2><button id="reload-inbox" class="quiet">새로고침</button></div><div id="history"></div></section>
-    <section id="settings-panel" class="panel" hidden>
+    <section id="inbox-panel" class="utility-panel" aria-labelledby="inbox-title"><div class="utility-header" data-drag-handle><h2 id="inbox-title">기록</h2><button data-close-window="inbox" class="quiet" aria-label="기록 닫기">×</button></div><button id="reload-inbox" class="quiet small">새로고침</button><div id="history"></div></section>
+    <section id="settings-panel" class="utility-panel" aria-labelledby="settings-title"><div class="utility-header" data-drag-handle><h2 id="settings-title">설정</h2><button data-close-window="settings" class="quiet" aria-label="설정 닫기">×</button></div>
       <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label><p class="help">네트워크 변경은 저장 후 서비스를 재시작하면 적용됩니다.</p><div class="form-actions"><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button class="primary" type="submit">설정 저장</button></div></form>
       <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong>로그인 시 실행</strong><p>로그인하면 자동 수신을 시작합니다.</p></div><button id="autostart" class="secondary">확인 중</button></div><div class="settings-row"><div><strong>수신 알림</strong><p id="notification-status">알림 권한을 확인합니다.</p></div><button id="notification-permission" class="secondary">알림 허용</button></div></section>
       <section class="settings-section"><div class="section-heading"><h2>기기 등록</h2><button id="pair-open" class="secondary small">등록 모드 열기</button></div><p class="help">양쪽 기기의 비교값이 같은지 확인한 뒤 등록하세요.</p><label for="pair-target">상대 기기 또는 LAN 주소</label><div class="inline-field"><input id="pair-target" placeholder="기기 ID 또는 주소" /><button id="pair-connect" class="secondary">연결</button></div><section id="pair-details" class="pair-details" aria-live="polite" hidden><div class="section-heading"><strong id="pair-state">연결 대기</strong><span id="pair-peer"></span></div><p id="pair-address"></p><p id="pair-comparison" class="comparison-value"></p><p id="pair-expiry" class="help"></p></section><input id="pair-session" type="hidden" /><div class="form-actions"><button id="pair-cancel" class="quiet">취소</button><button id="pair-confirm" class="primary">비교값 일치 확인</button></div><div id="paired-devices"></div></section>
       <div class="quit-row"><p class="help">창을 닫아도 수신은 계속됩니다.</p><button id="quit" class="danger">앱 종료</button></div>
     </section>
   </main>
+  <button id="expand-window" class="expand-widget" aria-label="펼치기" title="펼치기" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V5h4m6 0h4v4m0 6v4h-4M9 19H5v-4"/></svg></button>
   <dialog id="detail-dialog"><div class="detail-header"><h2 id="detail-title">수신 내용</h2><button id="close-detail" class="quiet">닫기</button></div><p id="detail-meta" class="help"></p><pre id="detail-body" class="detail-body"></pre><div id="detail-items"></div><div class="detail-actions"><button id="copy-detail" class="secondary">복사</button><button id="open-detail" class="primary" hidden>링크 열기</button><button id="reveal-detail" class="secondary" hidden>저장 위치 열기</button></div></dialog>
 `;
+// Detach unused view content rather than leaving another window's controls hidden and active.
+const utilityPanel = root.querySelector<HTMLElement>(`#${view}-panel`);
+if (isMain) {
+  root.querySelector("#inbox-panel")?.remove();
+  root.querySelector("#settings-panel")?.remove();
+} else if (utilityPanel) {
+  const notice = root.querySelector<HTMLElement>("#notice");
+  const detail = view === "inbox" ? root.querySelector<HTMLDialogElement>("#detail-dialog") : null;
+  root.replaceChildren(utilityPanel);
+  utilityPanel.classList.add("utility-window");
+  if (notice) utilityPanel.querySelector(".utility-header")?.after(notice);
+  if (detail) root.append(detail);
+}
+// Shared handlers bind only to controls belonging to this native view.
+function on(id: string, type: string, handler: EventListener): void {
+  document.getElementById(id)?.addEventListener(type, handler);
+}
+
 // Fail fast on static template mistakes instead of letting handlers silently address missing elements.
 function element<T extends HTMLElement = HTMLElement>(id: string): T {
   const result = document.getElementById(id);
@@ -106,6 +127,14 @@ function showNotice(message: string, error = false, source = "action"): void {
   notice.textContent = message;
   notice.classList.toggle("error", error);
   notice.hidden = false;
+  positionNotice();
+}
+
+// Keep feedback in the current native view, or above an open received-record detail sheet.
+function positionNotice(): void {
+  const dialog = [...document.querySelectorAll<HTMLDialogElement>("dialog[open]")].at(-1);
+  const anchor = dialog?.querySelector(".detail-header") ?? document.querySelector(".utility-header, .app-header");
+  anchor?.after(element("notice"));
 }
 
 // Translate stable engine codes into corrective actions while preserving unexpected native diagnostics.
@@ -148,24 +177,21 @@ function selectedDevice(): Device | undefined {
   return devices.find((device) => device.device_id === selectedId && device.online && device.paired);
 }
 
-// Keep the destination explicit in both the drop surface and send action to avoid wrong-device sends.
+// Keep the destination in accessible action names without duplicating the selected device row.
 function updateActions(): void {
+  if (!isMain) return;
   const target = selectedDevice();
-  element("selected-target").textContent = target ? target.display_name : "기기를 선택하세요";
+  element("send-message").setAttribute("aria-label", target ? `${target.display_name}에 보내기` : "보내기");
   const bytes = new TextEncoder().encode(element<HTMLTextAreaElement>("message").value).length;
-  element("message-count").textContent = `${bytes.toLocaleString()} B`;
   element<HTMLButtonElement>("send-message").disabled = !target || !connected || sending || bytes === 0 || bytes > MAX_MESSAGE_BYTES;
   element<HTMLButtonElement>("send-files").disabled = !target || !connected || sending || selectedPaths.length === 0;
   element<HTMLButtonElement>("choose-files").disabled = !desktop || sending;
-  element("drop-zone").classList.toggle("busy", sending);
 }
 
 // Only application-owned SVG paths enter the DOM; received names remain text nodes.
-function icon(name: "computer" | "server" | "check" | "file" | "text" | "link" | "delete"): SVGSVGElement {
+function icon(name: "computer" | "file" | "text" | "link" | "delete"): SVGSVGElement {
   const paths = {
     computer: ["M3 4h18v12H3z", "M8 21h8m-4-5v5"],
-    server: ["M4 3h16v7H4zM4 14h16v7H4z", "M7 6.5h.01M7 17.5h.01M11 6.5h6m-6 11h6"],
-    check: ["m5 12 4 4L19 6"],
     file: ["M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6"],
     text: ["M4 5h16M4 10h16M4 15h10M4 20h7"],
     link: ["M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"],
@@ -191,42 +217,40 @@ function stateLabel(state: string): string {
   return labels[state] ?? state;
 }
 
-// Device rows put identity, platform and online status in fixed columns instead of decorative cards.
+// Horizontal targets show only a computer and its name; status stays available without extra visible labels.
 function renderDevices(): void {
+  if (!isMain) return;
   const list = element("devices");
   list.replaceChildren();
   if (!devices.length) {
     const empty = document.createElement("div");
     empty.className = "empty-device";
     const title = document.createElement("strong");
-    title.textContent = "등록된 기기가 없습니다";
-    const help = document.createElement("p");
-    help.textContent = "기기 등록에서 다른 컴퓨터를 연결하세요.";
-    empty.append(title, help);
+    title.textContent = "기기 없음";
+    empty.append(title);
     list.append(empty);
   }
   for (const device of devices) {
     const button = document.createElement("button");
-    button.className = "device-row";
+    button.className = "device-tile";
+    button.dataset.deviceId = device.device_id;
     button.disabled = !device.online || !device.paired || sending || !networkReady;
     button.setAttribute("aria-pressed", String(device.device_id === selectedId));
+    const status = device.paired ? (device.online ? "온라인" : "오프라인") : "등록 필요";
+    button.title = `${device.display_name} · ${status}`;
+    button.setAttribute("aria-label", `${device.display_name}, ${status}`);
     const deviceIcon = document.createElement("span");
     deviceIcon.className = "device-icon";
-    deviceIcon.append(icon(device.os.toLowerCase() === "linux" ? "server" : "computer"));
-    const copy = document.createElement("span");
-    copy.className = "device-copy";
-    const name = document.createElement("strong");
+    deviceIcon.append(icon("computer"));
+    const dot = document.createElement("span");
+    dot.className = "device-status";
+    dot.dataset.state = !device.paired ? "unpaired" : device.online && networkReady ? "online" : "offline";
+    dot.setAttribute("aria-hidden", "true");
+    deviceIcon.append(dot);
+    const name = document.createElement("span");
+    name.className = "device-name";
     name.textContent = device.display_name;
-    const platform = document.createElement("small");
-    platform.textContent = device.os === "macos" ? "macOS" : device.os === "windows" ? "Windows" : device.os === "linux" ? "Linux" : device.os;
-    copy.append(name, platform);
-    const state = document.createElement("span");
-    state.className = `device-state${device.online && device.paired ? " online" : ""}`;
-    state.textContent = device.paired ? (device.online ? "온라인" : "오프라인") : "등록 필요";
-    const selected = document.createElement("span");
-    selected.className = "device-selected";
-    if (device.device_id === selectedId) selected.append(icon("check"));
-    button.append(deviceIcon, copy, state, selected);
+    button.append(deviceIcon, name);
     button.addEventListener("click", () => {
       selectedId = device.device_id;
       localStorage.setItem(LAST_DEVICE_KEY, selectedId);
@@ -236,10 +260,29 @@ function renderDevices(): void {
     list.append(button);
   }
   updateActions();
+  highlightDropTarget();
+}
+
+interface DropPoint { x: number; y: number }
+let dragPoint: DropPoint | undefined;
+
+// Native coordinates identify the tile under the cursor even when its icon/name is the hit element.
+function dropTarget(point: DropPoint): Device | undefined {
+  if (!connected || !networkReady || sending || document.querySelector("dialog[open]") !== null) return undefined;
+  const tile = document.elementFromPoint(point.x, point.y)?.closest<HTMLButtonElement>(".device-tile");
+  if (!tile || tile.disabled) return undefined;
+  return devices.find((device) => device.device_id === tile.dataset.deviceId && device.online && device.paired);
+}
+function highlightDropTarget(): void {
+  const target = dragPoint ? dropTarget(dragPoint) : undefined;
+  for (const tile of document.querySelectorAll<HTMLButtonElement>(".device-tile")) {
+    tile.classList.toggle("drop-target", tile.dataset.deviceId === target?.device_id);
+  }
 }
 
 // File selections exist only in this UI session; they are not an offline delivery queue.
 function renderFiles(): void {
+  if (!isMain) return;
   element("file-selection").hidden = selectedPaths.length === 0;
   element("file-list").replaceChildren(...selectedPaths.map((path) => {
     const item = document.createElement("li");
@@ -252,6 +295,7 @@ function renderFiles(): void {
 
 // History rows distinguish file identity, peer, timestamp and outcome without rendering remote markup.
 function renderHistory(): void {
+  if (view !== "inbox") return;
   const list = element("history");
   list.replaceChildren();
   if (!records.length) {
@@ -315,6 +359,7 @@ async function showDetail(id: string): Promise<void> {
   element("reveal-detail").hidden = record.kind !== "files" || !record.items.some((item) => item.path);
   const dialog = element<HTMLDialogElement>("detail-dialog");
   if (!dialog.open) dialog.showModal();
+  positionNotice();
 }
 
 // Refreshes are serialized so a slow response cannot overwrite a newer device selection state.
@@ -328,14 +373,10 @@ async function refresh(): Promise<void> {
     // Startup can outlast the initial IPC probe; remove its stale error only after a real successful response.
     if (element("notice").dataset.source === "connection") element("notice").hidden = true;
     networkReady = status.network_available !== false && status.network_reconfirmation_required !== true;
-    element("device-name").textContent = String(status.display_name ?? "이 컴퓨터");
-    element("connection-description").textContent = networkReady
-      ? `온라인 기기 ${devices.filter((device) => device.online && device.paired).length}대`
-      : "네트워크가 변경되었습니다. 설정 확인 후 서비스를 재시작하세요.";
-    element("status-dot").classList.toggle("online", networkReady);
+    if (!networkReady) showNotice("네트워크가 변경되었습니다. 설정 확인 후 서비스를 재시작하세요.", true, "connection");
     if (!selectedDevice()) selectedId = "";
     renderDevices();
-    if (connected) void act(processPendingActivations);
+    if (connected && isMain) void act(processPendingActivations);
     if (activePairSession) {
       try {
         const pairState = await rpc<JsonObject>("pairing.status", { session_id: activePairSession });
@@ -353,9 +394,6 @@ async function refresh(): Promise<void> {
     connected = false;
     networkReady = false;
     devices = [];
-    element("device-name").textContent = "전송 엔진 연결 끊김";
-    element("connection-description").textContent = "설정과 엔진 실행 상태를 확인해주세요.";
-    element("status-dot").classList.remove("online");
     renderDevices();
     showNotice(userError(error), true, "connection");
   } finally {
@@ -370,15 +408,11 @@ async function refreshHistory(): Promise<void> {
   renderHistory();
 }
 
-// Navigation is shared between the visible tabs and the OS tray/menu-bar actions.
-function navigate(tab: string): void {
-  for (const name of ["send", "inbox", "settings"]) {
-    element(`${name}-panel`).hidden = name !== tab;
-    const button = document.querySelector<HTMLButtonElement>(`[data-tab="${name}"]`);
-    if (name === tab) button?.setAttribute("aria-current", "page"); else button?.removeAttribute("aria-current");
-  }
-  if (desktop && tab === "inbox") void act(refreshHistory);
-  if (desktop && tab === "settings") void act(loadSettings);
+// Auxiliary content is hosted by native windows; opening it never resizes or replaces the widget.
+function navigate(destination: string): void {
+  if (destination !== "inbox" && destination !== "settings") return;
+  if (!desktop) { showNotice("별도 창은 데스크톱 앱에서 열 수 있습니다."); return; }
+  void act(async () => { await invoke("open_utility_window", { kind: destination }); });
 }
 
 // Sending remains pending until the engine reports final storage; failure preserves the selection.
@@ -597,49 +631,122 @@ async function quit(): Promise<void> {
 }
 
 // Bind each handler once; rerenders replace only dynamic lists and preserve drafts/focus.
-for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-tab]")) tab.addEventListener("click", () => navigate(tab.dataset.tab ?? "send"));
-element("add-device").addEventListener("click", () => { navigate("settings"); element("pair-open").focus(); });
-element("refresh").addEventListener("click", () => { void act(refresh); });
-element("reload-inbox").addEventListener("click", () => { void act(refreshHistory); });
-element("message").addEventListener("input", updateActions);
-element("choose-files").addEventListener("click", () => { void act(async () => { selectedPaths = await invoke<string[]>("choose_files"); renderFiles(); }); });
-element("clear-files").addEventListener("click", () => { selectedPaths = []; renderFiles(); });
-element("send-files").addEventListener("click", () => { void act(sendFiles); });
-element("send-message").addEventListener("click", () => { void act(sendMessage); });
-element("cancel-transfer").addEventListener("click", () => { void act(async () => {
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-window]")) button.addEventListener("click", () => navigate(button.dataset.window ?? "send"));
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-close-window]")) button.addEventListener("click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }); });
+for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) dialog.addEventListener("close", positionNotice);
+on("add-device", "click", () => navigate("settings"));
+on("refresh", "click", () => { void act(refresh); });
+on("reload-inbox", "click", () => { void act(refreshHistory); });
+on("message", "input", updateActions);
+on("choose-files", "click", () => { void act(async () => { selectedPaths = await invoke<string[]>("choose_files"); renderFiles(); }); });
+on("clear-files", "click", () => { selectedPaths = []; renderFiles(); });
+on("send-files", "click", () => { void act(sendFiles); });
+on("send-message", "click", () => { void act(sendMessage); });
+on("cancel-transfer", "click", () => { void act(async () => {
   if (!inFlightId) return;
   await rpc("transfers.cancel", { transfer_id: inFlightId });
   element<HTMLButtonElement>("cancel-transfer").disabled = true;
   showNotice("취소를 요청했어요. 이미 저장된 항목은 보존됩니다.");
 }); });
-element("close-detail").addEventListener("click", () => element<HTMLDialogElement>("detail-dialog").close());
-element("copy-detail").addEventListener("click", () => { void act(async () => { await invoke("copy_text", { value: currentDetail?.body ?? "" }); showNotice("복사했어요."); }); });
-element("open-detail").addEventListener("click", () => { void act(async () => { if (currentDetail?.body) await invoke("open_link", { value: currentDetail.body }); }); });
-element("reveal-detail").addEventListener("click", () => { void act(async () => { if (currentDetail) await invoke("reveal_transfer", { transferId: currentDetail.transfer_id }); }); });
-element("quit").addEventListener("click", () => { void act(quit); });
-element("restart-engine").addEventListener("click", () => { void act(async () => {
+on("close-detail", "click", () => element<HTMLDialogElement>("detail-dialog").close());
+on("copy-detail", "click", () => { void act(async () => { await invoke("copy_text", { value: currentDetail?.body ?? "" }); showNotice("복사했어요."); }); });
+on("open-detail", "click", () => { void act(async () => { if (currentDetail?.body) await invoke("open_link", { value: currentDetail.body }); }); });
+on("reveal-detail", "click", () => { void act(async () => { if (currentDetail) await invoke("reveal_transfer", { transferId: currentDetail.transfer_id }); }); });
+on("quit", "click", () => { void act(quit); });
+on("restart-engine", "click", () => { void act(async () => {
   if (sending) throw new Error("현재 전송이 끝난 뒤 엔진을 재시작해주세요.");
   await invoke("restart_engine");
   await refresh();
   showNotice("엔진을 재시작했어요.");
 }); });
-element("pin").addEventListener("click", () => { void act(async () => {
+// Keep the DOM and draft alive while the native window changes size; only confirmed native state hides the surface.
+function applyFolded(folded: boolean): void {
+  if (!isMain) return;
+  if (folded) element<HTMLDialogElement>("detail-dialog").close();
+  document.body.classList.toggle("folded", folded);
+  element("expand-window").hidden = !folded;
+  dragPoint = undefined;
+  highlightDropTarget();
+}
+async function setFolded(folded: boolean): Promise<void> {
+  if (desktop) applyFolded(await invoke<boolean>("set_folded", { folded }));
+}
+on("fold-window", "click", () => { void act(() => setFolded(true)); });
+on("close-app-window", "click", () => { void act(async () => { if (desktop) await invoke("close_app_window"); }); });
+
+// Native dragging starts only on non-interactive titlebar space, so window actions remain ordinary buttons.
+for (const handle of document.querySelectorAll<HTMLElement>("[data-drag-handle]")) {
+  handle.addEventListener("pointerdown", (event) => {
+    if (!desktop || event.button !== 0 || (event.target as HTMLElement).closest("button, input, textarea, a")) return;
+    event.preventDefault();
+    void act(async () => { await invoke("start_window_drag"); });
+  });
+}
+
+// The folded button is the only visible surface; distinguish a deliberate move from a click to expand.
+const WIDGET_DRAG_THRESHOLD_PX = 4;
+let widgetPointer: { id: number; x: number; y: number } | undefined;
+let widgetDragged = false;
+on("expand-window", "pointerdown", (raw) => {
+  const event = raw as PointerEvent;
+  if (event.button !== 0) return;
+  widgetDragged = false;
+  widgetPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+});
+on("expand-window", "pointermove", (raw) => {
+  const event = raw as PointerEvent;
+  if (!desktop || !widgetPointer || widgetDragged || !event.buttons) return;
+  if (Math.hypot(event.clientX - widgetPointer.x, event.clientY - widgetPointer.y) < WIDGET_DRAG_THRESHOLD_PX) return;
+  widgetDragged = true;
+  widgetPointer = undefined;
+  const button = event.currentTarget as HTMLElement;
+  if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId);
+  void act(async () => { await invoke("start_window_drag"); });
+});
+on("expand-window", "pointerup", (raw) => {
+  const event = raw as PointerEvent;
+  // Some native move paths coalesce pointermove; the release must still reject a moved gesture.
+  if (widgetPointer && Math.hypot(event.clientX - widgetPointer.x, event.clientY - widgetPointer.y) >= WIDGET_DRAG_THRESHOLD_PX) widgetDragged = true;
+  widgetPointer = undefined;
+});
+on("expand-window", "pointercancel", () => { widgetPointer = undefined; });
+on("expand-window", "click", (event) => {
+  // Native dragging can synthesize detail=0 clicks too; click count does not prove keyboard activation.
+  if (widgetDragged) { event.preventDefault(); return; }
+  void act(() => setFolded(false));
+});
+on("expand-window", "keydown", (raw) => {
+  const event = raw as KeyboardEvent;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  if (event.repeat || event.isComposing) return;
+  widgetDragged = false;
+  widgetPointer = undefined;
+  void act(() => setFolded(false));
+});
+on("expand-window", "keyup", (raw) => {
+  // Space releases must not generate another implicit button click after explicit keyboard expansion.
+  const event = raw as KeyboardEvent;
+  if (event.key === " ") event.preventDefault();
+});
+on("pin", "click", () => { void act(async () => {
   const pinned = element("pin").getAttribute("aria-pressed") !== "true";
   await invoke("set_pinned", { pinned });
   element("pin").setAttribute("aria-pressed", String(pinned));
   localStorage.setItem(PINNED_KEY, String(pinned));
 }); });
-element("autostart").addEventListener("click", () => { void act(async () => {
+on("autostart", "click", () => { void act(async () => {
   await invoke("set_autostart", { enabled: !autostartEnabled });
   autostartEnabled = !autostartEnabled;
   element("autostart").textContent = autostartEnabled ? "켜짐 · 끄기" : "꺼짐 · 켜기";
 }); });
-element("notification-permission").addEventListener("click", () => { void act(enableNotifications); });
-element("pair-open").addEventListener("click", () => { void act(() => pair("pairing.open", {})); });
-element("pair-connect").addEventListener("click", () => { void act(() => pair("pairing.connect", { target: element<HTMLInputElement>("pair-target").value.trim() })); });
-element("pair-confirm").addEventListener("click", () => { void act(() => pair("pairing.confirm", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
-element("pair-cancel").addEventListener("click", () => { void act(() => pair("pairing.cancel", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
-element("settings-form").addEventListener("submit", (event) => {
+on("notification-permission", "click", () => { void act(enableNotifications); });
+on("pair-open", "click", () => { void act(() => pair("pairing.open", {})); });
+on("pair-connect", "click", () => { void act(() => pair("pairing.connect", { target: element<HTMLInputElement>("pair-target").value.trim() })); });
+on("pair-confirm", "click", () => { void act(() => pair("pairing.confirm", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
+on("pair-cancel", "click", () => { void act(() => pair("pairing.cancel", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
+on("settings-form", "submit", (event) => {
   event.preventDefault();
   void act(async () => {
     const values: JsonObject = {
@@ -655,27 +762,75 @@ element("settings-form").addEventListener("submit", (event) => {
   });
 });
 
+// Settings-only OS controls are initialized in their own window without starting an engine or receipt loop.
+async function initializeSettingsControls(): Promise<void> {
+  try {
+    autostartEnabled = await invoke<boolean>("autostart_status");
+    element("autostart").textContent = autostartEnabled ? "켜짐 · 끄기" : "꺼짐 · 켜기";
+  } catch (error) {
+    element("autostart").textContent = "상태 확인 불가";
+    element<HTMLButtonElement>("autostart").disabled = true;
+    showNotice(userError(error), true);
+  }
+  await act(async () => {
+    renderNotificationPermission(await invoke<string>("notification_permission", { request: false }));
+  });
+}
+
+let settingsLoaded = false;
+// Retry initial IPC readiness without replacing a settings draft on each subsequent status refresh.
+async function refreshUtility(): Promise<void> {
+  await refresh();
+  if (!connected) return;
+  if (view === "inbox") await refreshHistory();
+  else if (!settingsLoaded) { await loadSettings(); settingsLoaded = true; }
+}
+
 // In a browser there is no native bridge: controls stay disabled and no fake devices are inserted.
 async function initialize(): Promise<void> {
   renderDevices();
   renderHistory();
   if (!desktop) {
-    element("device-name").textContent = "데스크톱 앱에서 사용해주세요";
-    element("connection-description").textContent = "브라우저에서는 화면만 확인할 수 있어요. 전송 기능은 실행되지 않습니다.";
-    showNotice("FTA 데스크톱 앱을 실행하면 내 기기를 연결하고 파일을 보낼 수 있어요.");
-    for (const button of document.querySelectorAll<HTMLButtonElement>("#settings-panel button, #pin")) button.disabled = true;
+    showNotice("미리보기 · 전송 불가");
+    for (const button of document.querySelectorAll<HTMLButtonElement>("#settings-panel button:not([data-close-window]), #pin, #fold-window, #expand-window, #close-app-window")) button.disabled = true;
     return;
   }
+  if (!isMain) {
+    window.setInterval(() => { void act(refreshUtility); }, REFRESH_INTERVAL_MS);
+    await act(refreshUtility);
+    if (view === "settings") await act(initializeSettingsControls);
+    return;
+  }
+  await listen<boolean>("fta:fold-state", (event) => applyFolded(event.payload));
+  applyFolded(await invoke<boolean>("fold_state"));
   await listen<string>("fta:navigate", (event) => navigate(event.payload));
   await listen("fta:quit-requested", () => { void act(quit); });
   await listen("fta:panel-hidden", () => { selectedPaths = []; renderFiles(); });
-  await listen<string>("fta:drop-error", (event) => showNotice(event.payload, true));
-  await listen<string[]>("fta:files-dropped", (event) => {
+  await listen<string>("fta:drop-error", (event) => {
+    // Rejected paths must clear hover feedback just like a completed or cancelled native drop.
+    dragPoint = undefined;
+    highlightDropTarget();
+    showNotice(event.payload, true);
+  });
+  await listen<DropPoint>("fta:drag-position", (event) => {
+    dragPoint = event.payload;
+    highlightDropTarget();
+  });
+  await listen("fta:drag-left", () => { dragPoint = undefined; highlightDropTarget(); });
+  await listen<{ paths: string[]; position: DropPoint }>("fta:files-dropped", (event) => {
+    // Hit-test the actual drop, never fall back to a previously selected computer.
+    const target = dropTarget(event.payload.position);
+    dragPoint = undefined;
+    highlightDropTarget();
     if (sending) { showNotice("현재 전송이 끝난 뒤 다시 파일을 놓아주세요.", true); return; }
-    selectedPaths = event.payload;
-    navigate("send");
+    selectedPaths = [];
+    if (!target) { renderFiles(); showNotice("온라인 기기 아이콘에 파일을 놓아주세요.", true); return; }
+    selectedId = target.device_id;
+    localStorage.setItem(LAST_DEVICE_KEY, selectedId);
+    selectedPaths = event.payload.paths;
     renderFiles();
-    if (selectedDevice()) void act(sendFiles);
+    renderDevices();
+    void act(sendFiles);
   });
   await listen("fta:activation-available", () => { void act(processPendingActivations); });
   await listen<ReceiptEvent>("fta:receipt", (event) => { void act(async () => {
@@ -701,17 +856,6 @@ async function initialize(): Promise<void> {
       element("pin").setAttribute("aria-pressed", "true");
     });
   }
-  try {
-    autostartEnabled = await invoke<boolean>("autostart_status");
-    element("autostart").textContent = autostartEnabled ? "켜짐 · 끄기" : "꺼짐 · 켜기";
-  } catch (error) {
-    element("autostart").textContent = "상태 확인 불가";
-    element<HTMLButtonElement>("autostart").disabled = true;
-    showNotice(userError(error), true);
-  }
-  await act(async () => {
-    renderNotificationPermission(await invoke<string>("notification_permission", { request: false }));
-  });
   try { await invoke("start_engine"); } catch (error) { showNotice(userError(error), true, "connection"); }
   window.setInterval(() => { void refresh(); }, REFRESH_INTERVAL_MS);
   await refresh();

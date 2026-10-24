@@ -47,6 +47,7 @@ npm --prefix apps/desktop run tauri dev
 
 - [데스크톱 개발·배포](apps/desktop/README.md)
 - [Windows x64 빌드·설치·검증](packaging/windows/README.md)
+- [macOS 설치·빌드](packaging/macos/README.md)
 - [Linux 서버 설치·서비스](packaging/linux/README.md)
 - [검증 명령과 구현 한계](docs/implementation-status.md)
 

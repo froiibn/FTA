@@ -1,8 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-window",
-  "description": "Only the bundled main UI can invoke the narrow Rust bridge and receive local events.",
-  "windows": ["main"],
+  "description": "Only the bundled transfer, history and settings windows receive local events; no filesystem, shell or network plugin grants.",
+  "windows": [
+    "main",
+    "inbox",
+    "settings"
+  ],
   "permissions": [
     "core:event:default"
   ]

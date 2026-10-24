@@ -6,7 +6,7 @@
 
 TypeScript 공통 화면, Tauri 2 Rust 호스트, 독립 Rust 엔진을 앱 번들에 포함한다. Tauri 메뉴 막대 앱이 사용자 세션에서 엔진을 시작·감시한다. TypeScript는 Tauri 명령을 호출하고 Rust 호스트가 Unix domain socket으로 엔진과 통신한다. 화면 렌더링은 macOS의 WKWebView를 사용한다. 다른 사용자의 엔진이나 중복 인스턴스를 재사용하지 않는다. 첫 버전은 별도 시스템 LaunchDaemon 없이 로그인 세션 안에서 동작한다.
 
-창 닫기는 수신을 유지하고 메뉴의 종료는 엔진을 종료한다. 로그인 시 실행은 사용자 선택으로 등록하며 지원 버전에 맞춰 ServiceManagement 어댑터를 구현한다. macOS 13 이상에서 SMAppService가 로그인 항목·에이전트 관리를 제공하므로 우선 후보로 삼는다. [Apple: SMAppService](https://developer.apple.com/documentation/ServiceManagement/SMAppService)
+창 닫기는 본체만 숨겨 수신을 유지한다. Dock 클릭의 macOS 재열기 이벤트는 숨김·최소화·접힘을 해제하고 본체를 표시한다. 기록·설정 창이 열려 있어도 본체를 복원한다. 메뉴의 종료·⌘Q는 데스크톱 앱과 앱이 직접 시작한 엔진을 종료하며, 이미 실행 중이던 독립 엔진은 유지한다. 로그인 시 실행은 사용자 선택으로 등록하며 지원 버전에 맞춰 ServiceManagement 어댑터를 구현한다. macOS 13 이상에서 SMAppService가 로그인 항목·에이전트 관리를 제공하므로 우선 후보로 삼는다. [Apple: SMAppService](https://developer.apple.com/documentation/ServiceManagement/SMAppService)
 
 로그아웃·종료·절전 중 수신은 보장하지 않는다. 화면 잠금 상태라도 앱이 실행되고 절전하지 않으면 수신한다. Mac을 계속 깨워 두는 정책은 기본으로 넣지 않는다.
 

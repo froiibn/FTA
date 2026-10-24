@@ -26,6 +26,8 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
+mod drop_coordinates;
+
 #[cfg(target_os = "macos")]
 mod native_notification;
 
@@ -45,11 +47,20 @@ const EVENT_CONSUMER: &str = "desktop-notifications";
 const ACTIVATION_SCHEME: &str = "fta";
 const MAX_PENDING_ACTIVATIONS: usize = 32;
 const WINDOW_LABEL: &str = "main";
+const FOLDED_WINDOW_SIDE: f64 = 44.0;
+
+// Expanded geometry is kept separately so a collapsed badge can always return to the user's working size.
+#[derive(Default)]
+struct FoldState {
+    collapsed: bool,
+    expanded_size: Option<tauri::LogicalSize<f64>>,
+}
 
 /// Narrow grants prevent a compromised UI from turning a generic IPC bridge into file exfiltration.
 #[derive(Default)]
 struct DesktopState {
     granted_paths: Mutex<HashSet<PathBuf>>,
+    fold: Mutex<FoldState>,
     child: Mutex<Option<Child>>,
     notifications_ready: AtomicBool,
     exit_allowed: AtomicBool,
@@ -94,6 +105,15 @@ async fn engine_request(method: String, params: Value) -> Result<Value, String> 
     }
 }
 
+// Secondary windows must not borrow file grants or consume notification work owned by the transfer window.
+fn require_main_window(label: &str) -> Result<(), String> {
+    if label == WINDOW_LABEL {
+        Ok(())
+    } else {
+        Err("이 작업은 전송 창에서만 사용할 수 있습니다".into())
+    }
+}
+
 /// Canonicalize grants at the OS-selection boundary, not from paths invented by JavaScript.
 fn grant_paths(state: &DesktopState, paths: Vec<PathBuf>) -> Result<Vec<String>, String> {
     let canonical = paths
@@ -128,9 +148,11 @@ fn grant_paths(state: &DesktopState, paths: Vec<PathBuf>) -> Result<Vec<String>,
 /// The native picker runs outside WebView filesystem permissions and grants only chosen files.
 #[tauri::command]
 async fn choose_files(
+    window: tauri::WebviewWindow,
     app: tauri::AppHandle,
     state: State<'_, DesktopState>,
 ) -> Result<Vec<String>, String> {
+    require_main_window(window.label())?;
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog().file().pick_files(move |selection| {
         let _ = sender.send(selection);
@@ -147,11 +169,13 @@ async fn choose_files(
 /// Revalidate selected paths when sending; selection never grants directory or wildcard access.
 #[tauri::command]
 async fn send_files(
+    window: tauri::WebviewWindow,
     state: State<'_, DesktopState>,
     to: String,
     paths: Vec<String>,
     transfer_id: String,
 ) -> Result<Value, String> {
+    require_main_window(window.label())?;
     if paths.is_empty() {
         return Err("전송할 파일을 선택해주세요".into());
     }
@@ -178,11 +202,13 @@ async fn send_files(
 /// Message limits and URL schemes are checked before forwarding content to the engine.
 #[tauri::command]
 async fn send_message(
+    window: tauri::WebviewWindow,
     to: String,
     kind: String,
     body: String,
     transfer_id: String,
 ) -> Result<Value, String> {
+    require_main_window(window.label())?;
     if body.is_empty() || body.len() > MAX_MESSAGE_BYTES {
         return Err("메시지는 비어 있지 않은 1 MiB 이하의 텍스트여야 합니다".into());
     }
@@ -248,6 +274,108 @@ fn copy_text(app: tauri::AppHandle, value: String) -> Result<(), String> {
     app.clipboard()
         .write_text(value)
         .map_err(|error| error.to_string())
+}
+
+// Native size and UI visibility change as one operation; a failed resize must not leave an invisible panel.
+fn apply_fold_state(window: &tauri::WebviewWindow, folded: bool) -> Result<bool, String> {
+    require_main_window(window.label())?;
+    let state = window.state::<DesktopState>();
+    let mut fold = state.fold.lock().map_err(|_| "창 접기 상태 오류")?;
+    if fold.collapsed == folded {
+        return Ok(fold.collapsed);
+    }
+    let config = window.app_handle().config();
+    let defaults = config
+        .app
+        .windows
+        .iter()
+        .find(|entry| entry.label == WINDOW_LABEL)
+        .ok_or("전송 창 설정을 찾을 수 없습니다")?;
+    window.unmaximize().map_err(|error| error.to_string())?;
+    let current = window
+        .inner_size()
+        .map_err(|error| error.to_string())?
+        .to_logical::<f64>(window.scale_factor().map_err(|error| error.to_string())?);
+    let expanded = fold
+        .expanded_size
+        .unwrap_or(tauri::LogicalSize::new(defaults.width, defaults.height));
+    let target = if folded {
+        tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE)
+    } else {
+        expanded
+    };
+    let expanded_min = tauri::LogicalSize::new(
+        defaults.min_width.unwrap_or(defaults.width),
+        defaults.min_height.unwrap_or(defaults.height),
+    );
+    window
+        .set_min_size(Some(if folded {
+            tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE)
+        } else {
+            expanded_min
+        }))
+        .map_err(|error| error.to_string())?;
+    if let Err(error) = window.set_size(target) {
+        let _ = window.set_min_size(Some(if fold.collapsed {
+            tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE)
+        } else {
+            expanded_min
+        }));
+        return Err(error.to_string());
+    }
+    if let Err(error) = window.set_resizable(!folded) {
+        let _ = window.set_min_size(Some(if fold.collapsed {
+            tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE)
+        } else {
+            expanded_min
+        }));
+        let _ = window.set_size(current);
+        return Err(error.to_string());
+    }
+    if folded {
+        fold.expanded_size = Some(current);
+    }
+    fold.collapsed = folded;
+    // A tray/notification can unfold natively while the frontend is busy; it must update the same visible state.
+    if let Err(error) = window.emit_to(WINDOW_LABEL, "fta:fold-state", folded) {
+        eprintln!("failed to synchronize folded window state: {error}");
+    }
+    Ok(fold.collapsed)
+}
+
+#[tauri::command]
+fn set_folded(window: tauri::WebviewWindow, folded: bool) -> Result<bool, String> {
+    apply_fold_state(&window, folded)
+}
+
+// Readiness reconnects must learn the real native state instead of assuming the window is expanded.
+#[tauri::command]
+fn fold_state(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> Result<bool, String> {
+    require_main_window(window.label())?;
+    Ok(state
+        .fold
+        .lock()
+        .map_err(|_| "창 접기 상태 오류")?
+        .collapsed)
+}
+
+// Replacing system decorations exposes only move and close operations for bundled window roles.
+#[tauri::command]
+fn start_window_drag(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != WINDOW_LABEL {
+        utility_label(window.label())?;
+    }
+    window.start_dragging().map_err(|error| error.to_string())
+}
+#[tauri::command]
+fn close_app_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != WINDOW_LABEL {
+        utility_label(window.label())?;
+    }
+    window.close().map_err(|error| error.to_string())
 }
 
 /// A pinned transfer surface is an app window, not a separate platform widget extension.
@@ -418,8 +546,13 @@ async fn restart_engine(state: State<'_, DesktopState>) -> Result<Value, String>
 
 /// Register readiness only after the UI listener exists; early native events must remain unacknowledged.
 #[tauri::command]
-fn notifications_ready(state: State<'_, DesktopState>) {
+fn notifications_ready(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> Result<(), String> {
+    require_main_window(window.label())?;
     state.notifications_ready.store(true, Ordering::Release);
+    Ok(())
 }
 
 /// Only a transfer UUID crosses the protocol boundary; external launch URLs never become file or shell actions.
@@ -484,7 +617,8 @@ fn ack_activation(state: State<'_, DesktopState>, transfer_id: String) -> Result
 
 /// Cursor acknowledgement happens after UI processing and native notification submission were attempted.
 #[tauri::command]
-async fn ack_receipt(sequence: u64) -> Result<Value, String> {
+async fn ack_receipt(window: tauri::WebviewWindow, sequence: u64) -> Result<Value, String> {
+    require_main_window(window.label())?;
     request(
         "events.ack",
         json!({ "consumer": EVENT_CONSUMER, "sequence": sequence }),
@@ -495,10 +629,12 @@ async fn ack_receipt(sequence: u64) -> Result<Value, String> {
 /// Native payload preparation errors prevent acknowledgement; OS display itself is outside this API's guarantee.
 #[tauri::command]
 async fn notify_receipt(
+    window: tauri::WebviewWindow,
     _app: tauri::AppHandle,
     sequence: u64,
     transfer_id: String,
 ) -> Result<(), String> {
+    require_main_window(window.label())?;
     let result = request(
         "events.list",
         json!({ "after": sequence.saturating_sub(1), "limit": 1 }),
@@ -586,7 +722,7 @@ fn monitor_receipts(app: tauri::AppHandle) {
                     .and_then(|events| events.first())
             {
                 // The frontend acknowledges only after handling this event; emit failure leaves it pending.
-                if let Err(error) = app.emit("fta:receipt", event) {
+                if let Err(error) = app.emit_to(WINDOW_LABEL, "fta:receipt", event) {
                     eprintln!("failed to deliver receipt event to desktop: {error}");
                 }
             }
@@ -595,12 +731,59 @@ fn monitor_receipts(app: tauri::AppHandle) {
     });
 }
 
-/// Closing the panel must not accidentally stop automatic reception.
+// Utility labels are an allowlist, never a URL or executable supplied by the WebView.
+fn utility_label(kind: &str) -> Result<&str, String> {
+    match kind {
+        "inbox" | "settings" => Ok(kind),
+        _ => Err("허용되지 않은 보조 창입니다".into()),
+    }
+}
+
+// Async creation avoids blocking a Windows IPC/UI thread while constructing another WebView.
+#[tauri::command]
+async fn open_utility_window(app: tauri::AppHandle, kind: String) -> Result<(), String> {
+    let label = utility_label(&kind)?;
+    if let Some(window) = app.get_webview_window(label) {
+        return window
+            .unminimize()
+            .and_then(|_| window.show())
+            .and_then(|_| window.set_focus())
+            .map_err(|error| error.to_string());
+    }
+    let config = app.config();
+    let window_config = config
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == label)
+        .ok_or("보조 창 설정을 찾을 수 없습니다")?;
+    let window = tauri::WebviewWindowBuilder::from_config(&app, window_config)
+        .map_err(|error| error.to_string())?
+        .build()
+        .map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())
+}
+
+// A child close must destroy only its own window, never hide the transfer panel or stop its engine.
+#[tauri::command]
+fn close_utility_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    utility_label(window.label())?;
+    window.close().map_err(|error| error.to_string())
+}
+
+/// Tray, Dock, and activation requests must restore hidden or minimized panels.
 fn show_main(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window(WINDOW_LABEL)
-        && let Err(error) = window.show().and_then(|_| window.set_focus())
-    {
-        eprintln!("failed to show transfer window: {error}");
+    if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
+        if let Err(error) = apply_fold_state(&window, false) {
+            eprintln!("failed to expand transfer window: {error}");
+        }
+        if let Err(error) = window
+            .unminimize()
+            .and_then(|_| window.show())
+            .and_then(|_| window.set_focus())
+        {
+            eprintln!("failed to show transfer window: {error}");
+        }
     }
 }
 
@@ -640,6 +823,8 @@ fn main() {
         // Restore geometry without restoring a hidden state that could strand a tray-only app.
         .plugin(
             tauri_plugin_window_state::Builder::default()
+                // A persisted 44px badge must never overwrite the next expanded startup size.
+                .skip_initial_state(WINDOW_LABEL)
                 .with_state_flags(
                     tauri_plugin_window_state::StateFlags::SIZE
                         | tauri_plugin_window_state::StateFlags::POSITION
@@ -656,6 +841,12 @@ fn main() {
             reveal_transfer,
             copy_text,
             set_pinned,
+            set_folded,
+            fold_state,
+            start_window_drag,
+            close_app_window,
+            open_utility_window,
+            close_utility_window,
             set_autostart,
             autostart_status,
             start_engine,
@@ -670,6 +861,11 @@ fn main() {
             ack_activation
         ])
         .setup(|app| {
+            // Restore only main position; child windows keep full geometry restoration through the plugin.
+            if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
+                use tauri_plugin_window_state::WindowExt;
+                let _ = window.restore_state(tauri_plugin_window_state::StateFlags::POSITION);
+            }
             let activation_app = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
@@ -705,8 +901,13 @@ fn main() {
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => show_main(app),
                     "inbox" | "settings" => {
-                        show_main(app);
-                        let _ = app.emit("fta:navigate", event.id.as_ref());
+                        let app = app.clone();
+                        let kind = event.id.as_ref().to_owned();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(error) = open_utility_window(app, kind).await {
+                                eprintln!("failed to open utility window: {error}");
+                            }
+                        });
                     }
                     "quit" => {
                         let _ = app.emit("fta:quit-requested", ());
@@ -719,7 +920,7 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| match event {
-            WindowEvent::CloseRequested { api, .. } => {
+            WindowEvent::CloseRequested { api, .. } if window.label() == WINDOW_LABEL => {
                 api.prevent_close();
                 if let Err(error) = window.hide() {
                     eprintln!("failed to hide transfer window: {error}");
@@ -729,14 +930,30 @@ fn main() {
                 }
                 let _ = window.emit("fta:panel-hidden", ());
             }
-            WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) => {
+            // Normalize backend-specific units once; Cocoa drag points must not be divided by Retina scale twice.
+            WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }) => {
+                if window.label() == WINDOW_LABEL
+                    && let Ok(scale) = window.scale_factor()
+                    && let Ok(point) = drop_coordinates::css_position(*position, scale)
+                {
+                    let _ = window.emit_to(WINDOW_LABEL, "fta:drag-position", json!({ "x": point.x, "y": point.y }));
+                }
+            }
+            WindowEvent::DragDrop(DragDropEvent::Leave) => {
+                let _ = window.emit_to(WINDOW_LABEL, "fta:drag-left", ());
+            }
+            WindowEvent::DragDrop(DragDropEvent::Drop { paths, position }) if window.label() == WINDOW_LABEL => {
                 let state = window.state::<DesktopState>();
                 match grant_paths(&state, paths.clone()) {
                     Ok(paths) => {
-                        let _ = window.emit("fta:files-dropped", paths);
+                        match window.scale_factor().map_err(|error| error.to_string())
+                            .and_then(|scale| drop_coordinates::css_position(*position, scale).map_err(str::to_owned)) {
+                            Ok(point) => { let _ = window.emit_to(WINDOW_LABEL, "fta:files-dropped", json!({ "paths": paths, "position": { "x": point.x, "y": point.y } })); }
+                            Err(error) => { let _ = window.emit_to(WINDOW_LABEL, "fta:drop-error", error); }
+                        }
                     }
                     Err(error) => {
-                        let _ = window.emit("fta:drop-error", error);
+                        let _ = window.emit_to(WINDOW_LABEL, "fta:drop-error", error);
                     }
                 }
             }
@@ -754,6 +971,12 @@ fn main() {
                 Err(error) => eprintln!("native notification integration unavailable: {error}"),
             }
             app.run(|app, event| {
+                // Dock clicks reopen an existing macOS process rather than launching a second instance.
+                // Handle both hidden-main and visible-utility cases so closing the panel cannot strand it.
+                #[cfg(target_os = "macos")]
+                if matches!(&event, tauri::RunEvent::Reopen { .. }) {
+                    show_main(app);
+                }
                 if let tauri::RunEvent::ExitRequested { api, .. } = &event
                     && !app
                         .state::<DesktopState>()
@@ -779,6 +1002,31 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // A history/settings window cannot reuse a file selection or acknowledge the main notification cursor.
+    #[test]
+    fn transfer_and_notification_actions_belong_to_main_window() {
+        assert!(require_main_window("main").is_ok());
+        assert!(require_main_window("inbox").is_err());
+        assert!(require_main_window("settings").is_err());
+    }
+
+    // User-controlled labels cannot become arbitrary local paths, external pages, or the main window.
+    #[test]
+    fn utility_windows_only_accept_known_roles() {
+        for label in ["inbox", "settings"] {
+            assert!(utility_label(label).is_ok());
+        }
+        for label in [
+            "main",
+            "../settings",
+            "https://example.com",
+            "",
+            "settings?view=main",
+        ] {
+            assert!(utility_label(label).is_err());
+        }
+    }
 
     // A received URL must never gain local-file or script execution privileges.
     #[test]

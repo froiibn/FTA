@@ -138,6 +138,9 @@ mod private_ipc {
                     Err(error) => panic!("CLI did not connect to the private socket: {error}"),
                 }
             };
+            // macOS accept inherits O_NONBLOCK; framed reads must wait for the CLI's next write.
+            // Keep only accept nonblocking so scheduling cannot turn valid requests into WouldBlock.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
