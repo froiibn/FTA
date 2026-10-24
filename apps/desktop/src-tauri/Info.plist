@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>집 안의 내 컴퓨터를 찾고 파일과 메시지를 주고받기 위해 로컬 네트워크를 사용합니다.</string>
+  <key>NSBonjourServices</key>
+  <array><string>_fta._tcp</string></array>
+</dict>
+</plist>

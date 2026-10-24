@@ -1,0 +1,11 @@
+/target/
+**/node_modules/
+**/dist/
+**/gen/schemas/
+/output/
+/.playwright-cli/
+.DS_Store
+
+# Sidecars and platform tool caches are regenerated from tracked Rust sources.
+/apps/desktop/src-tauri/binaries/
+**/__pycache__/

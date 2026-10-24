@@ -1,0 +1,16 @@
+# Keep headless builds independent of the desktop WebView dependency graph.
+[workspace]
+members = ["crates/fta-core", "crates/fta-engine", "crates/fta-cli", "crates/fta-platform", "crates/fta-mcp", "apps/desktop/src-tauri"]
+default-members = ["crates/fta-core", "crates/fta-engine", "crates/fta-cli", "crates/fta-platform", "crates/fta-mcp"]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+rust-version = "1.99.1"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+correctness = "deny"

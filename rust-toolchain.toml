@@ -1,0 +1,5 @@
+# Match the installed stable release so CI and local checks use the same compiler.
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

@@ -1,0 +1,2 @@
+# Sidecars are rebuilt from the workspace engine source for each release target.
+/src-tauri/binaries/
