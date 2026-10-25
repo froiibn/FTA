@@ -84,3 +84,9 @@
 - 동작 변경에는 관련 검증을 수행하고 실제로 수행한 검사와 미검증 OS를 구분해 보고한다. 오류 처리·무결성·충돌·복구 등 중요한 경계는 테스트한다.
 - 빌드·테스트는 실제 workspace와 npm 스크립트를 사용한다. 기본 headless 검증은 `cargo fmt --all --check`, `cargo test`, `cargo clippy --all-targets -- -D warnings`다. 데스크톱은 `cargo check -p fta-desktop`, `cargo test -p fta-desktop`, `cargo clippy -p fta-desktop --all-targets -- -D warnings`, `npm --prefix apps/desktop run build`로 추가 검증한다. 실제 OS에서 실행하지 않은 검사는 통과로 보고하지 않는다.
 - 문서만 바꾸는 작업에서는 링크와 내용 정합성을 확인하고 불필요한 앱 구현이나 의존성 설치를 시작하지 않는다.
+
+## 로컬 빌드와 배포
+
+- 빌드·테스트·패키징은 사용자 소유의 해당 OS 컴퓨터에서만 수행한다.
+- GitHub Actions 워크플로 추가·실행·재실행·재활성화와 예산 설정 변경을 하지 않는다.
+- GitHub Releases에는 로컬에서 검증한 설치 파일·SHA-256·빌드 정보를 배포한다.

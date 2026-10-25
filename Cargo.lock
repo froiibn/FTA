@@ -1530,10 +1530,13 @@ version = "0.1.0"
 dependencies = [
  "dirs 6.0.0",
  "dunce",
+ "if-addrs",
+ "ipnet",
  "libc",
  "rustix",
  "same-file",
  "security-framework",
+ "serde",
  "tokio",
  "uuid",
  "windows 0.61.3",

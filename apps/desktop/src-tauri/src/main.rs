@@ -9,7 +9,7 @@ use std::{
         Mutex,
         atomic::{AtomicBool, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use fta_core::{config::AppPaths, ipc};
@@ -48,6 +48,13 @@ const ACTIVATION_SCHEME: &str = "fta";
 const MAX_PENDING_ACTIVATIONS: usize = 32;
 const WINDOW_LABEL: &str = "main";
 const FOLDED_WINDOW_SIDE: f64 = 44.0;
+// A home confirmation expires rather than surviving unrelated settings work or an OS change.
+const NETWORK_CONFIRMATION_TTL: Duration = Duration::from_secs(120);
+struct NetworkConfirmation {
+    engine_path: PathBuf,
+    status: fta_platform::network_setup::NetworkSetupStatus,
+    observed_at: Instant,
+}
 
 // Expanded geometry is kept separately so a collapsed badge can always return to the user's working size.
 #[derive(Default)]
@@ -61,6 +68,7 @@ struct FoldState {
 struct DesktopState {
     granted_paths: Mutex<HashSet<PathBuf>>,
     fold: Mutex<FoldState>,
+    network_confirmation: Mutex<Option<NetworkConfirmation>>,
     child: Mutex<Option<Child>>,
     notifications_ready: AtomicBool,
     exit_allowed: AtomicBool,
@@ -103,6 +111,140 @@ async fn engine_request(method: String, params: Value) -> Result<Value, String> 
         | "transfers.get" | "transfers.cancel" => request(&method, params).await,
         _ => Err("이 데스크톱 명령은 허용되지 않습니다".into()),
     }
+}
+
+// Canonical paths also prevent a configured relative path from being interpreted as a tool option.
+fn setup_engine_path() -> Result<PathBuf, String> {
+    let path = engine_path()?.canonicalize().map_err(|e| e.to_string())?;
+    if !path.is_file() {
+        return Err("FTA 엔진 실행 파일을 확인할 수 없습니다".into());
+    }
+    Ok(path)
+}
+
+// Only the settings window may request OS authorization; executable paths and CIDRs stay native.
+#[tauri::command]
+async fn network_setup_status(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> Result<fta_platform::network_setup::NetworkSetupStatus, String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 네트워크를 확인할 수 있습니다".into());
+    }
+    *state
+        .network_confirmation
+        .lock()
+        .map_err(|_| "네트워크 상태 잠금 오류")? = None;
+    let engine = setup_engine_path()?;
+    let queried_engine = engine.clone();
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        fta_platform::network_setup::status(&queried_engine)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    *state
+        .network_confirmation
+        .lock()
+        .map_err(|_| "네트워크 상태 잠금 오류")? = Some(NetworkConfirmation {
+        engine_path: engine,
+        status: status.clone(),
+        observed_at: Instant::now(),
+    });
+    Ok(status)
+}
+
+// OS changes are verified before persisting LAN configuration; restarting remains an explicit action.
+#[tauri::command]
+async fn network_setup_apply(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+    selection: fta_platform::network_setup::NetworkSetupRequest,
+) -> Result<Value, String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 네트워크를 변경할 수 있습니다".into());
+    }
+    let _guard = LifecycleGuard::acquire(&state)?;
+    let confirmed = state
+        .network_confirmation
+        .lock()
+        .map_err(|_| "네트워크 상태 잠금 오류")?
+        .take()
+        .ok_or("연결을 재점검하고 집 네트워크를 다시 확인하세요")?;
+    let engine = setup_engine_path()?;
+    if confirmed.observed_at.elapsed() > NETWORK_CONFIRMATION_TTL || engine != confirmed.engine_path
+    {
+        return Err("확인 시간이 지났거나 앱이 변경되었습니다. 연결을 재점검하세요".into());
+    }
+    let expected =
+        fta_platform::network_setup::selected_interface(&confirmed.status.interfaces, &selection)
+            .map_err(|e| e.to_string())?;
+    let queried_engine = engine.clone();
+    let before = tauri::async_runtime::spawn_blocking(move || {
+        fta_platform::network_setup::status(&queried_engine)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    let current_interface =
+        fta_platform::network_setup::selected_interface(&before.interfaces, &selection)
+            .map_err(|e| e.to_string())?;
+    fta_platform::network_setup::verify_scope(&expected, &current_interface)
+        .map_err(|e| e.to_string())?;
+    // Check IPC before authorization, without capturing a listener port that another client may change.
+    request("settings.get", json!({})).await?;
+    let choice = selection.clone();
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        fta_platform::network_setup::apply(&engine, &choice)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    let selected = fta_platform::network_setup::selected_interface(&status.interfaces, &selection)
+        .map_err(|e| e.to_string())?;
+    fta_platform::network_setup::verify_scope(&expected, &selected).map_err(|e| {
+        format!("OS 변경 중 연결이 바뀌었습니다. 앱 설정은 저장하지 않았습니다: {e}")
+    })?;
+    let config = request("settings.get", json!({})).await?;
+    let current: std::net::SocketAddr = config["listen_addr"]
+        .as_str()
+        .ok_or("수신 주소를 읽을 수 없습니다")?
+        .parse()
+        .map_err(|_| "수신 주소가 잘못되었습니다")?;
+    let address: std::net::IpAddr = selected
+        .address
+        .parse()
+        .map_err(|_| "OS 네트워크 주소가 잘못되었습니다")?;
+    // The current listener port is retained; an address candidate cannot smuggle a port or subnet.
+    request("settings.update",json!({"values":{"listen_addr":std::net::SocketAddr::new(address,current.port()).to_string(),"allowed_networks":[selected.network],"discovery_enabled":selection.discovery_enabled}})).await
+        .map_err(|e|format!("OS 변경 후 앱 설정 저장에 실패했습니다. 상태를 재점검하세요: {e}"))?;
+    Ok(json!({"status":status,"restart_required":true}))
+}
+
+// Open only the fixed OS settings destination; no caller-supplied URL or command crosses this bridge.
+#[tauri::command]
+fn open_network_settings(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 시스템 설정을 열 수 있습니다".into());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("/usr/bin/open")
+            .args(["-b", "com.apple.systempreferences"])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(windows)]
+    {
+        window
+            .app_handle()
+            .opener()
+            .open_url("ms-settings:network-status", None::<&str>)
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    Err("지원하지 않는 OS입니다".into())
 }
 
 // Secondary windows must not borrow file grants or consume notification work owned by the transfer window.
@@ -834,6 +976,9 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             engine_request,
+            network_setup_status,
+            open_network_settings,
+            network_setup_apply,
             choose_files,
             send_files,
             send_message,

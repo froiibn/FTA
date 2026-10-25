@@ -6,6 +6,10 @@ publish = false
 
 [dependencies]
 uuid = "1"
+# Setup exposes typed OS observations, never an arbitrary shell or caller-supplied firewall scope.
+serde = { version = "1", features = ["derive"] }
+if-addrs = "0.14"
+ipnet = "2"
 
 # Platform-only dependencies keep the Linux engine independent of desktop runtimes.
 [target.'cfg(windows)'.dependencies]
