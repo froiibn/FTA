@@ -13,7 +13,9 @@ if (bundleEngine) {
   }
   const prepared = spawnSync(process.execPath, [fileURLToPath(new URL("./prepare-engine.mjs", import.meta.url))], { cwd: desktop, env, stdio: "inherit" });
   if (prepared.error || prepared.status !== 0) throw new Error(`Engine preparation failed: ${prepared.error?.message ?? prepared.status}`);
-  args.push("--config", "src-tauri/tauri.bundle.conf.json");
+  // Keep the Windows-only elevation helper out of Mac installers while shipping it beside the
+  // real engine on Windows; its location is independently checked before any UAC request.
+  args.push("--config", process.platform === "win32" ? "src-tauri/tauri.windows.bundle.conf.json" : "src-tauri/tauri.bundle.conf.json");
 }
 const result = spawnSync(process.execPath, [fileURLToPath(new URL("../node_modules/@tauri-apps/cli/tauri.js", import.meta.url)), ...args], { cwd: desktop, env, stdio: "inherit" });
 if (result.error) throw result.error;

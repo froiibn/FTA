@@ -4,6 +4,8 @@ use crate::PlatformPaths;
 
 /// Native protocol-activation toasts outlive this process and route back through the OS.
 pub mod notifications;
+// Setup uses a narrow, explicit elevation boundary instead of elevating the desktop or engine.
+pub mod network_setup;
 use std::{ffi::OsString, io, mem, os::windows::ffi::OsStringExt, path::Path, ptr};
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 use windows_sys::{
