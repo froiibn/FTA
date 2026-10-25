@@ -63,7 +63,7 @@ fn failure(code: &str, detail: impl std::fmt::Display) -> io::Error {
     io::Error::new(kind, format!("NETWORK_SETUP_{code}: {detail}"))
 }
 fn selection_id(connection: &Connection, address: &Address) -> io::Result<String> {
-    // Bind the displayed selection to its exact network GUID/profile/addresses. A changed LAN
+    // Bind the displayed selection to its exact network GUID/adapter/addresses. A changed LAN
     // with the same adapter and IP cannot reuse the screen's previous home-network approval.
     let mut identity = b"FTA.NetworkSelection.v1\0".to_vec();
     // Public -> Private is an explicitly requested result, not a different connection. Preserve

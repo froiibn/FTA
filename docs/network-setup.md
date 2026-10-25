@@ -42,4 +42,4 @@ Windows 담당의 통합 소스에서 headless84개·desktop9개(총93개), fmt/
 
 ### Windows IPC 후속 검증
 
-후속2ea7cae에서는 연결 이전의 Windows ERROR_PIPE_BUSY에만 제한된 비동기 재시도를 추가했다. 요청 프레임 전송 이후는 재시도하지 않는다. Windows 담당은 headless87개·desktop9개(총96개), 필수 검사와 NSIS 빌드 및 동일 동시 읽기24건 전부 성공을 보고했다. 부모가 실제 diff의 제어 흐름을 검토하고 병합한 Mac 소스도 headless72개·desktop10개와 필수 검사를 통과했다. Windows 새 설치본의 최종 화면 확인 및 파일 경로 동일성 후속 검토는 진행 중이다.
+후속2ea7cae에서는 연결 이전의 Windows ERROR_PIPE_BUSY에만 제한된 비동기 재시도를 추가했다. 요청 프레임 전송 이후는 재시도하지 않는다. Windows 담당은 headless87개·desktop9개(총96개), 필수 검사와 NSIS 빌드 및 동일 동시 읽기24건 전부 성공을 보고했다. 부모가 실제 diff의 제어 흐름을 검토하고 병합한 Mac 소스도 headless72개·desktop10개와 필수 검사를 통과했다. Windows 새 설치본의 최종 화면에서 실제 주소·대역·Private 표시, 집 연결 확인 전 적용 비활성, 연결 오류 안내 복구를 확인했다는 보고를 받았다. 실제 파일 동일성에 관한 후속 수정 검토는 진행 중이다.
