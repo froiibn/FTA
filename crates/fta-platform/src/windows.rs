@@ -481,7 +481,13 @@ mod tests {
                 1,
                 "only the owner ACE may remain"
             );
-            assert!(sddl.contains(&format!(";;;{})", current_user_sid()?)));
+            // Windows may serialize the same SID as an SDDL alias (for example LA).
+            // Normalize the single ACE's trustee instead of depending on its spelling.
+            let trustee = sddl
+                .rsplit_once(';')
+                .and_then(|(_, trustee)| trustee.strip_suffix(')'))
+                .expect("the single ACE must contain a trustee SID");
+            assert_eq!(canonical_sid(trustee)?, current_user_sid()?, "{sddl}");
             let child = root.join("owner.txt");
             std::fs::write(&child, b"private")?;
             assert_eq!(std::fs::read(&child)?, b"private");
@@ -491,6 +497,48 @@ mod tests {
         })();
         std::fs::remove_dir(root)?;
         result
+    }
+    // Well-known aliases and numeric SIDs identify the same trustee on all Windows accounts;
+    // normalization must still distinguish different principals rather than skipping the check.
+    #[test]
+    fn trustee_aliases_preserve_sid_identity() -> io::Result<()> {
+        assert_eq!(canonical_sid("SY")?, "S-1-5-18");
+        assert_eq!(canonical_sid("BA")?, "S-1-5-32-544");
+        assert_eq!(canonical_sid("S-1-5-18")?, "S-1-5-18");
+        assert_ne!(canonical_sid("SY")?, canonical_sid("BA")?);
+        // LA is machine-relative, so obtain its SID from Windows rather than a fixture account.
+        let administrator = canonical_sid("LA")?;
+        assert_ne!(administrator, "LA");
+        assert_eq!(canonical_sid(&administrator)?, administrator);
+        let owner = current_user_sid()?;
+        assert_eq!(canonical_sid(&owner)?, owner);
+        assert!(canonical_sid("not-a-sid").is_err());
+        Ok(())
+    }
+    fn canonical_sid(value: &str) -> io::Result<String> {
+        use windows_sys::Win32::Security::Authorization::ConvertStringSidToSidW;
+
+        let value: Vec<u16> = value.encode_utf16().chain(Some(0)).collect();
+        let mut sid = ptr::null_mut();
+        // SAFETY: value is terminated and sid is a valid output pointer. Windows resolves
+        // supported SDDL aliases as well as numeric strings without changing any permissions.
+        if unsafe { ConvertStringSidToSidW(value.as_ptr(), &mut sid) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let mut text = ptr::null_mut();
+        // SAFETY: sid remains live until this synchronous conversion returns.
+        let status = unsafe { ConvertSidToStringSidW(sid, &mut text) };
+        let error = io::Error::last_os_error();
+        // SAFETY: ConvertStringSidToSidW requires LocalFree for its SID allocation.
+        unsafe { LocalFree(sid) };
+        if status == 0 {
+            return Err(error);
+        }
+        // SAFETY: successful conversion returns a NUL-terminated UTF-16 allocation.
+        let result = unsafe { String::from_utf16_lossy(wide_slice(text)) };
+        // SAFETY: the converted string belongs to this call and uses LocalFree.
+        unsafe { LocalFree(text.cast()) };
+        Ok(result)
     }
     fn directory_sddl(path: &Path) -> io::Result<String> {
         use std::{

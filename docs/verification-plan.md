@@ -6,6 +6,10 @@
 
 macOS에서 전체 headless 검사를 실행하다 CLI·MCP 모의 IPC의 간헐적 `WouldBlock`을 확인했다. macOS `accept`가 리스너의 `O_NONBLOCK`을 상속하는 것을 별도 실험으로 확인했고, 양쪽 테스트 서버에서 accept 이후 스트림만 blocking으로 전환했다. 리스너의 유한 대기·미등록 전송 거절 검사는 유지했다. 프로덕션 IPC 동작은 변경하지 않았다. 수정 후 `cargo test`의 68개 테스트가 통과했다.
 
+## 2026-10-25 Windows CI 권한 검사 보완
+
+릴리즈 커밋의 [GitHub CI](https://github.com/froiibn/FTA/actions/runs/40130632392)에서 Windows 폴더 DACL의 trustee를 숫자 SID 문자열로만 비교한 검사가 실패했다. Windows SDDL은 같은 SID를 `LA` 등 계정 약칭으로 표현할 수 있으므로, 단일 ACE의 trustee를 Windows API로 숫자 SID로 정규화한 뒤 현재 사용자와 비교한다. DACL 상속 차단·단일 ACE·소유자 읽기/쓰기·파일 입력 거부 검사는 유지하고, 약칭과 숫자 SID의 동등성·다른 계정 구분·잘못된 SID 거부를 검증한다. 변경은 Windows 테스트에 한정하며 실제 폴더·IPC 접근 정책과 게시된 설치 파일은 변경하지 않는다.
+
 작성일: 2026-10-25. 이 문서는 전체 검증 계획이다. 일부 로컬 검증을 수행했으며 전체 4대 교차 OS 시험은 아직 수행하지 않았다. 실제 Mac↔Windows의 파일 송수신·해시·충돌 저장 결과는 [2026-10-25 실기 기록](lan-test-2026-10-25.md)에 정리한다.
 
 ## 1. 구현 전에 확인할 환경
