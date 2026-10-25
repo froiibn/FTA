@@ -308,14 +308,16 @@ pub(super) fn find_rule(policy: &INetFwPolicy2, name: &str) -> io::Result<Option
     }
 }
 pub(super) fn matches(rule: &INetFwRule, expected: &Rule) -> io::Result<bool> {
+    // Windows aliases may name one file, while case-only paths may name different NTFS files.
+    // Verify file identity and fail closed on absent/inaccessible programs instead of folding text.
     // SAFETY: all getters borrow a live rule; returned strings/variants have distinct ownership.
     unsafe {
         Ok(rule.Grouping().map_err(error)? == expected.group
-            && rule
-                .ApplicationName()
-                .map_err(error)?
-                .to_string()
-                .eq_ignore_ascii_case(&expected.program)
+            && same_file::is_same_file(
+                rule.ApplicationName().map_err(error)?.to_string(),
+                &expected.program,
+            )
+            .unwrap_or(false)
             && rule.Profiles().map_err(error)? == NET_FW_PROFILE2_PRIVATE.0
             && rule.Direction().map_err(error)? == NET_FW_RULE_DIR_IN
             && rule.Action().map_err(error)? == NET_FW_ACTION_ALLOW
@@ -437,10 +439,13 @@ mod tests {
     #[test]
     fn detached_rule_preserves_all_scope_filters() -> io::Result<()> {
         let _apartment = Apartment::enter()?;
+        let directory = tempfile::tempdir()?;
+        let program = directory.path().join("fta-engine.exe");
+        std::fs::write(&program, b"MZ detached rule fixture")?;
         let expected = Rule {
             name: "FTA detached test".into(),
             group: RULE_GROUP.into(),
-            program: r"C:\Program Files\FTA\fta-engine.exe".into(),
+            program: program.to_string_lossy().into_owned(),
             interface: connections()?
                 .into_iter()
                 .find(|c| c.connected)
@@ -459,6 +464,50 @@ mod tests {
         changed = expected;
         changed.program = r"C:\other.exe".into();
         assert!(!matches(&rule, &changed)?);
+        Ok(())
+    }
+
+    // A detached rule must recognize an alias by native file ID, reject a byte-for-byte copy,
+    // and stop claiming permission when the rule's executable disappears from disk.
+    #[test]
+    fn detached_rule_program_uses_existing_file_identity() -> io::Result<()> {
+        let _apartment = Apartment::enter()?;
+        let directory = tempfile::tempdir()?;
+        let program = directory.path().join("fta-engine.exe");
+        let alias = directory.path().join("engine-alias.exe");
+        let other = directory.path().join("other-engine.exe");
+        std::fs::write(&program, b"MZ identity fixture")?;
+        std::fs::hard_link(&program, &alias)?;
+        std::fs::copy(&program, &other)?;
+        let expected = Rule {
+            name: "FTA detached identity test".into(),
+            group: RULE_GROUP.into(),
+            program: program.to_string_lossy().into_owned(),
+            interface: connections()?
+                .into_iter()
+                .find(|c| c.connected)
+                .ok_or_else(|| error("native test needs a connected interface"))?
+                .name,
+            local_address: "192.168.4.2".into(),
+            remote_address: "192.168.4.0/24".into(),
+            protocol: NET_FW_IP_PROTOCOL_TCP.0,
+            local_port: "*".into(),
+        };
+        let rule = build_rule(&expected)?;
+        assert!(matches(&rule, &expected)?);
+        let mut changed = expected.clone();
+        changed.program = alias.to_string_lossy().into_owned();
+        assert!(matches(&rule, &changed)?);
+        changed.program = other.to_string_lossy().into_owned();
+        assert!(!matches(&rule, &changed)?);
+        changed.program = directory
+            .path()
+            .join("missing.exe")
+            .to_string_lossy()
+            .into_owned();
+        assert!(!matches(&rule, &changed)?);
+        std::fs::remove_file(&program)?;
+        assert!(!matches(&rule, &expected)?);
         Ok(())
     }
 

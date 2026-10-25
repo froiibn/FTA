@@ -90,21 +90,21 @@ fn selected(facts: &[Connection], id: &str, ip: &str) -> io::Result<(Connection,
     ))
 }
 fn checked_engine(path: &Path) -> io::Result<PathBuf> {
+    checked_engine_beside(path, &std::env::current_exe()?)
+}
+// The host path always comes from current_exe in production. A separate resolver lets native
+// identity tests use disposable installations instead of writing beside the running app.
+fn checked_engine_beside(path: &Path, executable: &Path) -> io::Result<PathBuf> {
     let path = dunce::canonicalize(path)?;
-    let executable = dunce::canonicalize(std::env::current_exe()?)?;
+    let executable = dunce::canonicalize(executable)?;
     // A host-side engine override is not permission to elevate an arbitrary external program.
-    // Automatic setup is restricted to the real engine beside this app/helper installation.
-    if !path
-        .file_name()
-        .is_some_and(|n| n.eq_ignore_ascii_case(ENGINE_NAME))
-        || !same_file::is_same_file(
-            path.parent()
-                .ok_or_else(|| error("engine parent missing"))?,
-            executable
-                .parent()
-                .ok_or_else(|| error("app parent missing"))?,
-        )?
-    {
+    // Compare the fixed installed file's identity: folded names and a shared parent could admit
+    // a different case-only sibling on NTFS. Real aliases remain valid; missing files fail closed.
+    let installed = executable
+        .parent()
+        .ok_or_else(|| error("app parent missing"))?
+        .join(ENGINE_NAME);
+    if !same_file::is_same_file(&path, &installed).unwrap_or(false) {
         return Err(failure(
             "DENIED",
             "앱과 같은 설치 폴더의 FTA 엔진만 자동 설정할 수 있습니다.",
@@ -118,7 +118,9 @@ fn checked_engine(path: &Path) -> io::Result<PathBuf> {
             "설치된 Windows 엔진 실행 파일을 확인할 수 없습니다.",
         ));
     }
-    Ok(path)
+    // Accept an input alias only as identity evidence. Returning that alias could redirect
+    // the subsequent helper lookup to its external directory; always return our fixed sibling.
+    dunce::canonicalize(installed)
 }
 fn scopes(plan: &Plan) -> (Rule, Rule) {
     let group = format!("{}.{}", native::RULE_GROUP, plan.user_sid);
@@ -549,6 +551,7 @@ pub fn helper_main(arguments: &[String]) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     // Synthetic LANs exercise authorization boundaries without requesting UAC or touching any
     // live profile/rule. Native read-only and detached COM tests cover the actual Windows ABI.
@@ -709,6 +712,67 @@ mod tests {
     fn unrelated_executable_cannot_be_an_engine_override() -> io::Result<()> {
         let error = checked_engine(&std::env::current_exe()?).unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        Ok(())
+    }
+
+    // Hard-link aliases identify the installed file; another file with identical bytes
+    // does not. Deleting the fixed sibling must revoke acceptance even while its alias survives.
+    #[test]
+    fn installed_engine_uses_file_identity_and_requires_fixed_sibling() -> io::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let host = directory.path().join(HELPER_NAME);
+        let engine = directory.path().join(ENGINE_NAME);
+        let alias = directory.path().join("engine-alias.exe");
+        let other = directory.path().join("other-engine.exe");
+        fs::write(&host, b"MZ host fixture")?;
+        fs::write(&engine, b"MZ engine fixture")?;
+        fs::hard_link(&engine, &alias)?;
+        fs::copy(&engine, &other)?;
+        assert!(checked_engine_beside(&engine, &host).is_ok());
+        assert!(checked_engine_beside(&alias, &host).is_ok());
+        // An external alias proves identity but must never select its own helper directory.
+        let external_directory = directory.path().join("external-aliases");
+        fs::create_dir(&external_directory)?;
+        let external_alias = external_directory.join("engine-alias.exe");
+        fs::hard_link(&engine, &external_alias)?;
+        assert_eq!(
+            checked_engine_beside(&external_alias, &host)?,
+            dunce::canonicalize(&engine)?
+        );
+        assert_eq!(
+            checked_engine_beside(&other, &host).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        fs::remove_file(&engine)?;
+        assert_eq!(
+            checked_engine_beside(&alias, &host).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        assert!(checked_engine_beside(&engine, &host).is_err());
+        Ok(())
+    }
+
+    // Run explicitly with TEMP on an already case-sensitive filesystem. This fixture never
+    // changes directory attributes, requests privileges, or touches real firewall rules.
+    #[test]
+    #[ignore = "requires an already case-sensitive temporary filesystem"]
+    fn case_sensitive_engine_rejects_case_only_different_file() -> io::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let host = directory.path().join(HELPER_NAME);
+        let engine = directory.path().join(ENGINE_NAME);
+        let other = directory.path().join(ENGINE_NAME.to_ascii_uppercase());
+        fs::write(&host, b"MZ host fixture")?;
+        fs::write(&engine, b"MZ engine fixture")?;
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&other)?
+            .write_all(b"MZ different engine fixture")?;
+        assert!(!same_file::is_same_file(&engine, &other)?);
+        assert_eq!(
+            checked_engine_beside(&other, &host).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
         Ok(())
     }
 }

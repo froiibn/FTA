@@ -36,3 +36,7 @@ libc = "0.2"
 # Atomic no-replace rename covers filesystems that cannot create hard links.
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+# Native identity regressions use disposable files, never the running installation.
+tempfile = "3"

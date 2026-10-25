@@ -1546,6 +1546,7 @@ dependencies = [
  "security-framework",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "uuid",
  "windows 0.61.3",
