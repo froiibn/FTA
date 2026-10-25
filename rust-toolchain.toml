@@ -1,4 +1,4 @@
-# Match the installed stable release so CI and local checks use the same compiler.
+# Pin the compiler so local verification and installer builds use the same release.
 [toolchain]
 channel = "1.99.1"
 profile = "minimal"

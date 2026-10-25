@@ -16,6 +16,8 @@ if (version.error || version.status !== 0) throw new Error(`Rust toolchain is un
 const host = version.stdout.match(/^host: (.+)$/m)?.[1];
 if (!host) throw new Error("rustc did not report a host target");
 const sidecars = ["fta-engine", "fta-mcp"];
+// The fixed Windows helper is a separate UAC target; never elevate the whole desktop/engine.
+if (process.platform === "win32") sidecars.push("fta-network-helper");
 const build = spawnSync(cargo, ["build", "--locked", "--release", ...sidecars.flatMap((name) => ["-p", name])], { cwd: workspace, stdio: "inherit", env });
 if (build.error || build.status !== 0) throw new Error(`Engine build failed: ${build.error?.message ?? build.status}`);
 // Cargo metadata resolves environment and .cargo/config target directories relative to Cargo's own rules.
@@ -29,4 +31,4 @@ for (const name of sidecars) {
   mkdirSync(dirname(destination), { recursive: true });
   copyFileSync(source, destination);
 }
-console.log(`Prepared engine and MCP sidecars for ${host}`);
+console.log(`Prepared ${sidecars.join(", ")} sidecars for ${host}`);

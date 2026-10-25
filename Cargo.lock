@@ -1525,6 +1525,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fta-network-helper"
+version = "0.1.0"
+dependencies = [
+ "fta-platform",
+]
+
+[[package]]
 name = "fta-platform"
 version = "0.1.0"
 dependencies = [
@@ -1537,6 +1544,7 @@ dependencies = [
  "same-file",
  "security-framework",
  "serde",
+ "serde_json",
  "tokio",
  "uuid",
  "windows 0.61.3",
