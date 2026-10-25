@@ -856,10 +856,17 @@ on("network-system-settings", "click", () => { void act(async () => { await invo
 let settingsLoaded = false;
 // Retry initial IPC readiness without replacing a settings draft on each subsequent status refresh.
 async function refreshUtility(): Promise<void> {
-  await refresh();
-  if (!connected) return;
-  if (view === "inbox") await refreshHistory();
-  else if (!settingsLoaded) { await loadSettings(); await refreshNetworkSetup(); settingsLoaded = true; }
+  try {
+    await refresh();
+    if (!connected) return;
+    if (view === "inbox") await refreshHistory();
+    else if (!settingsLoaded) { await loadSettings(); await refreshNetworkSetup(); settingsLoaded = true; }
+    // A recovered background query must clear only its own error; a failed user transfer,
+    // settings save or permission action must remain visible after an unrelated status poll.
+    if (element("notice").dataset.source === "utility-refresh") element("notice").hidden = true;
+  } catch (error) {
+    showNotice(userError(error), true, "utility-refresh");
+  }
 }
 
 // In a browser there is no native bridge: controls stay disabled and no fake devices are inserted.

@@ -34,6 +34,10 @@ ipnet = { version = "2", features = ["serde"] }
 mdns-sd = "0.15"
 fta-platform = { path = "../fta-platform" }
 
+# The native busy code distinguishes local pipe contention from missing-service/access failures.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation"] }
+
 [dev-dependencies]
 tempfile = "3"
 libc = "0.2"

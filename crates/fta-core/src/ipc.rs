@@ -27,9 +27,11 @@ pub async fn request(paths: &AppPaths, method: &str, params: Value) -> Result<Va
         .await
         .map_err(|e| Error::new("SERVICE_UNAVAILABLE", e.to_string()))?;
     #[cfg(windows)]
-    let mut socket = tokio::net::windows::named_pipe::ClientOptions::new()
-        .open(paths.pipe_name()?)
-        .map_err(|e| Error::new("SERVICE_UNAVAILABLE", e.to_string()))?;
+    let mut socket = connect_windows_pipe(
+        &paths.pipe_name()?,
+        std::time::Duration::from_secs(crate::config::CONNECT_SECONDS),
+    )
+    .await?;
     let request = Request {
         request_id: uuid::Uuid::new_v4().to_string(),
         method: method.into(),
@@ -45,6 +47,35 @@ pub async fn request(paths: &AppPaths, method: &str, params: Value) -> Result<Va
         (Some(v), None) => Ok(v),
         (_, Some(e)) => Err(e),
         _ => Err(Error::new("IPC_ERROR", "invalid response envelope")),
+    }
+}
+
+#[cfg(windows)]
+async fn connect_windows_pipe(
+    name: &str,
+    budget: std::time::Duration,
+) -> Result<tokio::net::windows::named_pipe::NamedPipeClient> {
+    use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
+    const RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(10);
+    let deadline = tokio::time::Instant::now() + budget;
+    loop {
+        match tokio::net::windows::named_pipe::ClientOptions::new().open(name) {
+            Ok(client) => return Ok(client),
+            // The engine replaces its listening instance after each connection. Concurrent
+            // views can hit that short busy window, which does not mean the engine is down.
+            // Retry only before a request is written, never replay a possibly-applied method.
+            Err(error)
+                if error.raw_os_error() == Some(ERROR_PIPE_BUSY as i32)
+                    && tokio::time::Instant::now() < deadline =>
+            {
+                tokio::time::sleep_until(
+                    (tokio::time::Instant::now() + RETRY_INTERVAL).min(deadline),
+                )
+                .await;
+            }
+            // Missing service, access denial and an exhausted busy budget remain real errors.
+            Err(error) => return Err(Error::new("SERVICE_UNAVAILABLE", error.to_string())),
+        }
     }
 }
 pub async fn write_frame<W: AsyncWrite + Unpin>(io: &mut W, bytes: &[u8]) -> Result<()> {
@@ -113,5 +144,69 @@ mod tests {
         let (mut a, mut b) = tokio::io::duplex(16);
         a.write_u32(MAX_CONTROL_BYTES as u32 + 1).await.unwrap();
         assert_eq!(read_frame(&mut b).await.unwrap_err().code, "TOO_LARGE");
+    }
+
+    // A real current-user pipe, not a mocked success, verifies the Windows accept/replacement
+    // race. No request is sent to a possibly-applied method or retried after writing a frame.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_busy_pipe_waits_for_a_replacement_listener() -> Result<()> {
+        let name =
+            fta_platform::windows::user_pipe_name(&format!("busy-{}", uuid::Uuid::new_v4()))?;
+        let occupied = fta_platform::windows::create_user_pipe(&name, true)?;
+        let _first = tokio::net::windows::named_pipe::ClientOptions::new().open(&name)?;
+        occupied.connect().await?;
+        let connection = connect_windows_pipe(&name, std::time::Duration::from_secs(2));
+        tokio::pin!(connection);
+        tokio::select! {
+            result = &mut connection => panic!("connection must wait while all instances are busy: {result:?}"),
+            _ = tokio::time::sleep(std::time::Duration::from_millis(30)) => {},
+        }
+        let mut replacement = fta_platform::windows::create_user_pipe(&name, false)?;
+        let mut client = connection.await?;
+        replacement.connect().await?;
+        client.write_all(b"one").await?;
+        let mut bytes = [0; 3];
+        replacement.read_exact(&mut bytes).await?;
+        assert_eq!(&bytes, b"one");
+        Ok(())
+    }
+
+    // Bounded waiting must still report an unavailable service when the busy state never ends.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_busy_pipe_has_a_finite_connection_budget() -> Result<()> {
+        let name = fta_platform::windows::user_pipe_name(&format!(
+            "busy-timeout-{}",
+            uuid::Uuid::new_v4()
+        ))?;
+        let occupied = fta_platform::windows::create_user_pipe(&name, true)?;
+        let _first = tokio::net::windows::named_pipe::ClientOptions::new().open(&name)?;
+        occupied.connect().await?;
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            connect_windows_pipe(&name, std::time::Duration::from_millis(30)),
+        )
+        .await
+        .expect("busy connection must remain bounded");
+        assert_eq!(result.unwrap_err().code, "SERVICE_UNAVAILABLE");
+        Ok(())
+    }
+
+    // Absence is not transient contention: a missing engine must fail promptly, not wait the
+    // full busy budget or fabricate a connection that could enable offline transfer behavior.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_missing_pipe_is_not_retried() -> Result<()> {
+        let name =
+            fta_platform::windows::user_pipe_name(&format!("absent-{}", uuid::Uuid::new_v4()))?;
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            connect_windows_pipe(&name, std::time::Duration::from_secs(5)),
+        )
+        .await
+        .expect("missing pipe must fail without a busy wait");
+        assert_eq!(result.unwrap_err().code, "SERVICE_UNAVAILABLE");
+        Ok(())
     }
 }

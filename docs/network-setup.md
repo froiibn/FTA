@@ -39,3 +39,7 @@ Windows는 같은 DTO로 프로필을 조회하며 선택 연결의 고유 네�
 ### Windows 통합 보고
 
 Windows 담당의 통합 소스에서 headless84개·desktop9개(총93개), fmt/check/Clippy/TypeScript/Vite, 전용 도우미 동봉 NSIS 빌드 통과 보고를 받았다. 설치·시작·설정 창의 읽기 전용 검증은 진행 중이며 UAC 승인·프로필 전환·방화벽 규칙의 실제 적용은 미검증이다. 부모 검토에서 경로 대소문자 문자열 비교를 실제 파일 동일성 검사로 바꾸도록 후속 수정을 요청했다. Mac 병합본은 headless 72개와 desktop10개, fmt/check/Clippy/TypeScript/Vite를 통과했다.
+
+### Windows IPC 후속 검증
+
+후속2ea7cae에서는 연결 이전의 Windows ERROR_PIPE_BUSY에만 제한된 비동기 재시도를 추가했다. 요청 프레임 전송 이후는 재시도하지 않는다. Windows 담당은 headless87개·desktop9개(총96개), 필수 검사와 NSIS 빌드 및 동일 동시 읽기24건 전부 성공을 보고했다. 부모가 실제 diff의 제어 흐름을 검토하고 병합한 Mac 소스도 headless72개·desktop10개와 필수 검사를 통과했다. Windows 새 설치본의 최종 화면 확인 및 파일 경로 동일성 후속 검토는 진행 중이다.
