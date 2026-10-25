@@ -2,6 +2,8 @@
 
 현재 구현 범위와 검증 결과는 [구현 현황](implementation-status.md)을 따른다. 이 문서의 설계 목표 전체가 구현됐다는 의미는 아니다.
 
+사용자 지정 운영 원칙: 예산을 사용하는 GitHub Actions 빌드·테스트는 실행하지 않는다. 빌드·검증·패키징은 사용자 소유 Windows·Mac·Linux 기기에서 해당 OS별로 수행하고, GitHub Releases에는 로컬 검증을 마친 최종 설치 파일과 해시·빌드 정보를 게시한다. 기존 `push`·`pull_request` 자동 검사 워크플로는 비활성화하고 삭제했다. 아래 원격 CI 실패 기록은 이전 실행의 원인과 테스트 보완을 남긴 이력이며 재실행 요구가 아니다.
+
 ## 2026-10-25 릴리즈 전 검사
 
 macOS에서 전체 headless 검사를 실행하다 CLI·MCP 모의 IPC의 간헐적 `WouldBlock`을 확인했다. macOS `accept`가 리스너의 `O_NONBLOCK`을 상속하는 것을 별도 실험으로 확인했고, 양쪽 테스트 서버에서 accept 이후 스트림만 blocking으로 전환했다. 리스너의 유한 대기·미등록 전송 거절 검사는 유지했다. 프로덕션 IPC 동작은 변경하지 않았다. 수정 후 `cargo test`의 68개 테스트가 통과했다.
