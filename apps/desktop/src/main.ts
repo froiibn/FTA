@@ -120,7 +120,7 @@ let progressTimer: number | undefined;
 let activationProcessing = false;
 const receiptInFlight = new Set<number>();
 
-const TOAST_DURATION_MS = 5000;
+const TOAST_DURATION_MS = 2000;
 // Settings scroll independently; feedback must stay in the viewport instead of above the form.
 const toast = document.createElement("div");
 toast.className = "settings-toast";
@@ -128,25 +128,17 @@ toast.hidden = true;
 toast.setAttribute("role", "status");
 toast.setAttribute("aria-live", "polite");
 const toastMessage = document.createElement("span");
-const toastClose = document.createElement("button");
-toastClose.type = "button";
-toastClose.textContent = "×";
-toastClose.setAttribute("aria-label", "알림 닫기");
-toast.append(toastMessage, toastClose);
+toast.append(toastMessage);
 document.body.append(toast);
 let toastTimer: number | undefined;
-toastClose.addEventListener("click", () => {
-  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
-  toast.hidden = true;
-});
 
-// A newer result cancels the previous timer; failures persist until dismissed or replaced.
+// Keep every result lightweight and brief; a newer message receives its own full two seconds.
 function showSettingsToast(message: string, error: boolean): void {
   if (toastTimer !== undefined) window.clearTimeout(toastTimer);
   toastMessage.textContent = message;
   toast.classList.toggle("error", error);
   toast.hidden = false;
-  if (!error) toastTimer = window.setTimeout(() => { toast.hidden = true; }, TOAST_DURATION_MS);
+  toastTimer = window.setTimeout(() => { toast.hidden = true; toastTimer = undefined; }, TOAST_DURATION_MS);
 }
 
 // Errors remain visible without echoing arbitrary received content into HTML.
@@ -804,9 +796,11 @@ on("settings-form", "submit", (event) => {
       discovery_enabled: element<HTMLInputElement>("setting-discovery").checked,
     };
     // Distinguish a rejected save from unrelated actions and never emit success before persistence.
-    try { await rpc("settings.update", { values }); }
+    let saved: JsonObject;
+    try { saved = await rpc("settings.update", { values }) as JsonObject; }
     catch (error) { showNotice(`설정을 저장하지 못했습니다. ${userError(error)}`, true); return; }
-    showNotice("설정을 저장했어요. 네트워크 설정은 엔진 재시작 후 적용됩니다.");
+    // The engine reports pending network changes; ordinary live settings need no restart prompt.
+    showNotice(saved.restart_required ? "저장했어요. 서비스 재시작이 필요합니다." : "저장했어요.");
     await refresh();
   });
 });
