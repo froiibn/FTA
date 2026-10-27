@@ -31,6 +31,8 @@ pub struct Engine {
     pub identity: Identity,
     pub store: Store,
     pub sessions: Mutex<HashMap<String, crate::network::PairSession>>,
+    // Pending first-use sends live only while an online approval request is active.
+    pub(crate) registration: crate::network::approval::State,
     pub discovered: Mutex<HashMap<String, Device>>,
     pub pairing_addresses: Mutex<HashMap<String, String>>,
     pub network_token: CancellationToken,
@@ -66,6 +68,7 @@ impl Engine {
             identity,
             store,
             sessions: Mutex::new(HashMap::new()),
+            registration: crate::network::approval::State::default(),
             discovered: Mutex::new(HashMap::new()),
             pairing_addresses: Mutex::new(HashMap::new()),
             network_token: CancellationToken::new(),
@@ -153,6 +156,18 @@ impl Engine {
     }
     /// Completion wins a cancellation race; pending requests are never labelled as confirmed cancellation.
     async fn cancel_transfer(&self, id: &str) -> Result<Value> {
+        // Approval precedes a transfer DB row, but its caller-generated ID must still be cancellable.
+        if let Some(pending) = crate::network::approval::cancel_pending(self, id)? {
+            self.cancelled
+                .lock()
+                .map_err(|_| Error::new("INTERNAL", "cancel lock poisoned"))?
+                .insert(id.into());
+            match self.store.transfer(id) {
+                Err(error) if error.code == "NOT_FOUND" => return Ok(pending),
+                Err(error) => return Err(error),
+                Ok(_) => {}
+            }
+        }
         let record = self.store.transfer(id)?;
         if terminal_state(&record.state) {
             return Ok(serde_json::to_value(record)?);
@@ -237,18 +252,20 @@ impl Engine {
             }
             "devices.unpair" => {
                 let d = self.store.device(required(&p, "device_id")?)?;
+                // Use the same session-then-DB order as approval so a delayed accept cannot re-add a revoked pin.
+                let mut sessions = self
+                    .sessions
+                    .lock()
+                    .map_err(|_| Error::new("INTERNAL", "session lock poisoned"))?;
                 self.store.unpair(&d.device_id)?;
                 self.store
                     .interrupt_active(Some(&d.device_id), "UNTRUSTED")?;
                 // A cancelled/unpaired registration must not be resurrected by a delayed poll response.
-                self.sessions
-                    .lock()
-                    .map_err(|_| Error::new("INTERNAL", "session lock poisoned"))?
-                    .retain(|_, s| {
-                        s.peer
-                            .as_ref()
-                            .is_none_or(|peer| peer.device_id != d.device_id)
-                    });
+                sessions.retain(|_, s| {
+                    s.peer
+                        .as_ref()
+                        .is_none_or(|peer| peer.device_id != d.device_id)
+                });
                 Ok(json!({"unpaired":d.device_id}))
             }
             "settings.get" => Ok(serde_json::to_value(Config::load_or_create(&self.paths)?)?),
@@ -373,12 +390,34 @@ impl Engine {
             "inbox.get" => Ok(serde_json::to_value(
                 self.store.transfer(required(&p, "transfer_id")?)?,
             )?),
-            "transfers.get" => crate::network::reconcile(self, required(&p, "transfer_id")?).await,
+            "transfers.get" => {
+                let id = required(&p, "transfer_id")?;
+                // Only a genuinely absent row can be an approval wait; do not hide DB failures.
+                match self.store.transfer(id) {
+                    Err(error) if error.code == "NOT_FOUND" => {
+                        if let Some(pending) = crate::network::approval::pending(self, id)? {
+                            return Ok(pending);
+                        }
+                    }
+                    Err(error) => return Err(error),
+                    Ok(_) => {}
+                }
+                crate::network::reconcile(self, id).await
+            }
             "inbox.delete" => {
                 self.store.delete_record(required(&p, "transfer_id")?)?;
                 Ok(json!({"deleted":true}))
             }
             "transfers.send" => crate::network::send(self, p).await,
+            // MCP keeps using transfers.send; it cannot initiate registration as a side effect.
+            "transfers.send_discovered" => crate::network::approval::send(self, p).await,
+            "registration.requests" => crate::network::approval::requests(self),
+            "registration.accept" => {
+                crate::network::approval::decide(self, required(&p, "session_id")?, true).await
+            }
+            "registration.reject" => {
+                crate::network::approval::decide(self, required(&p, "session_id")?, false).await
+            }
             "transfers.cancel" => self.cancel_transfer(required(&p, "transfer_id")?).await,
             "pairing.open" => crate::network::pair_open(self).await,
             "pairing.connect" => crate::network::pair_connect(self, required(&p, "target")?).await,
@@ -533,6 +572,11 @@ async fn run_inner(paths: AppPaths, identity: Option<Identity>) -> Result<()> {
         c.listen_addr = network.local_addr()?;
     }
     let mut discovery = DiscoveryTask(crate::network::start_discovery(engine.clone())?);
+    // Keep a bounded registration listener ready so receiving a first send needs no manual mode.
+    let registration_engine = engine.clone();
+    let _registration = ListenerTask(tokio::spawn(crate::network::approval::listen(
+        registration_engine,
+    )));
     let net_engine = engine.clone();
     let mut network_task = ListenerTask(tokio::spawn(async move {
         crate::network::serve(net_engine, network, false).await

@@ -74,14 +74,8 @@ struct DesktopState {
     exit_allowed: AtomicBool,
     lifecycle_busy: AtomicBool,
     pending_activations: Mutex<VecDeque<String>>,
-    // Retain a discovery click until the separate settings WebView is ready to consume it.
-    registration_target: Mutex<Option<RegistrationRequest>>,
-}
-
-// A request without a target opens manual registration; absence of a request remains distinct.
-#[derive(serde::Serialize)]
-struct RegistrationRequest {
-    target: Option<String>,
+    // The real native dialog owns consent and is never duplicated by refresh polling.
+    registration_prompting: AtomicBool,
 }
 
 /// Serialize restarts and exits so a second click cannot exit while the first is still draining files.
@@ -143,10 +137,18 @@ async fn request(method: &str, params: Value) -> Result<Value, String> {
 #[tauri::command]
 async fn engine_request(method: String, params: Value) -> Result<Value, String> {
     match method.as_str() {
-        "status" | "devices.list" | "devices.probe" | "devices.unpair" | "inbox.list"
-        | "inbox.get" | "inbox.delete" | "settings.get" | "settings.update" | "pairing.open"
-        | "pairing.connect" | "pairing.confirm" | "pairing.cancel" | "pairing.status"
-        | "transfers.get" | "transfers.cancel" => request(&method, params).await,
+        "status"
+        | "devices.list"
+        | "devices.probe"
+        | "devices.unpair"
+        | "inbox.list"
+        | "inbox.get"
+        | "inbox.delete"
+        | "settings.get"
+        | "settings.update"
+        | "registration.requests"
+        | "transfers.get"
+        | "transfers.cancel" => request(&method, params).await,
         _ => Err("이 데스크톱 명령은 허용되지 않습니다".into()),
     }
 }
@@ -373,7 +375,7 @@ async fn send_files(
         }
     }
     request(
-        "transfers.send",
+        "transfers.send_discovered",
         json!({ "to": to, "kind": "files", "paths": paths, "transfer_id": transfer_id }),
     )
     .await
@@ -400,7 +402,7 @@ async fn send_message(
         _ => return Err("지원하지 않는 메시지 종류입니다".into()),
     }
     request(
-        "transfers.send",
+        "transfers.send_discovered",
         json!({ "to": to, "kind": kind, "body": body, "transfer_id": transfer_id }),
     )
     .await
@@ -955,56 +957,65 @@ async fn open_utility_window(app: tauri::AppHandle, kind: String) -> Result<(), 
     window.set_focus().map_err(|error| error.to_string())
 }
 
-/// Plus opens manual pairing; a discovered icon additionally validates its untrusted device hint.
+/// Recipient consent is a native user decision; generic WebView RPC cannot accept a peer.
 #[tauri::command]
-async fn begin_registration(
+async fn prompt_registration(
     window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
     state: State<'_, DesktopState>,
-    device_id: Option<String>,
+    session_id: String,
 ) -> Result<(), String> {
     require_main_window(window.label())?;
-    if let Some(id) = &device_id {
-        let devices = request("devices.list", json!({})).await?;
-        validate_registration_target(&devices, id)?;
+    if state.registration_prompting.swap(true, Ordering::AcqRel) {
+        return Err("등록 확인 창이 이미 열려 있습니다".into());
     }
-    *state
-        .registration_target
-        .lock()
-        .map_err(|_| "등록 상태 오류")? = Some(RegistrationRequest { target: device_id });
-    open_utility_window(window.app_handle().clone(), "settings".into()).await?;
-    window
-        .app_handle()
-        .emit_to("settings", "fta:registration-target", ())
-        .map_err(|error| error.to_string())
-}
-
-// Reject stale or forged UI hints; registration starts only from the engine's current discovery list.
-fn validate_registration_target(devices: &Value, device_id: &str) -> Result<(), String> {
-    uuid::Uuid::parse_str(device_id).map_err(|_| "잘못된 기기 ID입니다")?;
-    if !devices.as_array().is_some_and(|devices| {
-        devices
-            .iter()
-            .any(|device| device["device_id"] == device_id && device["paired"] == false)
-    }) {
-        return Err("자동 발견된 미등록 기기를 다시 선택하세요".into());
+    struct PromptGuard<'a>(&'a AtomicBool);
+    impl Drop for PromptGuard<'_> {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::Release);
+        }
     }
+    let _guard = PromptGuard(&state.registration_prompting);
+    let pending = request("registration.requests", json!({})).await?;
+    let incoming = pending
+        .as_array()
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|item| item["session_id"].as_str() == Some(session_id.as_str()))
+        })
+        .ok_or("등록 요청이 만료되었거나 취소되었습니다")?;
+    let name = incoming["display_name"]
+        .as_str()
+        .unwrap_or("알 수 없는 기기");
+    let address = incoming["address"].as_str().unwrap_or("");
+    let content = format!(
+        "{name} ({address})에서 처음으로 전송하려고 합니다.\n\n이 기기를 등록하시겠습니까? 등록하면 이후 파일·텍스트·URL을 자동으로 받습니다. 아는 기기인지 확인하세요."
+    );
+    show_main(&app);
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .message(content)
+        .title("기기 등록 요청")
+        .parent(&window)
+        .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom(
+            "등록 허용".into(),
+            "거절".into(),
+        ))
+        .show(move |accepted| {
+            let _ = sender.send(accepted);
+        });
+    let accepted = receiver.await.unwrap_or(false);
+    request(
+        if accepted {
+            "registration.accept"
+        } else {
+            "registration.reject"
+        },
+        json!({"session_id":session_id}),
+    )
+    .await?;
     Ok(())
-}
-
-/// Only settings can consume the one-shot target; the actual pairing still uses the engine protocol.
-#[tauri::command]
-fn take_registration_target(
-    window: tauri::WebviewWindow,
-    state: State<'_, DesktopState>,
-) -> Result<Option<RegistrationRequest>, String> {
-    if window.label() != "settings" {
-        return Err("설정 창에서만 등록할 수 있습니다".into());
-    }
-    Ok(state
-        .registration_target
-        .lock()
-        .map_err(|_| "등록 상태 오류")?
-        .take())
 }
 
 // A child close must destroy only its own window, never hide the transfer panel or stop its engine.
@@ -1096,8 +1107,7 @@ fn main() {
             start_window_drag,
             close_app_window,
             open_utility_window,
-            begin_registration,
-            take_registration_target,
+            prompt_registration,
             close_utility_window,
             set_autostart,
             autostart_status,
@@ -1255,22 +1265,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    // A history/settings window cannot reuse a file selection or acknowledge the main notification cursor.
-    // A clicked icon cannot substitute an address, registered peer, or absent discovery entry.
-    #[test]
-    fn registration_target_requires_current_unpaired_discovery() {
-        let id = uuid::Uuid::new_v4().to_string();
-        assert!(
-            validate_registration_target(&json!([{"device_id":id,"paired":false}]), &id).is_ok()
-        );
-        assert!(
-            validate_registration_target(&json!([{"device_id":id,"paired":true}]), &id).is_err()
-        );
-        assert!(validate_registration_target(&json!([]), &id).is_err());
-        assert!(validate_registration_target(&json!([{"device_id":id}]), &id).is_err());
-        assert!(validate_registration_target(&json!([]), "127.0.0.1:1").is_err());
-    }
-
+    // History/settings cannot borrow the native receiver consent action.
     #[test]
     fn transfer_and_notification_actions_belong_to_main_window() {
         assert!(require_main_window("main").is_ok());

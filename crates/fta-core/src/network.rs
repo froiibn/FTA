@@ -16,6 +16,9 @@ use sha2::{Digest, Sha256};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::io::AsyncWriteExt;
 
+// First-send approval reuses the isolated registration transport, never the file receiver.
+pub mod approval;
+
 const SERVICE_TYPE: &str = "_fta._tcp.local.";
 const MAX_META: usize = 256 * 1024;
 const CHUNK_SIZE: usize = 64 * 1024;
@@ -39,6 +42,9 @@ pub struct PairSession {
     pub peer: Option<Device>,
     pub nonce: String,
     pub initiated: bool,
+    // Absent on the explicit legacy/CLI comparison flow and on older peers.
+    #[serde(default)]
+    pub approval: Option<approval::Intent>,
 }
 fn lock_error() -> Error {
     Error::new("INTERNAL", "state lock poisoned")
@@ -65,6 +71,17 @@ fn store_session(e: &Engine, mut s: PairSession) -> Result<PairSession> {
         let previous = sessions
             .get(&s.session_id)
             .ok_or_else(|| Error::new("NOT_FOUND", "registration was cancelled"))?;
+        // A delayed status response must never resurrect a recipient's rejection/cancellation.
+        if previous.state == "rejected" {
+            return Err(Error::new(
+                "REGISTRATION_REJECTED",
+                "registration was rejected or cancelled",
+            ));
+        }
+        // A response started before expiry must not save trust after the approval budget ended.
+        if previous.state == "expired" || previous.expires_at < now() {
+            return Err(Error::new("TIMEOUT", "registration session expired"));
+        }
         s.local_confirmed |= previous.local_confirmed;
         s.remote_confirmed |= previous.remote_confirmed;
         if s.local_confirmed
@@ -96,15 +113,27 @@ pub fn pair_status(e: &Engine, id: Option<&str>) -> Result<Value> {
 }
 pub async fn pair_open(e: &Arc<Engine>) -> Result<Value> {
     e.ensure_network()?;
+    // Background readiness and explicit CLI opens must not create competing listeners.
+    let _opening = e.registration.opening.lock().await;
     e.sessions
         .lock()
         .map_err(|_| lock_error())?
         .retain(|_, s| s.expires_at >= now());
+    if let Some(waiting) = e
+        .sessions
+        .lock()
+        .map_err(|_| lock_error())?
+        .values()
+        .find(|s| !s.initiated && s.state == "waiting" && s.expires_at >= now())
+        .cloned()
+    {
+        return Ok(serde_json::to_value(waiting)?);
+    }
     if e.sessions
         .lock()
         .map_err(|_| lock_error())?
         .values()
-        .any(|s| s.expires_at >= now() && s.state != "paired")
+        .any(|s| s.expires_at >= now() && ["waiting", "compare"].contains(&s.state.as_str()))
     {
         return Err(Error::new("BUSY", "a registration session is already open"));
     }
@@ -121,6 +150,7 @@ pub async fn pair_open(e: &Arc<Engine>) -> Result<Value> {
         peer: None,
         nonce: uuid::Uuid::new_v4().to_string(),
         initiated: false,
+        approval: None,
     };
     let advertisement = PairAdvertisement(advertise_pairing(e, &session)?);
     e.sessions
@@ -138,11 +168,12 @@ pub async fn pair_open(e: &Arc<Engine>) -> Result<Value> {
                 let state = session_engine.sessions.lock().ok().and_then(|sessions| {
                     sessions
                         .get(&session_id)
+                        .filter(|session| session.expires_at >= now())
                         .map(|session| session.state.clone())
                 });
                 match state.as_deref() {
                     None => break,
-                    Some("paired") => {
+                    Some("paired" | "rejected") => {
                         advertisement.0.take().inspect(|daemon| {
                             let _ = daemon.shutdown();
                         });
@@ -153,7 +184,7 @@ pub async fn pair_open(e: &Arc<Engine>) -> Result<Value> {
         };
         tokio::select! {
             _=serve(engine.clone(),listener,true)=>{},
-            _=tokio::time::sleep(Duration::from_secs(PAIR_SECONDS))=>{},
+            // The first-send approval budget begins when a peer connects, not at engine startup.
             _=engine.network_token.cancelled()=>{},
             _=monitor=>{},
         }
@@ -284,6 +315,15 @@ async fn resolve_pairing_target(e: &Engine, target: &str) -> Result<String> {
 }
 
 pub async fn pair_connect(e: &Arc<Engine>, target: &str) -> Result<Value> {
+    pair_connect_mode(e, target, None).await
+}
+
+// Only a send explicitly requesting first-use registration supplies an approval intent.
+async fn pair_connect_mode(
+    e: &Arc<Engine>,
+    target: &str,
+    approval: Option<approval::Intent>,
+) -> Result<Value> {
     e.ensure_network()?;
     let target = resolve_pairing_target(e, target.trim()).await?;
     let address = allowed_address(e, &target)?;
@@ -291,7 +331,7 @@ pub async fn pair_connect(e: &Arc<Engine>, target: &str) -> Result<Value> {
     let nonce = uuid::Uuid::new_v4().to_string();
     let response = network_io(e, async {
         c.post(format!("https://{address}/pair/hello"))
-            .json(&json!({"device":e.own_device()?,"nonce":nonce}))
+            .json(&json!({"device":e.own_device()?,"nonce":nonce,"approval":approval}))
             .send()
             .await
             .map_err(net_error)
@@ -309,6 +349,13 @@ pub async fn pair_connect(e: &Arc<Engine>, target: &str) -> Result<Value> {
         .peer
         .clone()
         .ok_or_else(|| Error::new("INVALID_REQUEST", "missing remote registration identity"))?;
+    // A legacy peer must not silently downgrade recipient approval into a different trust flow.
+    if session.approval != approval {
+        return Err(Error::new(
+            "VERSION_UNSUPPORTED",
+            "peer does not support first-send registration approval",
+        ));
+    }
     if hex::decode(&peer.certificate).ok().as_deref() != Some(observed.as_slice()) {
         return Err(Error::new(
             "KEY_CHANGED",
@@ -342,7 +389,7 @@ pub async fn pair_connect(e: &Arc<Engine>, target: &str) -> Result<Value> {
             let Ok(mut s) = active_session(&engine, &id) else {
                 break;
             };
-            if s.state == "paired" {
+            if ["paired", "rejected", "expired"].contains(&s.state.as_str()) {
                 break;
             }
             let Some(peer) = &s.peer else {
@@ -363,11 +410,32 @@ pub async fn pair_connect(e: &Arc<Engine>, target: &str) -> Result<Value> {
             }
             .send();
             let response = network_io(&engine, async { request.await.map_err(net_error) }).await;
-            if let Ok(response) = response
-                && let Ok(value) = network_io(&engine, response_value(response)).await
-            {
-                s.remote_confirmed = value["local_confirmed"].as_bool().unwrap_or(false);
-                let _ = store_session(&engine, s);
+            if let Ok(response) = response {
+                match network_io(&engine, response_value(response)).await {
+                    Ok(value) => {
+                        if value["state"] == "rejected" {
+                            s.state = "rejected".into();
+                        }
+                        s.remote_confirmed = value["local_confirmed"].as_bool().unwrap_or(false);
+                        let _ = store_session(&engine, s);
+                    }
+                    Err(error)
+                        if s.approval.is_some()
+                            && ["NOT_FOUND", "REGISTRATION_REJECTED"]
+                                .contains(&error.code.as_str()) =>
+                    {
+                        // Explicit rejection/removal is terminal; do not wait until the old deadline.
+                        s.state = "rejected".into();
+                        let _ = store_session(&engine, s);
+                        break;
+                    }
+                    Err(error) if s.approval.is_some() && error.code == "TIMEOUT" => {
+                        s.state = "expired".into();
+                        let _ = store_session(&engine, s);
+                        break;
+                    }
+                    Err(_) => {}
+                }
             }
         }
     });
@@ -375,6 +443,12 @@ pub async fn pair_connect(e: &Arc<Engine>, target: &str) -> Result<Value> {
 }
 pub async fn pair_confirm(e: &Arc<Engine>, id: &str) -> Result<Value> {
     let mut session = active_session(e, id)?;
+    if session.state == "rejected" {
+        return Err(Error::new(
+            "REGISTRATION_REJECTED",
+            "registration was rejected or cancelled",
+        ));
+    }
     if session.peer.is_none() {
         return Err(Error::new(
             "INVALID_REQUEST",
@@ -807,7 +881,13 @@ async fn pair_route(
                 "registration identity does not match the TLS client certificate",
             ));
         }
-        if let Ok(old) = e.store.device(&peer.device_id)
+        // Database failures must not be mistaken for a new, unregistered identity.
+        let registered = match e.store.device(&peer.device_id) {
+            Ok(old) => Some(old),
+            Err(error) if error.code == "UNTRUSTED" => None,
+            Err(error) => return Err(error),
+        };
+        if let Some(old) = &registered
             && !hex::decode(&old.certificate)
                 .ok()
                 .is_some_and(|old| same_public_key(&old, &certificate))
@@ -824,6 +904,12 @@ async fn pair_route(
                 "peer address must match connection source",
             ));
         }
+        let intent: Option<approval::Intent> =
+            serde_json::from_value(body.get("approval").cloned().unwrap_or(Value::Null))?;
+        if let Some(intent) = &intent {
+            approval::validate_intent(intent)?;
+            approval::check_request(e, &peer)?;
+        }
         let mut sessions = e.sessions.lock().map_err(|_| lock_error())?;
         let session = sessions
             .values_mut()
@@ -832,11 +918,17 @@ async fn pair_route(
         session.comparison = comparison(&certificate, &e.identity.cert, nonce, &session.nonce)?;
         session.peer = Some(peer);
         session.state = "compare".into();
+        session.approval = intent;
+        if session.approval.is_some() {
+            session.expires_at = now() + PAIR_SECONDS;
+            // A previously accepted key is already trusted on this receiver; do not prompt twice.
+            session.local_confirmed = registered.is_some();
+        }
         let mut remote = session.clone();
         remote.peer = Some(e.own_device()?);
         return Ok(serde_json::to_value(remote)?);
     }
-    if path == "/pair/status" {
+    if path == "/pair/status" || path == "/pair/cancel" {
         let mut session = active_session(e, required(&body, "session_id")?)?;
         if session.initiated {
             return Err(Error::new(
@@ -845,11 +937,29 @@ async fn pair_route(
             ));
         }
         // Confirmation must be bound to the client identity, not merely a guessable network address.
-        if let Some(peer) = &session.peer
-            && (hex::decode(&peer.certificate).ok().as_deref() != cert
-                || allowed_address(e, &peer.address)?.ip() != address.ip())
+        let peer = session
+            .peer
+            .as_ref()
+            .ok_or_else(|| Error::new("UNTRUSTED", "registration has no connected peer"))?;
+        if hex::decode(&peer.certificate).ok().as_deref() != cert
+            || allowed_address(e, &peer.address)?.ip() != address.ip()
         {
             return Err(Error::new("UNTRUSTED", "session source changed"));
+        }
+        if path == "/pair/cancel" {
+            // Cancellation is authenticated exactly like status and never removes an accepted pin.
+            if let Some(current) = e
+                .sessions
+                .lock()
+                .map_err(|_| lock_error())?
+                .get_mut(&session.session_id)
+            {
+                current.state = "rejected".into();
+            }
+            return Ok(json!({"cancelled":true}));
+        }
+        if session.state == "rejected" {
+            return Ok(serde_json::to_value(session)?);
         }
         if body["confirmed"] == true {
             session.remote_confirmed = true;
@@ -1126,6 +1236,10 @@ async fn send_inner(
     t: &mut Transfer,
     sources: Vec<OpenedSource>,
 ) -> Result<()> {
+    // Cancellation can arrive while first-use consent or source validation is finishing.
+    if e.is_cancelled(&t.transfer_id) {
+        return Err(Error::new("CANCELLED", "transfer cancelled before sending"));
+    }
     probe(e, peer).await?;
     let address = allowed_address(e, &peer.address)?;
     let cert =
@@ -1143,6 +1257,9 @@ async fn send_inner(
     )
     .await?;
     let target = format!("{base}/{}", t.transfer_id);
+    if e.is_cancelled(&t.transfer_id) {
+        return Err(Error::new("CANCELLED", "transfer cancelled before payload"));
+    }
     if t.kind != "files" {
         let response = c
             .post(format!("{target}/message"))

@@ -59,7 +59,7 @@ root.innerHTML = `
     </header>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
     <section id="send-panel" class="panel send-board">
-      <aside class="target-rail"><div class="section-heading"><h2>기기</h2><div class="device-tools"><button id="refresh" class="quiet icon-label" aria-label="새로고침" title="새로고침"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button><button id="add-device" class="quiet small" aria-label="기기 등록" title="기기 등록">+</button></div></div><div id="devices" class="devices" role="group" aria-label="전송 대상"></div></aside>
+      <aside class="target-rail"><div class="section-heading"><h2>기기</h2><div class="device-tools"><button id="refresh" class="quiet icon-label" aria-label="새로고침" title="새로고침"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button></div></div><div id="devices" class="devices" role="group" aria-label="전송 대상"></div></aside>
       <div class="send-workspace">
         <section class="file-section" aria-labelledby="file-heading"><h2 id="file-heading" class="sr-only">파일</h2><button id="choose-files" class="quiet small" aria-label="파일 선택">파일 선택</button><div id="file-selection" class="file-selection" hidden><ul id="file-list"></ul><div class="selection-actions"><button id="clear-files" class="quiet">선택 해제</button><button id="send-files" class="primary">파일 보내기</button></div></div></section>
         <section class="composer" aria-labelledby="message-heading"><h2 id="message-heading" class="sr-only">텍스트 · 링크</h2><label class="sr-only" for="message">전송할 텍스트 또는 URL</label><div class="message-input"><textarea id="message" rows="2" placeholder="텍스트 또는 URL"></textarea><button id="send-message" class="primary send-arrow" aria-label="보내기" title="보내기" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div></section>
@@ -71,7 +71,7 @@ root.innerHTML = `
       <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 선택한 연결은 내가 사용하는 집 네트워크입니다.</label><label id="network-private-row" class="checkbox-label" hidden><input id="network-private" type="checkbox" /> 이 연결의 Windows 프로필을 개인으로 변경합니다. 다른 앱의 개인 프로필 방화벽 규칙에도 영향을 줍니다.</label><label class="checkbox-label"><input id="network-firewall" type="checkbox" /> FTA 엔진의 수신 통신 허용</label><p id="network-permission" class="help"></p><div class="form-actions"><button id="network-system-settings" class="secondary">시스템 설정 열기</button><button id="network-apply" class="primary" disabled>연결 설정 저장</button></div><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다. 저장 후 서비스를 재시작하면 적용됩니다.</p></section>
       <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label><p class="help">네트워크 변경은 저장 후 서비스를 재시작하면 적용됩니다.</p><div class="form-actions"><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button class="primary" type="submit">설정 저장</button></div></form>
       <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong>로그인 시 실행</strong><p>로그인하면 자동 수신을 시작합니다.</p></div><button id="autostart" class="secondary">확인 중</button></div><div class="settings-row"><div><strong>수신 알림</strong><p id="notification-status">알림 권한을 확인합니다.</p></div><button id="notification-permission" class="secondary">알림 허용</button></div></section>
-      <section class="settings-section"><div class="section-heading"><h2>기기 등록</h2><button id="pair-open" class="secondary small">등록 모드 열기</button></div><p class="help">양쪽 기기의 비교값이 같은지 확인한 뒤 등록하세요.</p><label for="pair-target">상대 기기 또는 LAN 주소</label><div class="inline-field"><input id="pair-target" placeholder="기기 ID 또는 주소" /><button id="pair-connect" class="secondary">연결</button></div><section id="pair-details" class="pair-details" aria-live="polite" hidden><div class="section-heading"><strong id="pair-state">연결 대기</strong><span id="pair-peer"></span></div><p id="pair-address"></p><p id="pair-comparison" class="comparison-value"></p><p id="pair-expiry" class="help"></p></section><input id="pair-session" type="hidden" /><div class="form-actions"><button id="pair-cancel" class="quiet">취소</button><button id="pair-confirm" class="primary">비교값 일치 확인</button></div><div id="paired-devices"></div></section>
+      <section class="settings-section"><div class="section-heading"><h2>등록된 기기</h2></div><p class="help">감지된 컴퓨터에 처음 보내면 상대에서 한 번만 등록을 확인합니다. 이후에는 바로 전송됩니다.</p><div id="paired-devices"></div></section>
       <div class="quit-row"><p class="help">창을 닫아도 수신은 계속됩니다.</p><button id="quit" class="danger">앱 종료</button></div>
     </section>
   </main>
@@ -114,9 +114,8 @@ let networkReady = false;
 let refreshing = false;
 let autostartEnabled = false;
 let currentDetail: TransferRecord | undefined;
-let activePairSession = "";
-// Keep registration actions ordered while native window recreation resumes engine-owned state.
-let pairOperation: Promise<void> = Promise.resolve();
+// Only one real incoming request owns the native consent prompt.
+let registrationPrompting = false;
 let inFlightId = "";
 let progressTimer: number | undefined;
 let activationProcessing = false;
@@ -187,6 +186,8 @@ function userError(error: unknown): string {
     PERMISSION_DENIED: "파일 또는 수신 폴더의 접근 권한을 확인하세요.",
     BUSY: "다른 작업을 처리하고 있습니다. 현재 작업이 끝난 뒤 다시 시도하세요.",
     UNTRUSTED: "등록되지 않은 기기입니다. 기기를 먼저 등록하세요.",
+    REGISTRATION_REJECTED: "상대 기기에서 등록을 거절했습니다. 전송하지 않았습니다.",
+    REGISTRATION_EXPIRED: "등록 확인 시간이 지났습니다. 상대에서 확인할 수 있을 때 다시 보내주세요.",
     KEY_CHANGED: "기기 인증 정보가 변경되었습니다. 기존 등록을 확인하고 다시 등록하세요.",
     NOT_FOUND: "항목을 찾을 수 없습니다. 기록이 삭제되었거나 더 이상 보관되지 않을 수 있습니다.",
     // A registration discovery miss is unrelated to deleted history or received files.
@@ -209,10 +210,10 @@ async function rpc<T>(method: string, params: JsonObject = {}): Promise<T> {
   return invoke<T>("engine_request", { method, params });
 }
 
-// Only online registered devices may become a target; a stale selection is cleared during refresh.
+// Discovery entries can request first-use consent; registered offline peers remain blocked.
 function selectedDevice(): Device | undefined {
   if (!networkReady) return undefined;
-  return devices.find((device) => device.device_id === selectedId && device.online && device.paired);
+  return devices.find((device) => device.device_id === selectedId && (!device.paired || device.online));
 }
 
 // Keep the destination in accessible action names without duplicating the selected device row.
@@ -274,7 +275,7 @@ function renderDevices(): void {
     button.dataset.deviceId = device.device_id;
     button.disabled = (device.paired && !device.online) || sending || !networkReady;
     button.setAttribute("aria-pressed", String(device.device_id === selectedId));
-    const status = device.paired ? (device.online ? "온라인" : "오프라인") : "등록 필요";
+    const status = device.paired ? (device.online ? "온라인" : "오프라인") : "처음 전송 시 등록 확인";
     button.title = `${device.display_name} · ${status}`;
     button.setAttribute("aria-label", `${device.display_name}, ${status}`);
     const deviceIcon = document.createElement("span");
@@ -290,11 +291,6 @@ function renderDevices(): void {
     name.textContent = device.display_name;
     button.append(deviceIcon, name);
     button.addEventListener("click", () => {
-      // Discovery is only a hint: open explicit pairing instead of granting transfer trust.
-      if (!device.paired) {
-        void act(async () => { await invoke("begin_registration", { deviceId: device.device_id }); });
-        return;
-      }
       selectedId = device.device_id;
       localStorage.setItem(LAST_DEVICE_KEY, selectedId);
       renderDevices();
@@ -314,7 +310,7 @@ function dropTarget(point: DropPoint): Device | undefined {
   if (!connected || !networkReady || sending || document.querySelector("dialog[open]") !== null) return undefined;
   const tile = document.elementFromPoint(point.x, point.y)?.closest<HTMLButtonElement>(".device-tile");
   if (!tile || tile.disabled) return undefined;
-  return devices.find((device) => device.device_id === tile.dataset.deviceId && device.online && device.paired);
+  return devices.find((device) => device.device_id === tile.dataset.deviceId && (!device.paired || device.online));
 }
 function highlightDropTarget(): void {
   const target = dragPoint ? dropTarget(dragPoint) : undefined;
@@ -419,26 +415,7 @@ async function refresh(): Promise<void> {
     if (!networkReady) showNotice("네트워크가 변경되었습니다. 설정 확인 후 서비스를 재시작하세요.", true, "connection");
     if (!selectedDevice()) selectedId = "";
     renderDevices();
-    if (connected && isMain) void act(processPendingActivations);
-    if (view === "settings" && !activePairSession) {
-      const pending = await pendingPairSession();
-      if (pending) applyPairSession(pending);
-    }
-    if (activePairSession) {
-      try {
-        const pairState = await rpc<JsonObject>("pairing.status", { session_id: activePairSession });
-        renderPair(pairState);
-        if (pairState.state === "paired") {
-          activePairSession = "";
-          showNotice("기기 등록이 완료되었어요.");
-        }
-      } catch (error) {
-        // The temporary listener expires even if its settings window stays open.
-        const expired = ["TIMEOUT", "NOT_FOUND"].includes(String(error).split(":", 1)[0] ?? "");
-        clearPairSession(expired ? "등록 모드가 만료되었거나 닫혔습니다. 등록 모드를 다시 열어주세요." : "등록 상태를 확인하지 못했습니다.");
-        showNotice(expired ? element("pair-state").textContent ?? "등록 모드를 다시 열어주세요." : userError(error), true);
-      }
-    }
+    if (connected && isMain) { void act(processPendingActivations); void act(processRegistrationRequests); }
   } catch (error) {
     connected = false;
     networkReady = false;
@@ -482,7 +459,7 @@ function initializeSettingsTabs(): void {
   tabs.setAttribute("role", "tablist");
   tabs.setAttribute("aria-label", "설정 그룹");
   const names = ["network", "computer", "app", "devices"];
-  const labels = ["네트워크", "이 컴퓨터", "앱 동작", "기기 등록"];
+  const labels = ["네트워크", "이 컴퓨터", "앱 동작", "등록 기기"];
   groups.forEach((group, index) => {
     const name = names[index];
     const label = labels[index];
@@ -515,39 +492,25 @@ function initializeSettingsTabs(): void {
   selectSettingsTab("computer");
 }
 
-// Consume a host-held target after the settings window has installed its listener (also handles cold creation).
-async function registerPendingDevice(): Promise<void> {
-  const request = await invoke<{ target: string | null } | null>("take_registration_target");
-  if (!request) return;
-  selectSettingsTab("devices");
-  // The engine owns registration lifetime; reopening this window must resume its existing session.
-  const target = request.target;
-  element<HTMLInputElement>("pair-target").value = target ?? "";
-  await pair("pairing.open", {});
-  if (!target) { element("pair-target").focus(); return; }
-  try { await pair("pairing.connect", { target }); }
-  catch (error) {
-    if (!String(error).startsWith("PAIRING_NOT_FOUND:") && !String(error).startsWith("NOT_FOUND:")) throw error;
-    // Both modes can already be open while discovery is delayed; keep the manual endpoint fallback visible.
-    showNotice("상대 컴퓨터에서 등록 모드를 확인하세요. 이미 열려 있다면 상대 등록 화면의 ‘연결 주소’를 입력해 연결할 수 있습니다.");
-  }
-}
-
 // Sending remains pending until the engine reports final storage; failure preserves the selection.
 async function sendFiles(): Promise<void> {
   const target = selectedDevice();
   if (!target || sending) throw new Error("온라인 기기를 먼저 선택해주세요.");
   sending = true;
-  beginProgress();
+  beginProgress(target);
   updateActions();
   element("transfer-status").hidden = false;
-  element("transfer-status").textContent = `${target.display_name}에 파일을 전송하고 있어요…`;
+  element("transfer-status").textContent = target.paired ? `${target.display_name}에 파일을 전송하고 있어요…` : `${target.display_name}에서 처음 한 번 등록을 허용해주세요.`;
   try {
     const result = await invoke<TransferRecord>("send_files", { to: target.device_id, paths: selectedPaths, transferId: inFlightId });
     element("transfer-status").textContent = `파일 전송 ${stateLabel(result.state)}`;
     if (result.state === "completed") selectedPaths = [];
     else showNotice(transferFailureMessage(result), true);
     await refreshHistory();
+  } catch (error) {
+    // Failed approval creates no transfer row; do not leave its old waiting caption visible.
+    element("transfer-status").textContent = userError(error);
+    throw error;
   } finally {
     await finishProgress();
     sending = false;
@@ -570,7 +533,7 @@ async function sendMessage(): Promise<void> {
   const input = element<HTMLTextAreaElement>("message");
   if (!target || !input.value || sending) throw new Error("받는 기기와 내용을 확인해주세요.");
   sending = true;
-  beginProgress();
+  beginProgress(target);
   updateActions();
   try {
     const result = await invoke<TransferRecord>("send_message", { to: target.device_id, kind: messageKind(input.value), body: input.value, transferId: inFlightId });
@@ -598,12 +561,12 @@ function transferFailureMessage(record: TransferRecord): string {
 }
 
 // Caller-generated IDs make cancellation possible before the long-running send IPC returns.
-function beginProgress(): void {
+function beginProgress(target: Device): void {
   inFlightId = crypto.randomUUID();
   element("cancel-transfer").hidden = false;
   element<HTMLButtonElement>("cancel-transfer").disabled = false;
   element("transfer-status").hidden = false;
-  element("transfer-status").textContent = "전송 준비 중…";
+  element("transfer-status").textContent = target.paired ? "전송 준비 중…" : "상대 기기의 등록 승인 대기 중…";
   element("transfer-progress-bar").hidden = true;
   progressTimer = window.setInterval(() => { void updateProgress(); }, PROGRESS_INTERVAL_MS);
 }
@@ -629,6 +592,12 @@ async function updateProgress(): Promise<void> {
   try {
     const record = await rpc<TransferRecord>("transfers.get", { transfer_id: id });
     if (inFlightId !== id) return;
+    // Consent waiting has no transferred bytes; do not show an invented percentage.
+    if (record.state === "awaiting_registration") {
+      element("transfer-progress-bar").hidden = true;
+      element("transfer-status").textContent = "상대 기기의 등록 승인 대기 중… 상대에서 등록 허용을 눌러주세요.";
+      return;
+    }
     const count = record.items.filter((item) => item.state === "completed").length;
     const total = record.items.reduce((sum, item) => sum + byteCount(item.size), 0n);
     const transferred = record.items.reduce((sum, item) => sum + byteCount(item.bytes_transferred ?? (item.state === "completed" ? item.size : "0")), 0n);
@@ -680,83 +649,16 @@ async function loadSettings(): Promise<void> {
   }
 }
 
-// Show only the comparison and actionable connection data, not certificate or protocol internals.
-function renderPair(result: JsonObject): void {
-  element("pair-details").hidden = false;
-  const states: Record<string, string> = { waiting: "상대 기기 연결 대기", compare: "양쪽 비교값을 확인하세요", paired: "등록 완료" };
-  element("pair-state").textContent = result.cancelled ? "등록 취소됨" : states[String(result.state)] ?? "등록 상태 확인";
-  const peer = typeof result.peer === "object" && result.peer !== null ? result.peer as JsonObject : undefined;
-  element("pair-peer").textContent = typeof peer?.display_name === "string" ? peer.display_name : "";
-  element("pair-address").textContent = typeof result.address === "string" ? `연결 주소  ${result.address}` : "";
-  const comparison = typeof result.comparison === "string" ? result.comparison : "";
-  element("pair-comparison").textContent = comparison ? comparison.match(/.{1,8}/g)?.join(" ") ?? comparison : "상대 기기에서 위 주소로 연결하면 비교값이 표시됩니다.";
-  element("pair-expiry").textContent = typeof result.expires_at === "number" ? `${new Date(result.expires_at * 1000).toLocaleTimeString()}까지 확인할 수 있습니다.` : "";
-  element<HTMLButtonElement>("pair-confirm").disabled = !comparison || result.state === "paired";
-}
-
-// Prefer an existing comparison over an unused listening slot left by an older two-sided flow.
-async function pendingPairSession(): Promise<JsonObject | undefined> {
-  const sessions = await rpc<JsonObject[]>("pairing.status");
-  const pending = sessions.filter((session) => session.state !== "paired");
-  return pending.find((session) => session.session_id === activePairSession && session.peer !== null && typeof session.peer === "object")
-    ?? pending.find((session) => session.peer !== null && typeof session.peer === "object")
-    ?? pending.find((session) => session.session_id === activePairSession)
-    ?? pending[0];
-}
-
-// Expired/cancelled sessions must not leave a usable comparison or a misleading waiting address.
-function clearPairSession(message: string): void {
-  activePairSession = "";
-  element<HTMLInputElement>("pair-session").value = "";
-  element("pair-details").hidden = false;
-  element("pair-state").textContent = message;
-  for (const id of ["pair-peer", "pair-address", "pair-comparison", "pair-expiry"]) element(id).textContent = "";
-  element<HTMLButtonElement>("pair-confirm").disabled = true;
-}
-
-// Restoring engine state must also restore the hidden ID used by confirm and cancel.
-function applyPairSession(result: JsonObject): void {
-  if (result.cancelled === true) { clearPairSession("등록을 취소했습니다."); return; }
-  renderPair(result);
-  if (typeof result.session_id === "string") element<HTMLInputElement>("pair-session").value = result.session_id;
-  if (typeof result.session_id === "string") activePairSession = result.session_id;
-}
-
-// Serialize clicks before opening a slot; duplicate opens and connects must not replace a comparison.
-async function pair(method: string, params: JsonObject): Promise<void> {
-  const operation = pairOperation.then(async () => {
-    let result: JsonObject;
-    if (method === "pairing.open") {
-      const pending = await pendingPairSession();
-      if (pending) result = pending;
-      else {
-        try { result = await rpc<JsonObject>(method, params); }
-        catch (error) {
-          // Another client can open a slot between the status query and the open request.
-          if (!String(error).startsWith("BUSY:")) throw error;
-          const current = await pendingPairSession();
-          if (!current) throw error;
-          result = current;
-        }
-      }
-    } else if (method === "pairing.connect") {
-      const pending = await pendingPairSession();
-      const peer = pending?.peer;
-      if (pending && typeof peer === "object" && peer !== null) {
-        applyPairSession(pending);
-        if ((peer as JsonObject).device_id !== params.target && !(pending.initiated === true && pending.address === params.target)) {
-          throw new Error("이미 다른 기기와 등록을 진행 중입니다. 현재 등록의 비교값을 확인하거나 취소한 뒤 다시 선택하세요.");
-        }
-        result = pending;
-      } else result = await rpc<JsonObject>(method, params);
-    } else result = await rpc<JsonObject>(method, params);
-    applyPairSession(result);
-    if (method === "pairing.cancel") activePairSession = "";
+// The main window owns native recipient consent; polling never auto-approves a request.
+async function processRegistrationRequests(): Promise<void> {
+  if (!isMain || registrationPrompting) return;
+  registrationPrompting = true;
+  try {
+    const requests = await rpc<JsonObject[]>("registration.requests");
+    if (typeof requests[0]?.session_id !== "string") return;
+    await invoke("prompt_registration", { sessionId: requests[0].session_id });
     await refresh();
-  });
-  // A failed request is reported to its caller without poisoning subsequent confirm/cancel actions.
-  pairOperation = operation.catch(() => {});
-  await operation;
+  } finally { registrationPrompting = false; }
 }
 
 // Native authorization is separate from transfer acceptance, and unavailable development builds say so.
@@ -813,8 +715,6 @@ async function quit(): Promise<void> {
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-window]")) button.addEventListener("click", () => navigate(button.dataset.window ?? "send"));
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-close-window]")) button.addEventListener("click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }); });
 for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) dialog.addEventListener("close", positionNotice);
-// Plus is a registration action, not a generic settings shortcut; the host retains it across window creation.
-on("add-device", "click", () => { void act(async () => { await invoke("begin_registration", { deviceId: null }); }); });
 on("refresh", "click", () => { void act(refresh); });
 on("reload-inbox", "click", () => { void act(refreshHistory); });
 on("message", "input", updateActions);
@@ -929,10 +829,6 @@ on("autostart", "click", () => { void act(async () => {
   element("autostart").textContent = autostartEnabled ? "켜짐 · 끄기" : "꺼짐 · 켜기";
 }); });
 on("notification-permission", "click", () => { void act(enableNotifications); });
-on("pair-open", "click", () => { void act(() => pair("pairing.open", {})); });
-on("pair-connect", "click", () => { void act(() => pair("pairing.connect", { target: element<HTMLInputElement>("pair-target").value.trim() })); });
-on("pair-confirm", "click", () => { void act(() => pair("pairing.confirm", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
-on("pair-cancel", "click", () => { void act(() => pair("pairing.cancel", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
 // Native required-field validation prevents submit; give it the same visible feedback as RPC errors.
 document.getElementById("settings-form")?.addEventListener("invalid", (event) => {
   const field = event.target;
@@ -1077,12 +973,10 @@ async function initialize(): Promise<void> {
     return;
   }
   if (!isMain) {
-    if (view === "settings") await listen("fta:registration-target", () => { void act(registerPendingDevice); });
     window.setInterval(() => { void act(refreshUtility); }, REFRESH_INTERVAL_MS);
     await act(refreshUtility);
     if (view === "settings") {
       await act(initializeSettingsControls);
-      await act(registerPendingDevice);
     }
     return;
   }

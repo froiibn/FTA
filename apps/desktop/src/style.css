@@ -107,12 +107,6 @@ label { display: block; margin: 13px 0 5px; font-size: 12px; color: #bdcad8; }
 .checkbox-label { display: flex; align-items: center; gap: 7px; margin-top: 14px; }
 .checkbox-label input { width: 14px; height: 14px; accent-color: var(--navy); }
 .form-actions { justify-content: flex-end; margin-top: 14px; }
-.inline-field { display: flex; gap: 8px; align-items: center; }
-.inline-field input { min-width: 0; }
-.pair-details { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 11px; padding: 12px; background: #202a34; border: 1px solid var(--line); border-radius: 5px; max-height: 250px; overflow-y: auto; }
-.comparison-value { padding: 9px 0; font-size: 13px; color: var(--ink); line-height: 1.85; font-variant-numeric: tabular-nums; }
-#pair-address { color: var(--muted); font-size: 11px; }
-#pair-peer { color: var(--muted); font-size: 11px; }
 .quit-row { margin-top: 2px; }
 .quit-row .help { margin: 0; }
 .danger { padding: 6px 12px; color: #efa6a0; background: var(--paper); border-color: #78534f; font-size: 12px; }
@@ -240,7 +234,6 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos .history-icon, .platform-macos .delete-record { color: var(--muted); }
 .platform-macos label { color: #bdbdbd; }
 .platform-macos .history-row, .platform-macos .settings-row + .settings-row, .platform-macos #detail-items p { border-color: var(--line); }
-.platform-macos .pair-details { background: #ffffff08; border-radius: 9px; }
 .platform-macos :where(.status-badge) { color: #cecece; background: #2c2c2c; }
 /* Explicit close hover wins all shared button selectors, keeping the red disk visible beneath its cross. */
 .platform-macos .utility-header button[data-close-window]:hover:not(:disabled), .platform-macos #close-app-window:hover:not(:disabled) { background: #ff5f57; border-color: #e34a43; opacity: 1; filter: none; }

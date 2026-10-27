@@ -30,6 +30,9 @@ pub struct Args {
     pub state_dir: Option<PathBuf>,
     #[arg(long, global = true)]
     pub runtime_dir: Option<PathBuf>,
+    // Explicit opt-in keeps unattended/MCP callers from opening trust prompts as a side effect.
+    #[arg(long, global = true)]
+    pub request_registration: bool,
     #[command(subcommand)]
     pub command: Command,
 }
@@ -42,6 +45,10 @@ pub enum Command {
     Pair {
         #[command(subcommand)]
         command: PairCommand,
+    },
+    Registration {
+        #[command(subcommand)]
+        command: RegistrationCommand,
     },
     Unpair {
         device_id: String,
@@ -102,6 +109,14 @@ pub enum PairCommand {
     Cancel {
         session_id: String,
     },
+}
+
+// A headless receiver makes the same one-time decision through explicit local commands.
+#[derive(Debug, Subcommand)]
+pub enum RegistrationCommand {
+    Requests,
+    Accept { session_id: String },
+    Reject { session_id: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -244,19 +259,22 @@ pub async fn execute(args: Args) -> Result<Value, CliError> {
         } => output.clone(),
         _ => None,
     };
-    let (method, params) = request_for(&args.command, &mut io::stdin().lock())?;
+    let (mut method, params) = request_for(&args.command, &mut io::stdin().lock())?;
+    if args.request_registration && method == "transfers.send" {
+        method = "transfers.send_discovered";
+    }
     let transfer_id = params
         .get("transfer_id")
         .and_then(Value::as_str)
         .map(str::to_owned);
-    if method == "transfers.send"
+    if matches!(method, "transfers.send" | "transfers.send_discovered")
         && let Some(id) = &transfer_id
     {
         eprintln!("transfer_id: {id}");
     }
 
     // Interrupting a socket alone would leave remote receipt ambiguous, so request cancellation explicitly.
-    let response = if method == "transfers.send" {
+    let response = if matches!(method, "transfers.send" | "transfers.send_discovered") {
         tokio::select! {
             result = ipc::request(&paths, method, params) => result.map_err(engine_error)?,
             signal = tokio::signal::ctrl_c() => {
@@ -315,6 +333,15 @@ pub fn request_for(
     match command {
         Command::Status => Ok(("status", json!({}))),
         Command::Devices => Ok(("devices.list", json!({}))),
+        Command::Registration { command } => match command {
+            RegistrationCommand::Requests => Ok(("registration.requests", json!({}))),
+            RegistrationCommand::Accept { session_id } => {
+                Ok(("registration.accept", json!({"session_id":session_id})))
+            }
+            RegistrationCommand::Reject { session_id } => {
+                Ok(("registration.reject", json!({"session_id":session_id})))
+            }
+        },
         Command::Pair { command } => match command {
             PairCommand::Open => Ok(("pairing.open", json!({}))),
             PairCommand::Status { session_id } => {
@@ -461,7 +488,11 @@ fn remote_error(error: &Value) -> CliError {
         "INVALID_REQUEST" | "TOO_LARGE" | "CONFIG_ERROR" => EXIT_INVALID,
         "OFFLINE" | "TIMEOUT" | "BUSY" => 3,
         // Missing registration discovery is a pairing failure, not a broken local IPC service.
-        "UNTRUSTED" | "KEY_CHANGED" | "PAIRING_NOT_FOUND" => 4,
+        "UNTRUSTED"
+        | "KEY_CHANGED"
+        | "PAIRING_NOT_FOUND"
+        | "REGISTRATION_REJECTED"
+        | "REGISTRATION_EXPIRED" => 4,
         "NO_SPACE" | "PERMISSION_DENIED" | "SOURCE_CHANGED" | "HASH_MISMATCH" => 5,
         "UNKNOWN" | "RESULT_UNKNOWN" => 7,
         "CANCELLED" => EXIT_INTERRUPTED,
