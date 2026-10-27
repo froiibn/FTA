@@ -75,7 +75,13 @@ struct DesktopState {
     lifecycle_busy: AtomicBool,
     pending_activations: Mutex<VecDeque<String>>,
     // Retain a discovery click until the separate settings WebView is ready to consume it.
-    registration_target: Mutex<Option<String>>,
+    registration_target: Mutex<Option<RegistrationRequest>>,
+}
+
+// A request without a target opens manual registration; absence of a request remains distinct.
+#[derive(serde::Serialize)]
+struct RegistrationRequest {
+    target: Option<String>,
 }
 
 /// Serialize restarts and exits so a second click cannot exit while the first is still draining files.
@@ -114,7 +120,8 @@ fn mac_window_style(mut context: tauri::Context<tauri::Wry>) -> tauri::Context<t
         window.transparent = true;
         window.background_color = Some(Color(0, 0, 0, 0));
         window.window_effects = Some(WindowEffectsConfig {
-            effects: vec![WindowEffect::HudWindow],
+            // Sidebar material transmits the desktop tint more clearly than the dense HUD material.
+            effects: vec![WindowEffect::Sidebar],
             state: Some(WindowEffectState::Active),
             radius: Some(WINDOW_CORNER_RADIUS),
             ..Default::default()
@@ -947,20 +954,22 @@ async fn open_utility_window(app: tauri::AppHandle, kind: String) -> Result<(), 
     window.set_focus().map_err(|error| error.to_string())
 }
 
-/// A discovered icon starts explicit registration, never automatic trust or arbitrary-address access.
+/// Plus opens manual pairing; a discovered icon additionally validates its untrusted device hint.
 #[tauri::command]
-async fn begin_device_registration(
+async fn begin_registration(
     window: tauri::WebviewWindow,
     state: State<'_, DesktopState>,
-    device_id: String,
+    device_id: Option<String>,
 ) -> Result<(), String> {
     require_main_window(window.label())?;
-    let devices = request("devices.list", json!({})).await?;
-    validate_registration_target(&devices, &device_id)?;
+    if let Some(id) = &device_id {
+        let devices = request("devices.list", json!({})).await?;
+        validate_registration_target(&devices, id)?;
+    }
     *state
         .registration_target
         .lock()
-        .map_err(|_| "등록 상태 오류")? = Some(device_id);
+        .map_err(|_| "등록 상태 오류")? = Some(RegistrationRequest { target: device_id });
     open_utility_window(window.app_handle().clone(), "settings".into()).await?;
     window
         .app_handle()
@@ -986,7 +995,7 @@ fn validate_registration_target(devices: &Value, device_id: &str) -> Result<(), 
 fn take_registration_target(
     window: tauri::WebviewWindow,
     state: State<'_, DesktopState>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<RegistrationRequest>, String> {
     if window.label() != "settings" {
         return Err("설정 창에서만 등록할 수 있습니다".into());
     }
@@ -1086,7 +1095,7 @@ fn main() {
             start_window_drag,
             close_app_window,
             open_utility_window,
-            begin_device_registration,
+            begin_registration,
             take_registration_target,
             close_utility_window,
             set_autostart,

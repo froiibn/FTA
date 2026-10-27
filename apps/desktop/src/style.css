@@ -192,7 +192,7 @@ body.folded .shell { display: none; }
 
 /* Mac alone uses native vibrancy behind quiet black surfaces; Windows keeps its existing palette. */
 html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --muted: #a5a5a5; --navy: #c4c4c4; --line: #ffffff18; --selection: #ffffff12; --focus: #d3d3d3; background: transparent; height: 100%; border-radius: 14px; overflow: hidden; }
-.platform-macos body { height: 100dvh; min-height: 100dvh; border-radius: 14px; overflow: auto; background: rgb(0 0 0 / 82%); }
+.platform-macos body { height: 100dvh; min-height: 100dvh; border-radius: 14px; overflow: auto; background: rgb(20 20 20 / 58%); }
 .platform-macos .shell { background: transparent; border-radius: 14px; border: 1px solid #ffffff16; overflow: hidden; }
 .platform-macos .app-header { background: transparent; border-bottom: 0; padding: 5px 9px; gap: 7px; }
 .platform-macos .brand { flex: 1; gap: 5px; }
@@ -200,7 +200,8 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos h1 { font-size: 13px; font-weight: 600; color: #d9d9d9; }
 .platform-macos .window-actions { gap: 1px; }
 .platform-macos .window-actions .quiet { padding: 4px; }
-.platform-macos .quiet:hover:not(:disabled), .platform-macos .quiet[aria-pressed="true"] { background: #ffffff12; color: var(--ink); border-color: transparent; }
+/* Close controls have their own red hover surface and must not inherit generic quiet-button fills. */
+.platform-macos .quiet:not([data-close-window]):not(#close-app-window):hover:not(:disabled), .platform-macos .quiet[aria-pressed="true"] { background: #ffffff12; color: var(--ink); border-color: transparent; }
 .platform-macos .device-tile { background: transparent; border-radius: 10px; }
 .platform-macos .device-tile[aria-pressed="true"] { background: #ffffff10; border-color: #ffffff35; }
 .platform-macos .device-tile.drop-target { background: #ffffff1c; border-color: #ffffff70; outline-color: #ffffff70; }
@@ -210,7 +211,7 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos .secondary, .platform-macos .danger { background: #ffffff08; border-color: #ffffff25; }
 .platform-macos .message-input textarea { background: rgb(0 0 0 / 28%); }
 .platform-macos .send-arrow { background: #ffffff18; color: #eeeeee; border: 0; }
-.platform-macos .utility-window { background: rgb(12 12 12 / 35%); border-radius: 14px; }
+.platform-macos .utility-window { background: rgb(20 20 20 / 18%); border-radius: 14px; }
 .platform-macos .utility-header { position: relative; justify-content: center; background: transparent; border-bottom-color: #ffffff12; min-height: 40px; }
 .platform-macos .utility-header h2 { font-size: 13px; font-weight: 600; }
 .platform-macos .settings-tabs button { border-radius: 6px 6px 0 0; }
@@ -220,7 +221,7 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos .utility-header [data-close-window] { position: absolute; left: 18px; top: 14px; }
 .platform-macos #close-app-window svg { display: none; }
 .platform-macos #close-app-window:hover::after, .platform-macos .utility-header [data-close-window]:hover::after { content: "×"; position: absolute; inset: -1px; color: #651b15; font: 12px/12px -apple-system, sans-serif; text-align: center; }
-.platform-macos body.folded { background: rgb(0 0 0 / 78%); }
+.platform-macos body.folded { background: rgb(20 20 20 / 58%); }
 .platform-macos .expand-widget { background: transparent; border-radius: 14px; border-color: #ffffff25; }
 .platform-macos .notice { background: #ffffff0c; color: var(--ink); }
 .platform-macos .notice.error { background: #382828; color: #efaaa4; }
@@ -241,3 +242,5 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos .history-row, .platform-macos .settings-row + .settings-row, .platform-macos #detail-items p { border-color: var(--line); }
 .platform-macos .pair-details { background: #ffffff08; border-radius: 9px; }
 .platform-macos :where(.status-badge) { color: #cecece; background: #2c2c2c; }
+/* Explicit close hover wins all shared button selectors, keeping the red disk visible beneath its cross. */
+.platform-macos .utility-header button[data-close-window]:hover:not(:disabled), .platform-macos #close-app-window:hover:not(:disabled) { background: #ff5f57; border-color: #e34a43; opacity: 1; filter: none; }

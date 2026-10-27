@@ -288,7 +288,7 @@ function renderDevices(): void {
     button.addEventListener("click", () => {
       // Discovery is only a hint: open explicit pairing instead of granting transfer trust.
       if (!device.paired) {
-        void act(async () => { await invoke("begin_device_registration", { deviceId: device.device_id }); });
+        void act(async () => { await invoke("begin_registration", { deviceId: device.device_id }); });
         return;
       }
       selectedId = device.device_id;
@@ -507,12 +507,18 @@ function initializeSettingsTabs(): void {
 
 // Consume a host-held target after the settings window has installed its listener (also handles cold creation).
 async function registerPendingDevice(): Promise<void> {
-  const target = await invoke<string | null>("take_registration_target");
-  if (!target) return;
+  const request = await invoke<{ target: string | null } | null>("take_registration_target");
+  if (!request) return;
   selectSettingsTab("devices");
-  if (activePairSession) throw new Error("진행 중인 등록을 완료하거나 취소한 뒤 다시 선택하세요.");
-  element<HTMLInputElement>("pair-target").value = target;
+  // Plus may revisit the active comparison without replacing its session or losing confirmation state.
+  if (activePairSession) {
+    if (request.target) throw new Error("진행 중인 등록을 완료하거나 취소한 뒤 다시 선택하세요.");
+    return;
+  }
+  const target = request.target;
+  element<HTMLInputElement>("pair-target").value = target ?? "";
   await pair("pairing.open", {});
+  if (!target) { element("pair-target").focus(); return; }
   try { await pair("pairing.connect", { target }); }
   catch (error) {
     if (!String(error).includes("NOT_FOUND")) throw error;
@@ -745,7 +751,8 @@ async function quit(): Promise<void> {
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-window]")) button.addEventListener("click", () => navigate(button.dataset.window ?? "send"));
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-close-window]")) button.addEventListener("click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }); });
 for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) dialog.addEventListener("close", positionNotice);
-on("add-device", "click", () => navigate("settings"));
+// Plus is a registration action, not a generic settings shortcut; the host retains it across window creation.
+on("add-device", "click", () => { void act(async () => { await invoke("begin_registration", { deviceId: null }); }); });
 on("refresh", "click", () => { void act(refresh); });
 on("reload-inbox", "click", () => { void act(refreshHistory); });
 on("message", "input", updateActions);
