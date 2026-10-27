@@ -37,7 +37,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\packaging\window
 
 | 파일 | 용도 |
 |---|---|
-| `*-setup.exe` | 현재 사용자용 x64 설치 프로그램 |
+| `*-setup.exe` | Program Files를 기본값으로 제시하고 다른 폴더 선택을 허용하는 모든 사용자용 x64 설치 프로그램 |
 | `fta.exe` | 설치 앱 엔진에 연결하는 진단·CLI 도구 |
 | `fta-engine.exe`, `fta-mcp.exe` | 같은 빌드의 엔진·MCP 진단용 실행 파일 |
 | `SHA256SUMS.txt` | 배포 파일 무결성 비교값 |
@@ -49,14 +49,16 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\packaging\window
 Get-FileHash -Algorithm SHA256 -LiteralPath '.\실제-설치파일명-setup.exe'
 ```
 
-직접 빌드한 테스트 패키지에는 배포용 코드 서명을 적용하지 않는다. 배포 게시자 서명 검증은 별도 미완료 항목이다. 설치 파일 형식과 현재 사용자 설치 방식은 [Tauri NSIS 안내](https://v2.tauri.app/distribute/windows-installer/)를 따른다.
+직접 빌드한 테스트 패키지에는 배포용 코드 서명을 적용하지 않는다. 배포 게시자 서명 검증은 별도 미완료 항목이다. 설치 파일 형식과 모든 사용자용 설치 방식은 [Tauri NSIS 안내](https://v2.tauri.app/distribute/windows-installer/#install-modes)를 따른다.
+
+`apps/desktop/src-tauri/tauri.windows.conf.json`의 `installMode`는 사용자 요청에 따라 `perMachine`으로 설정한다. 기본 설치 위치를 AppData에서 OS의 Program Files 아래 `FTA`로 바꾸기 위한 선택이다. 기본 NSIS 폴더 선택 페이지를 유지하므로 다른 드라이브·폴더도 지정할 수 있고, 같은 설치 범위의 재설치는 이전 선택을 복원한다. 경로를 하드코딩하거나 이 동작만을 위해 NSIS 템플릿을 복제하지 않는다. Program Files에 실행 파일을 쓰고 모든 사용자용 설치 정보를 등록하므로 설치 시 관리자 승인이 필요하다.
 
 네트워크 자동 설정용 Windows 빌드에는 `fta-network-helper.exe`도 엔진 옆에 동봉한다. 이 파일은 사용자가 집 연결을 확인하고 설정 적용을 요청할 때만 UAC 대상으로 실행하는 일회용 도우미이며, UI·엔진 전체를 관리자 권한으로 실행하지 않는다. 개발 시 같은 빌드 폴더에서 `fta-network-helper.exe --inspect`로 읽기 전용 상태를 확인할 수 있다. 실제 승인·취소와 규칙 적용 검증은 별도로 수행하고 [설정 어댑터의 제한](../../docs/platforms/windows.md#앱-네트워크-설정-어댑터)을 따른다.
 
 ## 3. 설치와 첫 실행
 
 1. 전송 중인 기존 FTA가 있다면 완료를 기다리고 트레이 메뉴로 종료한다.
-2. 생성된 `*-setup.exe`를 실행해 현재 사용자에게 설치한다. 설치 위치를 기록한다.
+2. 생성된 `*-setup.exe`를 실행하고 설치 관리자 승인을 진행한다. 기본 `C:\Program Files\FTA`를 사용하거나 폴더 선택 화면에서 다른 위치를 지정하고 실제 설치 위치를 기록한다. OS의 Program Files 위치가 다른 환경에서는 해당 OS 경로를 사용한다.
 3. 시작 메뉴의 FTA를 일반 사용자 권한으로 실행한다. 설치 위치에 앱과 `fta-engine.exe`, `fta-mcp.exe`가 함께 있는지 확인한다.
 4. 설정에서 기기 이름과 쓰기 가능한 수신 폴더를 저장한다. 기본 수신 폴더는 Windows Downloads의 `FTA`다.
 5. 알림을 사용하려면 FTA의 알림 설정과 Windows 설정의 시스템 → 알림 → FTA를 확인한다. 집중 모드는 알림 표시를 억제할 수 있다.
@@ -70,7 +72,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath '.\실제-설치파일명-setup.exe'
 .\fta.exe config show --json
 ```
 
-설정·DB·DPAPI 보호 키는 현재 사용자의 `%LOCALAPPDATA%\FTA`에 있다. 문제 보고 때 이 폴더 전체나 키 파일을 공유하지 않는다.
+설정·DB·DPAPI 보호 키는 설치 폴더와 별개로 현재 사용자의 `%LOCALAPPDATA%\FTA`에 있다. 문제 보고 때 이 폴더 전체나 키 파일을 공유하지 않는다. 기존 현재 사용자용 설치와 새 모든 사용자용 설치는 설치 정보의 등록 범위가 다르므로, 이전 설치의 자동 이동·설정 이전이 끝났다고 가정하지 않는다. 기존 앱을 종료한 뒤 새 경로와 등록 정보를 확인하고, 이전 설치를 제거할 때 앱 데이터 삭제를 선택하지 않는다. Codex 같은 패키지 앱에서 실행한 이전 설치는 AppData 경로가 패키지별 LocalCache로 리디렉션됐을 수 있으므로 실제 데이터 위치도 확인한다. 이번 설정 변경은 기존 설정·키·수신 파일을 이동하거나 삭제하지 않는다.
 
 ## 4. 집 LAN 설정과 최초 기기 등록
 
@@ -115,4 +117,4 @@ Linux 테스트는 서버 배포판·CPU를 확인하고 [Linux 설치](../linux
 
 실패하면 다음을 기록한다: 실패한 검증 행, Windows 버전, `build-info.json`, `build.log`의 첫 오류, CLI 상태, 전송 ID와 오류 코드. 로그에 개인 경로·기기 ID가 포함될 수 있으므로 공유 전에 확인한다. 연결 오류에는 엔진 중복 실행보다 앱 설정의 서비스 재시작을 먼저 사용한다.
 
-업데이트·제거는 전송이 없는 때 수행한다. Windows 설치된 앱에서 제거하고 수신 파일·기존 설정의 보존 여부를 확인한다. 현재 사용자 설치·재설치·실행·프로토콜과 알림 바로가기 등록, Private 프로필의 엔진·집 대역 한정 규칙을 통한 Mac 양방향 파일 송수신은 확인했다. 제거·실제 알림 표시와 클릭·로그인 시 자동 실행·Public 프로필 차단 동작은 **아직 Windows 실기 미검증**이며 이 검증표의 결과로 갱신한다.
+업데이트·제거는 전송이 없는 때 수행한다. Windows 설치된 앱에서 제거하고 수신 파일·기존 설정의 보존 여부를 확인한다. 앞선 현재 사용자용 설치·재실행·프로토콜·알림 바로가기 등록과 Private 프로필의 Mac 양방향 전송 기록은 유지한다. 새 모든 사용자용 설치의 Program Files 기본값·사용자 지정 경로·이전 설치에서의 전환은 사용자가 직접 검증한다. 제거·실제 알림 표시와 클릭·로그인 시 자동 실행·Public 프로필 차단 동작도 **아직 Windows 실기 미검증**이며 이 검증표의 결과로 갱신한다.
