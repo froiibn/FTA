@@ -120,9 +120,44 @@ let progressTimer: number | undefined;
 let activationProcessing = false;
 const receiptInFlight = new Set<number>();
 
+const TOAST_DURATION_MS = 5000;
+// Settings scroll independently; feedback must stay in the viewport instead of above the form.
+const toast = document.createElement("div");
+toast.className = "settings-toast";
+toast.hidden = true;
+toast.setAttribute("role", "status");
+toast.setAttribute("aria-live", "polite");
+const toastMessage = document.createElement("span");
+const toastClose = document.createElement("button");
+toastClose.type = "button";
+toastClose.textContent = "×";
+toastClose.setAttribute("aria-label", "알림 닫기");
+toast.append(toastMessage, toastClose);
+document.body.append(toast);
+let toastTimer: number | undefined;
+toastClose.addEventListener("click", () => {
+  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
+  toast.hidden = true;
+});
+
+// A newer result cancels the previous timer; failures persist until dismissed or replaced.
+function showSettingsToast(message: string, error: boolean): void {
+  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
+  toastMessage.textContent = message;
+  toast.classList.toggle("error", error);
+  toast.hidden = false;
+  if (!error) toastTimer = window.setTimeout(() => { toast.hidden = true; }, TOAST_DURATION_MS);
+}
+
 // Errors remain visible without echoing arbitrary received content into HTML.
 function showNotice(message: string, error = false, source = "action"): void {
   const notice = element("notice");
+  // User actions in settings use a fixed toast; background connectivity keeps its own banner.
+  if (view === "settings" && source === "action") {
+    if (notice.dataset.source === "action") notice.hidden = true;
+    showSettingsToast(message, error);
+    return;
+  }
   // Keep connection recovery from clearing an unrelated transfer or permission failure.
   notice.dataset.source = source;
   notice.textContent = message;
@@ -154,6 +189,7 @@ function userError(error: unknown): string {
     NETWORK_CHANGED: "집 네트워크가 변경되어 전송을 중지했습니다. 설정 확인 후 서비스를 재시작하세요.",
     NETWORK_DENIED: "허용한 집 네트워크의 주소가 아닙니다. 연결 설정을 확인하세요.",
     NO_SPACE: "받는 기기의 저장 공간이 부족합니다.",
+    IO_ERROR: "파일 또는 폴더에 접근하지 못했습니다. 경로와 접근 권한을 확인하세요.",
     PERMISSION_DENIED: "파일 또는 수신 폴더의 접근 권한을 확인하세요.",
     BUSY: "다른 작업을 처리하고 있습니다. 현재 작업이 끝난 뒤 다시 시도하세요.",
     UNTRUSTED: "등록되지 않은 기기입니다. 기기를 먼저 등록하세요.",
@@ -752,6 +788,11 @@ on("pair-open", "click", () => { void act(() => pair("pairing.open", {})); });
 on("pair-connect", "click", () => { void act(() => pair("pairing.connect", { target: element<HTMLInputElement>("pair-target").value.trim() })); });
 on("pair-confirm", "click", () => { void act(() => pair("pairing.confirm", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
 on("pair-cancel", "click", () => { void act(() => pair("pairing.cancel", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
+// Native required-field validation prevents submit; give it the same visible feedback as RPC errors.
+document.getElementById("settings-form")?.addEventListener("invalid", (event) => {
+  const field = event.target;
+  if (field instanceof HTMLInputElement) showNotice(field.validationMessage, true);
+}, true);
 on("settings-form", "submit", (event) => {
   event.preventDefault();
   void act(async () => {
@@ -762,7 +803,9 @@ on("settings-form", "submit", (event) => {
       allowed_networks: element<HTMLInputElement>("setting-networks").value.split(",").map((value) => value.trim()).filter(Boolean),
       discovery_enabled: element<HTMLInputElement>("setting-discovery").checked,
     };
-    await rpc("settings.update", { values });
+    // Distinguish a rejected save from unrelated actions and never emit success before persistence.
+    try { await rpc("settings.update", { values }); }
+    catch (error) { showNotice(`설정을 저장하지 못했습니다. ${userError(error)}`, true); return; }
     showNotice("설정을 저장했어요. 네트워크 설정은 엔진 재시작 후 적용됩니다.");
     await refresh();
   });
