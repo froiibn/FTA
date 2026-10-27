@@ -95,6 +95,34 @@ impl Drop for LifecycleGuard<'_> {
     }
 }
 
+/// The host supplies the actual build platform so Mac styles never depend on a browser user-agent guess.
+#[tauri::command]
+fn desktop_platform() -> &'static str {
+    std::env::consts::OS
+}
+
+// Apply Mac materials before any main or utility WebView is constructed; shared Windows config is untouched.
+#[cfg(target_os = "macos")]
+fn mac_window_style(mut context: tauri::Context<tauri::Wry>) -> tauri::Context<tauri::Wry> {
+    use tauri::utils::{
+        WindowEffect, WindowEffectState,
+        config::{Color, WindowEffectsConfig},
+    };
+    const WINDOW_CORNER_RADIUS: f64 = 14.0;
+    context.config_mut().app.macos_private_api = true;
+    for window in &mut context.config_mut().app.windows {
+        window.transparent = true;
+        window.background_color = Some(Color(0, 0, 0, 0));
+        window.window_effects = Some(WindowEffectsConfig {
+            effects: vec![WindowEffect::HudWindow],
+            state: Some(WindowEffectState::Active),
+            radius: Some(WINDOW_CORNER_RADIUS),
+            ..Default::default()
+        });
+    }
+    context
+}
+
 /// Recoverable engine errors reach the UI instead of terminating the tray process.
 async fn request(method: &str, params: Value) -> Result<Value, String> {
     let paths = AppPaths::discover().map_err(|error| error.to_string())?;
@@ -1012,6 +1040,9 @@ fn stop_owned_engine(app: &tauri::AppHandle) {
 
 /// Platform plugins stay in the desktop binary so Linux CLI builds remain display-independent.
 fn main() {
+    let context = tauri::generate_context!();
+    #[cfg(target_os = "macos")]
+    let context = mac_window_style(context);
     let app = tauri::Builder::default()
         .manage(DesktopState::default())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
@@ -1039,6 +1070,7 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             engine_request,
+            desktop_platform,
             network_setup_status,
             open_network_settings,
             network_setup_apply,
@@ -1169,7 +1201,7 @@ fn main() {
             }
             _ => {}
         })
-        .build(tauri::generate_context!());
+        .build(context);
     match app {
         Ok(app) => {
             // Apple requires this delegate before applicationDidFinishLaunching, not Tauri's later setup callback.

@@ -24,6 +24,8 @@ url = "2"
 uuid = "1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# Transparent WebViews are required only by the Mac vibrancy surface; Windows stays opaque.
+tauri = { version = "2", features = [] }
 fta-platform = { path = "../../../crates/fta-platform" }
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSBundle", "NSDictionary", "NSString", "NSError"] }
