@@ -51,4 +51,4 @@ Tauri 번들러로 생성한 앱 번들의 엔진을 포함한 서명과 notariz
 
 ## Mac 전용 창 소재
 
-Mac 빌드에서만 Tauri `macos-private-api` 기능으로 투명 WebView를 사용한다. Mac 전용 호스트 초기화가 본체·설정·기록 창 설정에 Sidebar vibrancy와 14px 반경을 적용한다. 공통 JSON 창 설정은 바꾸지 않는다. 실제 플랫폼은 좁은 읽기 전용 `desktop_platform` 명령으로 전달하며 파일·셸·네트워크 권한을 추가하지 않는다. 빨간 닫기 컨트롤은 기존 앱 내 타이틀바 버튼으로, AppKit 신호등 직접 조작이나 네이티브 타이틀바 추가는 하지 않는다.
+Mac 빌드에서만 Tauri `macos-private-api` 기능으로 투명 WebView를 사용한다. Mac 전용 호스트 초기화가 본체·설정·기록 창 설정에 macOS 26 이상의 Clear Glass(이전 OS는 Menu vibrancy)와 14px 반경을 적용한다. 공통 JSON 창 설정은 바꾸지 않는다. 실제 플랫폼은 좁은 읽기 전용 `desktop_platform` 명령으로 전달하며 파일·셸·네트워크 권한을 추가하지 않는다. 빨간 닫기 컨트롤은 기존 앱 내 타이틀바 버튼으로, AppKit 신호등 직접 조작이나 네이티브 타이틀바 추가는 하지 않는다.

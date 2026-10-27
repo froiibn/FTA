@@ -120,8 +120,9 @@ fn mac_window_style(mut context: tauri::Context<tauri::Wry>) -> tauri::Context<t
         window.transparent = true;
         window.background_color = Some(Color(0, 0, 0, 0));
         window.window_effects = Some(WindowEffectsConfig {
-            // Sidebar material transmits the desktop tint more clearly than the dense HUD material.
-            effects: vec![WindowEffect::Sidebar],
+            // Clear glass exposes the actual backdrop on macOS 26; older systems use menu translucency.
+            // Sidebar/HUD materials can appear opaque even when the WebView itself is transparent.
+            effects: vec![WindowEffect::LiquidGlassClear, WindowEffect::Menu],
             state: Some(WindowEffectState::Active),
             radius: Some(WINDOW_CORNER_RADIUS),
             ..Default::default()
