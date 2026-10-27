@@ -14,7 +14,7 @@ HTTP/1.1 기반 `/v1` API를 기준으로 한다. 기능 목록은 `hello` 응�
 
 | 요청 | 동작 |
 |---|---|
-| `GET /v1/hello` | 인증된 기기 정보, 버전, 기능, 크기·동시성 제한 |
+| `GET /v1/hello` | 인증된 기기 정보, 현재 `display_name`(선택 필드), 버전, 기능, 크기·동시성 제한 |
 | `POST /v1/transfers` | ID·종류·항목 메타데이터를 검증하고 수신 슬롯 확보 |
 | `PUT /v1/transfers/{id}/items/{n}/body` | 정확한 Content-Length의 파일 스트림 수신 |
 | `POST /v1/transfers/{id}/items/{n}/commit` | 송신 중 계산한 SHA-256과 수신 해시 비교·최종 저장 |

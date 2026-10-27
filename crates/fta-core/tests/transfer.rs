@@ -55,6 +55,36 @@ async fn pair(a: &Arc<Engine>, b: &Arc<Engine>) {
 fn target(b: &Arc<Engine>) -> Device {
     b.own_device().unwrap()
 }
+// Names must refresh through authenticated hello even with no discovery event or address change.
+#[tokio::test]
+async fn renamed_peer_refreshes_registration_without_repairing() {
+    let (_ad, a, at) = instance().await;
+    let (_bd, b, bt) = instance().await;
+    pair(&a, &b).await;
+    let id = b.own_device().unwrap().device_id;
+    let certificate = a.store.device(&id).unwrap().certificate;
+    b.dispatch(
+        "settings.update",
+        json!({"values":{"display_name":"Renamed peer"}}),
+    )
+    .await
+    .unwrap();
+    let listed = a.dispatch("devices.list", json!({})).await.unwrap();
+    let peer = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|peer| peer["device_id"] == id)
+        .unwrap();
+    assert_eq!(peer["display_name"], "Renamed peer");
+    assert_eq!(peer["online"], true);
+    let saved = a.store.device(&id).unwrap();
+    assert_eq!(saved.display_name, "Renamed peer");
+    assert_eq!(saved.certificate, certificate);
+    at.abort();
+    bt.abort();
+}
+
 #[tokio::test]
 async fn paired_file_text_url_and_collision_roundtrip() {
     let (ad, a, at) = instance().await;

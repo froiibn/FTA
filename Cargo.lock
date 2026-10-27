@@ -1468,6 +1468,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-util",
  "uuid",
+ "windows-sys 0.61.2",
  "x509-parser",
  "zeroize",
 ]
@@ -1525,15 +1526,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "fta-network-helper"
+version = "0.1.0"
+dependencies = [
+ "fta-platform",
+]
+
+[[package]]
 name = "fta-platform"
 version = "0.1.0"
 dependencies = [
  "dirs 6.0.0",
  "dunce",
+ "if-addrs",
+ "ipnet",
  "libc",
  "rustix",
  "same-file",
  "security-framework",
+ "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
  "uuid",
  "windows 0.61.3",

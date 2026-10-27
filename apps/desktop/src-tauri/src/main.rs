@@ -9,7 +9,7 @@ use std::{
         Mutex,
         atomic::{AtomicBool, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use fta_core::{config::AppPaths, ipc};
@@ -48,6 +48,13 @@ const ACTIVATION_SCHEME: &str = "fta";
 const MAX_PENDING_ACTIVATIONS: usize = 32;
 const WINDOW_LABEL: &str = "main";
 const FOLDED_WINDOW_SIDE: f64 = 44.0;
+// A home confirmation expires rather than surviving unrelated settings work or an OS change.
+const NETWORK_CONFIRMATION_TTL: Duration = Duration::from_secs(120);
+struct NetworkConfirmation {
+    engine_path: PathBuf,
+    status: fta_platform::network_setup::NetworkSetupStatus,
+    observed_at: Instant,
+}
 
 // Expanded geometry is kept separately so a collapsed badge can always return to the user's working size.
 #[derive(Default)]
@@ -61,11 +68,20 @@ struct FoldState {
 struct DesktopState {
     granted_paths: Mutex<HashSet<PathBuf>>,
     fold: Mutex<FoldState>,
+    network_confirmation: Mutex<Option<NetworkConfirmation>>,
     child: Mutex<Option<Child>>,
     notifications_ready: AtomicBool,
     exit_allowed: AtomicBool,
     lifecycle_busy: AtomicBool,
     pending_activations: Mutex<VecDeque<String>>,
+    // Retain a discovery click until the separate settings WebView is ready to consume it.
+    registration_target: Mutex<Option<RegistrationRequest>>,
+}
+
+// A request without a target opens manual registration; absence of a request remains distinct.
+#[derive(serde::Serialize)]
+struct RegistrationRequest {
+    target: Option<String>,
 }
 
 /// Serialize restarts and exits so a second click cannot exit while the first is still draining files.
@@ -83,6 +99,36 @@ impl Drop for LifecycleGuard<'_> {
     fn drop(&mut self) {
         self.0.store(false, Ordering::Release);
     }
+}
+
+/// The host supplies the actual build platform so Mac styles never depend on a browser user-agent guess.
+#[tauri::command]
+fn desktop_platform() -> &'static str {
+    std::env::consts::OS
+}
+
+// Apply Mac materials before any main or utility WebView is constructed; shared Windows config is untouched.
+#[cfg(target_os = "macos")]
+fn mac_window_style(mut context: tauri::Context<tauri::Wry>) -> tauri::Context<tauri::Wry> {
+    use tauri::utils::{
+        WindowEffect, WindowEffectState,
+        config::{Color, WindowEffectsConfig},
+    };
+    const WINDOW_CORNER_RADIUS: f64 = 14.0;
+    context.config_mut().app.macos_private_api = true;
+    for window in &mut context.config_mut().app.windows {
+        window.transparent = true;
+        window.background_color = Some(Color(0, 0, 0, 0));
+        window.window_effects = Some(WindowEffectsConfig {
+            // Clear glass exposes the actual backdrop on macOS 26; older systems use menu translucency.
+            // Sidebar/HUD materials can appear opaque even when the WebView itself is transparent.
+            effects: vec![WindowEffect::LiquidGlassClear, WindowEffect::Menu],
+            state: Some(WindowEffectState::Active),
+            radius: Some(WINDOW_CORNER_RADIUS),
+            ..Default::default()
+        });
+    }
+    context
 }
 
 /// Recoverable engine errors reach the UI instead of terminating the tray process.
@@ -103,6 +149,140 @@ async fn engine_request(method: String, params: Value) -> Result<Value, String> 
         | "transfers.get" | "transfers.cancel" => request(&method, params).await,
         _ => Err("이 데스크톱 명령은 허용되지 않습니다".into()),
     }
+}
+
+// Canonical paths also prevent a configured relative path from being interpreted as a tool option.
+fn setup_engine_path() -> Result<PathBuf, String> {
+    let path = engine_path()?.canonicalize().map_err(|e| e.to_string())?;
+    if !path.is_file() {
+        return Err("FTA 엔진 실행 파일을 확인할 수 없습니다".into());
+    }
+    Ok(path)
+}
+
+// Only the settings window may request OS authorization; executable paths and CIDRs stay native.
+#[tauri::command]
+async fn network_setup_status(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> Result<fta_platform::network_setup::NetworkSetupStatus, String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 네트워크를 확인할 수 있습니다".into());
+    }
+    *state
+        .network_confirmation
+        .lock()
+        .map_err(|_| "네트워크 상태 잠금 오류")? = None;
+    let engine = setup_engine_path()?;
+    let queried_engine = engine.clone();
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        fta_platform::network_setup::status(&queried_engine)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    *state
+        .network_confirmation
+        .lock()
+        .map_err(|_| "네트워크 상태 잠금 오류")? = Some(NetworkConfirmation {
+        engine_path: engine,
+        status: status.clone(),
+        observed_at: Instant::now(),
+    });
+    Ok(status)
+}
+
+// OS changes are verified before persisting LAN configuration; restarting remains an explicit action.
+#[tauri::command]
+async fn network_setup_apply(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+    selection: fta_platform::network_setup::NetworkSetupRequest,
+) -> Result<Value, String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 네트워크를 변경할 수 있습니다".into());
+    }
+    let _guard = LifecycleGuard::acquire(&state)?;
+    let confirmed = state
+        .network_confirmation
+        .lock()
+        .map_err(|_| "네트워크 상태 잠금 오류")?
+        .take()
+        .ok_or("연결을 재점검하고 집 네트워크를 다시 확인하세요")?;
+    let engine = setup_engine_path()?;
+    if confirmed.observed_at.elapsed() > NETWORK_CONFIRMATION_TTL || engine != confirmed.engine_path
+    {
+        return Err("확인 시간이 지났거나 앱이 변경되었습니다. 연결을 재점검하세요".into());
+    }
+    let expected =
+        fta_platform::network_setup::selected_interface(&confirmed.status.interfaces, &selection)
+            .map_err(|e| e.to_string())?;
+    let queried_engine = engine.clone();
+    let before = tauri::async_runtime::spawn_blocking(move || {
+        fta_platform::network_setup::status(&queried_engine)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    let current_interface =
+        fta_platform::network_setup::selected_interface(&before.interfaces, &selection)
+            .map_err(|e| e.to_string())?;
+    fta_platform::network_setup::verify_scope(&expected, &current_interface)
+        .map_err(|e| e.to_string())?;
+    // Check IPC before authorization, without capturing a listener port that another client may change.
+    request("settings.get", json!({})).await?;
+    let choice = selection.clone();
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        fta_platform::network_setup::apply(&engine, &choice)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    let selected = fta_platform::network_setup::selected_interface(&status.interfaces, &selection)
+        .map_err(|e| e.to_string())?;
+    fta_platform::network_setup::verify_scope(&expected, &selected).map_err(|e| {
+        format!("OS 변경 중 연결이 바뀌었습니다. 앱 설정은 저장하지 않았습니다: {e}")
+    })?;
+    let config = request("settings.get", json!({})).await?;
+    let current: std::net::SocketAddr = config["listen_addr"]
+        .as_str()
+        .ok_or("수신 주소를 읽을 수 없습니다")?
+        .parse()
+        .map_err(|_| "수신 주소가 잘못되었습니다")?;
+    let address: std::net::IpAddr = selected
+        .address
+        .parse()
+        .map_err(|_| "OS 네트워크 주소가 잘못되었습니다")?;
+    // The current listener port is retained; an address candidate cannot smuggle a port or subnet.
+    request("settings.update",json!({"values":{"listen_addr":std::net::SocketAddr::new(address,current.port()).to_string(),"allowed_networks":[selected.network],"discovery_enabled":selection.discovery_enabled}})).await
+        .map_err(|e|format!("OS 변경 후 앱 설정 저장에 실패했습니다. 상태를 재점검하세요: {e}"))?;
+    Ok(json!({"status":status,"restart_required":true}))
+}
+
+// Open only the fixed OS settings destination; no caller-supplied URL or command crosses this bridge.
+#[tauri::command]
+fn open_network_settings(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 시스템 설정을 열 수 있습니다".into());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("/usr/bin/open")
+            .args(["-b", "com.apple.systempreferences"])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(windows)]
+    {
+        window
+            .app_handle()
+            .opener()
+            .open_url("ms-settings:network-status", None::<&str>)
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    Err("지원하지 않는 OS입니다".into())
 }
 
 // Secondary windows must not borrow file grants or consume notification work owned by the transfer window.
@@ -458,6 +638,12 @@ fn engine_path() -> Result<PathBuf, String> {
 /// A failed start remains visible; it must never fabricate online peers or successful transfers.
 #[tauri::command]
 async fn start_engine(state: State<'_, DesktopState>) -> Result<Value, String> {
+    let _guard = LifecycleGuard::acquire(&state)?;
+    ensure_engine(&state).await
+}
+
+// Keep the lifecycle guard through readiness so another click cannot interrupt a restart halfway.
+async fn ensure_engine(state: &DesktopState) -> Result<Value, String> {
     if let Ok(status) = request("status", json!({})).await {
         return Ok(status);
     }
@@ -526,22 +712,27 @@ async fn shutdown_child(child: &mut Child) -> Result<(), String> {
     Ok(())
 }
 
-/// Only a child owned by this desktop may be restarted; an independent server is never killed.
+/// Existing same-user services use cooperative IPC shutdown; only owned children permit a kill fallback.
 #[tauri::command]
 async fn restart_engine(state: State<'_, DesktopState>) -> Result<Value, String> {
-    let guard = LifecycleGuard::acquire(&state)?;
-    let mut child = state
+    let _guard = LifecycleGuard::acquire(&state)?;
+    let owned = state
         .child
         .lock()
         .map_err(|_| "엔진 프로세스 상태 오류")?
-        .take()
-        .ok_or("이 앱에서 시작한 서비스가 아닙니다. 해당 서비스를 직접 재시작하세요")?;
-    if let Err(error) = shutdown_child(&mut child).await {
-        *state.child.lock().map_err(|_| "엔진 프로세스 상태 오류")? = Some(child);
-        return Err(error);
+        .take();
+    if let Some(mut child) = owned {
+        if let Err(error) = shutdown_child(&mut child).await {
+            *state.child.lock().map_err(|_| "엔진 프로세스 상태 오류")? = Some(child);
+            return Err(error);
+        }
+    } else {
+        let paths = AppPaths::discover().map_err(|error| error.to_string())?;
+        fta_core::engine::shutdown_existing(&paths)
+            .await
+            .map_err(|error| error.to_string())?;
     }
-    drop(guard);
-    start_engine(state).await
+    ensure_engine(&state).await
 }
 
 /// Register readiness only after the UI listener exists; early native events must remain unacknowledged.
@@ -764,6 +955,58 @@ async fn open_utility_window(app: tauri::AppHandle, kind: String) -> Result<(), 
     window.set_focus().map_err(|error| error.to_string())
 }
 
+/// Plus opens manual pairing; a discovered icon additionally validates its untrusted device hint.
+#[tauri::command]
+async fn begin_registration(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+    device_id: Option<String>,
+) -> Result<(), String> {
+    require_main_window(window.label())?;
+    if let Some(id) = &device_id {
+        let devices = request("devices.list", json!({})).await?;
+        validate_registration_target(&devices, id)?;
+    }
+    *state
+        .registration_target
+        .lock()
+        .map_err(|_| "등록 상태 오류")? = Some(RegistrationRequest { target: device_id });
+    open_utility_window(window.app_handle().clone(), "settings".into()).await?;
+    window
+        .app_handle()
+        .emit_to("settings", "fta:registration-target", ())
+        .map_err(|error| error.to_string())
+}
+
+// Reject stale or forged UI hints; registration starts only from the engine's current discovery list.
+fn validate_registration_target(devices: &Value, device_id: &str) -> Result<(), String> {
+    uuid::Uuid::parse_str(device_id).map_err(|_| "잘못된 기기 ID입니다")?;
+    if !devices.as_array().is_some_and(|devices| {
+        devices
+            .iter()
+            .any(|device| device["device_id"] == device_id && device["paired"] == false)
+    }) {
+        return Err("자동 발견된 미등록 기기를 다시 선택하세요".into());
+    }
+    Ok(())
+}
+
+/// Only settings can consume the one-shot target; the actual pairing still uses the engine protocol.
+#[tauri::command]
+fn take_registration_target(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> Result<Option<RegistrationRequest>, String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 등록할 수 있습니다".into());
+    }
+    Ok(state
+        .registration_target
+        .lock()
+        .map_err(|_| "등록 상태 오류")?
+        .take())
+}
+
 // A child close must destroy only its own window, never hide the transfer panel or stop its engine.
 #[tauri::command]
 fn close_utility_window(window: tauri::WebviewWindow) -> Result<(), String> {
@@ -807,6 +1050,9 @@ fn stop_owned_engine(app: &tauri::AppHandle) {
 
 /// Platform plugins stay in the desktop binary so Linux CLI builds remain display-independent.
 fn main() {
+    let context = tauri::generate_context!();
+    #[cfg(target_os = "macos")]
+    let context = mac_window_style(context);
     let app = tauri::Builder::default()
         .manage(DesktopState::default())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
@@ -834,6 +1080,10 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             engine_request,
+            desktop_platform,
+            network_setup_status,
+            open_network_settings,
+            network_setup_apply,
             choose_files,
             send_files,
             send_message,
@@ -846,6 +1096,8 @@ fn main() {
             start_window_drag,
             close_app_window,
             open_utility_window,
+            begin_registration,
+            take_registration_target,
             close_utility_window,
             set_autostart,
             autostart_status,
@@ -959,7 +1211,7 @@ fn main() {
             }
             _ => {}
         })
-        .build(tauri::generate_context!());
+        .build(context);
     match app {
         Ok(app) => {
             // Apple requires this delegate before applicationDidFinishLaunching, not Tauri's later setup callback.
@@ -1004,6 +1256,21 @@ mod tests {
     use super::*;
 
     // A history/settings window cannot reuse a file selection or acknowledge the main notification cursor.
+    // A clicked icon cannot substitute an address, registered peer, or absent discovery entry.
+    #[test]
+    fn registration_target_requires_current_unpaired_discovery() {
+        let id = uuid::Uuid::new_v4().to_string();
+        assert!(
+            validate_registration_target(&json!([{"device_id":id,"paired":false}]), &id).is_ok()
+        );
+        assert!(
+            validate_registration_target(&json!([{"device_id":id,"paired":true}]), &id).is_err()
+        );
+        assert!(validate_registration_target(&json!([]), &id).is_err());
+        assert!(validate_registration_target(&json!([{"device_id":id}]), &id).is_err());
+        assert!(validate_registration_target(&json!([]), "127.0.0.1:1").is_err());
+    }
+
     #[test]
     fn transfer_and_notification_actions_belong_to_main_window() {
         assert!(require_main_window("main").is_ok());

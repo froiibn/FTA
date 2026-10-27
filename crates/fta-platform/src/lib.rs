@@ -3,6 +3,8 @@
 
 use std::path::PathBuf;
 pub mod notification_payload;
+// Shared setup contracts keep the desktop bridge independent of OS-specific permission mechanisms.
+pub mod network_setup;
 
 /// OS-derived locations prevent assumptions about a user's home or Downloads folder.
 #[derive(Debug, Clone, PartialEq, Eq)]

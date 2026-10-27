@@ -3,6 +3,8 @@
 use std::io;
 
 use crate::PlatformPaths;
+// Application Firewall integration remains separate from identity and storage code.
+pub mod network_setup;
 
 const APPLICATION_DIRECTORY: &str = "FTA";
 const KEYCHAIN_SERVICE: &str = "app.fta.local-transfer.identity";

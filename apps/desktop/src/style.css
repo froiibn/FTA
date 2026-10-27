@@ -172,3 +172,84 @@ body.folded { overflow: hidden; background: var(--paper); }
 body.folded .shell { display: none; }
 .expand-widget { display: grid; place-items: center; width: 100vw; height: 100dvh; padding: 0; color: var(--navy); background: var(--paper); border: 1px solid var(--line); border-radius: 5px; touch-action: none; user-select: none; }
 .expand-widget svg { width: 22px; height: 22px; }
+
+/* Network choices use the existing settings rhythm; the transfer widget remains unchanged. */
+#network-interface { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; }
+#network-interface:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#network-private-row[hidden] { display: none; }
+
+/* A content-sized, quiet toast confirms actions without covering the settings form. */
+.settings-toast { position: fixed; z-index: 1000; bottom: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); padding: 7px 12px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
+.settings-toast[hidden] { display: none; }
+.settings-toast.error { background: #382e2e; color: #efaaa4; }
+
+/* Group tabs replace the long settings stack without changing the compact sender geometry. */
+.settings-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.settings-tabs button { flex: 1; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 9px 4px; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.settings-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--navy); }
+.settings-tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+.settings-section[hidden] { display: none; }
+
+/* Mac glass retains backdrop detail; a 90% charcoal tint limits transparency for text readability. Windows keeps its existing palette. */
+html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --muted: #a5a5a5; --navy: #c4c4c4; --line: #ffffff18; --selection: #ffffff12; --focus: #d3d3d3; background: transparent; height: 100%; border-radius: 14px; overflow: hidden; }
+.platform-macos body { height: 100dvh; min-height: 100dvh; border-radius: 14px; overflow: auto; background: rgb(20 20 20 / 90%); }
+.platform-macos .shell { background: transparent; border-radius: 14px; border: 1px solid #ffffff16; overflow: hidden; }
+.platform-macos .app-header { background: transparent; border-bottom: 0; padding: 5px 9px; gap: 7px; }
+.platform-macos .brand { flex: 1; gap: 5px; }
+.platform-macos .brand-mark { display: none; }
+.platform-macos h1 { font-size: 13px; font-weight: 600; color: #d9d9d9; }
+.platform-macos .window-actions { gap: 1px; }
+.platform-macos .window-actions .quiet { padding: 4px; }
+/* Close controls have their own red hover surface and must not inherit generic quiet-button fills. */
+.platform-macos .quiet:not([data-close-window]):not(#close-app-window):hover:not(:disabled), .platform-macos .quiet[aria-pressed="true"] { background: #ffffff12; color: var(--ink); border-color: transparent; }
+.platform-macos .device-tile { background: transparent; border-radius: 10px; }
+.platform-macos .device-tile[aria-pressed="true"] { background: #ffffff10; border-color: #ffffff35; }
+.platform-macos .device-tile.drop-target { background: #ffffff1c; border-color: #ffffff70; outline-color: #ffffff70; }
+.platform-macos input, .platform-macos textarea, .platform-macos #network-interface { background: rgb(0 0 0 / 24%); border-color: #ffffff24; border-radius: 9px; }
+.platform-macos button { border-radius: 7px; }
+.platform-macos .primary { background: #dadada; border-color: #dadada; color: #171717; }
+.platform-macos .secondary, .platform-macos .danger { background: #ffffff08; border-color: #ffffff25; }
+.platform-macos .message-input textarea { background: rgb(0 0 0 / 28%); }
+.platform-macos .send-arrow { background: #ffffff18; color: #eeeeee; border: 0; }
+.platform-macos .utility-window { background: rgb(20 20 20 / 18%); border-radius: 14px; }
+.platform-macos .utility-header { position: relative; justify-content: center; background: transparent; border-bottom-color: #ffffff12; min-height: 40px; }
+.platform-macos .utility-header h2 { font-size: 13px; font-weight: 600; }
+.platform-macos .settings-tabs button { border-radius: 6px 6px 0 0; }
+.platform-macos .settings-tabs button[aria-selected="true"] { border-bottom-color: #dddddd; }
+/* One red close control keeps existing hide/close semantics; the collapsed badge still has only expand. */
+.platform-macos #close-app-window, .platform-macos .utility-header [data-close-window] { position: relative; flex: none; display: block; width: 12px; min-width: 12px; height: 12px; min-height: 12px; padding: 0; border: 1px solid #e34a43; border-radius: 50%; background: #ff5f57; color: transparent; font-size: 0; }
+.platform-macos .utility-header [data-close-window] { position: absolute; left: 18px; top: 14px; }
+.platform-macos #close-app-window svg { display: none; }
+.platform-macos #close-app-window:hover::after, .platform-macos .utility-header [data-close-window]:hover::after { content: "×"; position: absolute; inset: -1px; color: #651b15; font: 12px/12px -apple-system, sans-serif; text-align: center; }
+.platform-macos body.folded { background: rgb(20 20 20 / 90%); }
+.platform-macos .expand-widget { background: transparent; border-radius: 14px; border-color: #ffffff25; }
+.platform-macos .notice { background: #ffffff0c; color: var(--ink); }
+.platform-macos .notice.error { background: #382828; color: #efaaa4; }
+/* Honor the Mac accessibility preference while retaining a solid, readable black appearance. */
+@media (prefers-reduced-transparency: reduce) { .platform-macos body, .platform-macos .utility-window { background: #161616; } }
+
+/* Secondary surfaces use the same neutral material when a file selection or received detail is opened. */
+.platform-macos .file-selection, .platform-macos .selection-actions, .platform-macos dialog, .platform-macos .detail-body { background: #1b1b1b; border-color: #ffffff24; }
+.platform-macos .file-selection li { border-bottom-color: #ffffff18; }
+.platform-macos .target-rail { background: transparent; }
+
+/* Neutral foregrounds remove the former navy tint without muting real online/offline status colors. */
+.platform-macos .device-icon { color: #c1c1c1; }
+.platform-macos input::placeholder, .platform-macos textarea::placeholder { color: #929292; }
+/* History and registration retain semantic result colors while neutral chrome matches the black material. */
+.platform-macos .history-icon, .platform-macos .delete-record { color: var(--muted); }
+.platform-macos label { color: #bdbdbd; }
+.platform-macos .history-row, .platform-macos .settings-row + .settings-row, .platform-macos #detail-items p { border-color: var(--line); }
+.platform-macos .pair-details { background: #ffffff08; border-radius: 9px; }
+.platform-macos :where(.status-badge) { color: #cecece; background: #2c2c2c; }
+/* Explicit close hover wins all shared button selectors, keeping the red disk visible beneath its cross. */
+.platform-macos .utility-header button[data-close-window]:hover:not(:disabled), .platform-macos #close-app-window:hover:not(:disabled) { background: #ff5f57; border-color: #e34a43; opacity: 1; filter: none; }
+/* Fill the Mac widget's remaining height instead of leaving fixed-textarea and empty-progress space below it. */
+.platform-macos .shell { display: flex; flex-direction: column; height: 100dvh; }
+.platform-macos .send-board { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.platform-macos .target-rail { flex: none; }
+.platform-macos .send-workspace { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.platform-macos .composer { display: flex; flex-direction: column; flex: 1; min-height: 58px; }
+.platform-macos .message-input { display: flex; flex: 1; min-height: 0; }
+.platform-macos .message-input textarea { flex: 1; height: 100%; min-height: 0; }
+.platform-macos .transfer-progress:not(:has(> :not([hidden]))) { display: none; }

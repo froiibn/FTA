@@ -485,7 +485,8 @@ async fn route(
     let peer = authenticated(e, cert.as_deref())?;
     if path == "/v1/hello" {
         return Ok(
-            json!({"device_id":e.config()?.device_id,"version":1,"features":["files","text","url"]}),
+            // Names are mutable metadata; expose the current value only after mutual TLS authentication.
+            json!({"device_id":e.config()?.device_id,"display_name":e.config()?.display_name,"version":1,"features":["files","text","url"]}),
         );
     }
     if path == "/v1/transfers" && method == hyper::Method::POST {

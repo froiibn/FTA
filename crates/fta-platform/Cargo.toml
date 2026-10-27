@@ -6,17 +6,23 @@ publish = false
 
 [dependencies]
 uuid = "1"
+# Shared setup observations remain typed on every OS without introducing a WebView dependency.
+serde = { version = "1", features = ["derive"] }
+if-addrs = "0.14"
+ipnet = "2"
 
 # Platform-only dependencies keep the Linux engine independent of desktop runtimes.
 [target.'cfg(windows)'.dependencies]
+# Native network setup keeps command text and caller-supplied shell arguments out of elevation.
+serde_json = "1"
 # Shell shortcut and launch commands require ordinary DOS/UNC paths whenever normalization permits.
 dunce = "1"
 # Installer and runtime path spelling can differ; compare file identity before adopting an unowned handler.
 same-file = "1"
-windows = { version = "0.61", features = ["Data_Xml_Dom", "UI_Notifications", "Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_System_WinRT", "Win32_UI_Shell", "Win32_UI_Shell_PropertiesSystem"] }
-uuid = { version = "1", features = ["v5"] }
-tokio = { version = "1", features = ["net", "rt", "macros", "io-util"] }
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Threading", "Win32_UI_Shell"] }
+windows = { version = "0.61", features = ["Data_Xml_Dom", "UI_Notifications", "Win32_Foundation", "Win32_Networking_NetworkListManager", "Win32_NetworkManagement_WindowsFirewall", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Ole", "Win32_System_Variant", "Win32_System_WinRT", "Win32_UI_Shell", "Win32_UI_Shell_PropertiesSystem"] }
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
+tokio = { version = "1", features = ["net", "rt", "macros", "io-util", "time"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Pipes", "Win32_System_Registry", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 winreg = "0.55"
 zeroize = "1"
 
@@ -30,3 +36,7 @@ libc = "0.2"
 # Atomic no-replace rename covers filesystems that cannot create hard links.
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+# Native identity regressions use disposable files, never the running installation.
+tempfile = "3"

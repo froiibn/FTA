@@ -51,6 +51,8 @@ Get-FileHash -Algorithm SHA256 -LiteralPath '.\실제-설치파일명-setup.exe'
 
 직접 빌드한 테스트 패키지에는 배포용 코드 서명을 적용하지 않는다. 배포 게시자 서명 검증은 별도 미완료 항목이다. 설치 파일 형식과 현재 사용자 설치 방식은 [Tauri NSIS 안내](https://v2.tauri.app/distribute/windows-installer/)를 따른다.
 
+네트워크 자동 설정용 Windows 빌드에는 `fta-network-helper.exe`도 엔진 옆에 동봉한다. 이 파일은 사용자가 집 연결을 확인하고 설정 적용을 요청할 때만 UAC 대상으로 실행하는 일회용 도우미이며, UI·엔진 전체를 관리자 권한으로 실행하지 않는다. 개발 시 같은 빌드 폴더에서 `fta-network-helper.exe --inspect`로 읽기 전용 상태를 확인할 수 있다. 실제 승인·취소와 규칙 적용 검증은 별도로 수행하고 [설정 어댑터의 제한](../../docs/platforms/windows.md#앱-네트워크-설정-어댑터)을 따른다.
+
 ## 3. 설치와 첫 실행
 
 1. 전송 중인 기존 FTA가 있다면 완료를 기다리고 트레이 메뉴로 종료한다.

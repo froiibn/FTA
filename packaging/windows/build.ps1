@@ -69,6 +69,9 @@ try {
     Invoke-Checked cargo @('fmt', '--all', '--check')
     Invoke-Checked cargo @('test', '--locked')
     Invoke-Checked cargo @('clippy', '--locked', '--all-targets', '--', '-D', 'warnings')
+    # This Windows-only binary is intentionally outside default headless members; lint its
+    # fixed elevated entry point explicitly before it can be packaged with the desktop.
+    Invoke-Checked cargo @('clippy', '--locked', '-p', 'fta-network-helper', '--all-targets', '--', '-D', 'warnings')
     # Fresh source archives do not contain dist; prepare assets before the desktop Rust checks.
     Invoke-Checked npm.cmd @('--prefix', 'apps/desktop', 'ci')
     Invoke-Checked npm.cmd @('--prefix', 'apps/desktop', 'run', 'build')
@@ -84,7 +87,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve Cargo artifact directory.' }
     $Metadata = $MetadataJson | ConvertFrom-Json
     $Release = Join-Path $Metadata.target_directory 'release'
-    foreach ($Name in @('fta', 'fta-engine', 'fta-mcp', 'fta-desktop')) {
+    # The UAC helper must be a real x64 sidecar in every installer, not a script downloaded later.
+    foreach ($Name in @('fta', 'fta-engine', 'fta-mcp', 'fta-network-helper', 'fta-desktop')) {
         $Executable = Join-Path $Release "$Name.exe"
         Assert-X64Executable $Executable
         if ($Name -ne 'fta-desktop') { Copy-Item -LiteralPath $Executable -Destination $Output }
@@ -104,7 +108,7 @@ try {
         node = (& node --version)
         windows = [Environment]::OSVersion.VersionString
         installer = $Installers[0].Name
-        checks = 'fmt, headless test/clippy, desktop check/test/clippy, TypeScript/Vite build'
+        checks = 'fmt, headless test/clippy, Windows helper clippy, desktop check/test/clippy, TypeScript/Vite build'
         runtime_verification = 'Not performed by this build script; follow packaging/windows/README.md.'
     } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $Output 'build-info.json')
     Get-ChildItem -LiteralPath $Output -File | Where-Object { $_.Extension -eq '.exe' } |

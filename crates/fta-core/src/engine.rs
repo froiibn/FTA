@@ -116,7 +116,7 @@ impl Engine {
                     {
                         let mut updated = device.clone();
                         updated.address = candidate.address.clone();
-                        if crate::network::probe(self, &updated).await.is_ok() {
+                        if self.refresh_peer_metadata(&mut updated).await? {
                             updated.online = true;
                             updated.paired = true;
                             self.store.save_device(&updated)?;
@@ -124,7 +124,7 @@ impl Engine {
                             return Ok(updated);
                         }
                     }
-                    device.online = crate::network::probe(self, &device).await.is_ok();
+                    device.online = self.refresh_peer_metadata(&mut device).await?;
                     device.paired = true;
                     device.certificate.clear();
                     Ok(device)
@@ -134,6 +134,22 @@ impl Engine {
             .collect::<Vec<Result<Device>>>()
             .await;
         results.into_iter().collect()
+    }
+    /// Refresh names only from pinned TLS peers, never from untrusted discovery TXT records.
+    async fn refresh_peer_metadata(&self, device: &mut Device) -> Result<bool> {
+        let Ok(value) = crate::network::probe(self, device).await else {
+            return Ok(false);
+        };
+        // Older peers omit the optional name; preserve registration metadata until they upgrade.
+        if let Some(name) = value["display_name"]
+            .as_str()
+            .filter(|name| !name.trim().is_empty() && name.len() <= 128)
+            && name != device.display_name
+        {
+            device.display_name = name.into();
+            self.store.save_device(device)?;
+        }
+        Ok(true)
     }
     /// Completion wins a cancellation race; pending requests are never labelled as confirmed cancellation.
     async fn cancel_transfer(&self, id: &str) -> Result<Value> {
@@ -448,6 +464,34 @@ impl Drop for SocketCleanup {
             eprintln!("IPC socket cleanup failed: {}", error.kind());
         }
     }
+}
+
+/// Stop an existing user-scoped engine cooperatively, regardless of which desktop launched it.
+pub async fn shutdown_existing(paths: &AppPaths) -> Result<()> {
+    const STOP_ATTEMPTS: usize = 50;
+    const STOP_DELAY: Duration = Duration::from_millis(200);
+    tokio::time::timeout(
+        Duration::from_secs(2),
+        crate::ipc::request(paths, "engine.shutdown", json!({})),
+    )
+    .await
+    .map_err(|_| Error::new("TIMEOUT", "engine shutdown request timed out"))??;
+    // IPC closes before transfers finish draining. Wait for the state lock, not a failed status probe.
+    let lock = std::fs::OpenOptions::new()
+        .write(true)
+        .open(paths.state_dir.join("engine.lock"))?;
+    for _ in 0..STOP_ATTEMPTS {
+        match lock.try_lock_exclusive() {
+            Ok(()) => return Ok(()),
+            Err(error) if error.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {}
+            Err(error) => return Err(error.into()),
+        }
+        tokio::time::sleep(STOP_DELAY).await;
+    }
+    Err(Error::new(
+        "TIMEOUT",
+        "engine is still stopping; retry after active operations finish",
+    ))
 }
 
 /// Keep a state-directory instance lock for the listener lifetime, regardless of runtime overrides.
