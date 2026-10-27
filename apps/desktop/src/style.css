@@ -190,9 +190,9 @@ body.folded .shell { display: none; }
 .settings-tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
 .settings-section[hidden] { display: none; }
 
-/* Mac alone uses native vibrancy behind quiet black surfaces; Windows keeps its existing palette. */
+/* Mac glass retains backdrop detail; a 70% charcoal tint limits transparency for text readability. Windows keeps its existing palette. */
 html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --muted: #a5a5a5; --navy: #c4c4c4; --line: #ffffff18; --selection: #ffffff12; --focus: #d3d3d3; background: transparent; height: 100%; border-radius: 14px; overflow: hidden; }
-.platform-macos body { height: 100dvh; min-height: 100dvh; border-radius: 14px; overflow: auto; background: rgb(20 20 20 / 58%); }
+.platform-macos body { height: 100dvh; min-height: 100dvh; border-radius: 14px; overflow: auto; background: rgb(20 20 20 / 70%); }
 .platform-macos .shell { background: transparent; border-radius: 14px; border: 1px solid #ffffff16; overflow: hidden; }
 .platform-macos .app-header { background: transparent; border-bottom: 0; padding: 5px 9px; gap: 7px; }
 .platform-macos .brand { flex: 1; gap: 5px; }
@@ -221,7 +221,7 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos .utility-header [data-close-window] { position: absolute; left: 18px; top: 14px; }
 .platform-macos #close-app-window svg { display: none; }
 .platform-macos #close-app-window:hover::after, .platform-macos .utility-header [data-close-window]:hover::after { content: "×"; position: absolute; inset: -1px; color: #651b15; font: 12px/12px -apple-system, sans-serif; text-align: center; }
-.platform-macos body.folded { background: rgb(20 20 20 / 58%); }
+.platform-macos body.folded { background: rgb(20 20 20 / 70%); }
 .platform-macos .expand-widget { background: transparent; border-radius: 14px; border-color: #ffffff25; }
 .platform-macos .notice { background: #ffffff0c; color: var(--ink); }
 .platform-macos .notice.error { background: #382828; color: #efaaa4; }
