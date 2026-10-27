@@ -24,6 +24,8 @@ const MAX_DISCOVERED_DEVICES: usize = 1000;
 const PAIR_SERVICE_TYPE: &str = "_fta-pair._tcp.local.";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 const REVOCATION_POLL_INTERVAL: Duration = Duration::from_millis(250);
+// Registration advertisements may arrive after a click or a stale passive browse cache.
+const PAIR_LOOKUP_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PairSession {
@@ -222,24 +224,68 @@ async fn response_value(response: reqwest::Response) -> Result<Value> {
     }
     Ok(value)
 }
+// A cache miss is not proof that the peer's temporary listener is closed.
+fn cached_pairing_target(e: &Engine, target: &str) -> Result<Option<String>> {
+    let addresses = e.pairing_addresses.lock().map_err(|_| lock_error())?;
+    let mut matches = addresses
+        .iter()
+        .filter(|(id, _)| !target.is_empty() && id.starts_with(target));
+    let address = matches.next().map(|(_, address)| address.clone());
+    if matches.next().is_some() {
+        return Err(Error::new(
+            "CONFLICT",
+            "device ID matches more than one open registration",
+        ));
+    }
+    Ok(address)
+}
+
+// Refresh only registration discovery; never guess the ordinary transfer port or replay /pair/hello.
+async fn resolve_pairing_target(e: &Engine, target: &str) -> Result<String> {
+    if target.parse::<SocketAddr>().is_ok() {
+        return Ok(target.into());
+    }
+    if let Some(address) = cached_pairing_target(e, target)? {
+        return Ok(address);
+    }
+    let missing = || {
+        Error::new(
+            "PAIRING_NOT_FOUND",
+            "registration endpoint not discovered; reopen registration on the peer or use its temporary registration address",
+        )
+    };
+    let config = e.config()?;
+    if !config.discovery_enabled || config.listen_addr.ip().is_loopback() {
+        return Err(missing());
+    }
+    // A short-lived browser does not replace the running daemon's single listener for this type.
+    // The guard stops its worker on success, error, cancellation, and future drop.
+    let daemon = discovery_daemon(&config)?;
+    let _guard = PairAdvertisement(Some(daemon.clone()));
+    let events = daemon.browse(PAIR_SERVICE_TYPE).map_err(net_error)?;
+    let deadline = tokio::time::sleep(Duration::from_secs(CONNECT_SECONDS));
+    tokio::pin!(deadline);
+    let mut poll = tokio::time::interval(PAIR_LOOKUP_POLL_INTERVAL);
+    loop {
+        e.ensure_network()?;
+        if let Some(address) = cached_pairing_target(e, target)? {
+            return Ok(address);
+        }
+        tokio::select! {
+            _ = &mut deadline => return Err(missing()),
+            _ = e.network_token.cancelled() => return Err(Error::new("NETWORK_CHANGED", "home network changed during registration discovery")),
+            _ = poll.tick() => {},
+            event = events.recv_async() => {
+                let event = event.map_err(net_error)?;
+                apply_discovery_event(e, &config, event, true)?;
+            }
+        }
+    }
+}
+
 pub async fn pair_connect(e: &Arc<Engine>, target: &str) -> Result<Value> {
     e.ensure_network()?;
-    let target = if target.parse::<SocketAddr>().is_ok() {
-        target.to_string()
-    } else {
-        let addresses = e.pairing_addresses.lock().map_err(|_| lock_error())?;
-        let matches: Vec<_> = addresses
-            .iter()
-            .filter(|(id, _)| !target.is_empty() && id.starts_with(target))
-            .collect();
-        if matches.len() > 1 {
-            return Err(Error::new(
-                "CONFLICT",
-                "device ID matches more than one open registration",
-            ));
-        }
-        matches.first().map(|(_,address)|(*address).clone()).ok_or_else(||Error::new("NOT_FOUND","no open registration discovered for that device; open registration on the receiver"))?
-    };
+    let target = resolve_pairing_target(e, target.trim()).await?;
     let address = allowed_address(e, &target)?;
     let c = client(e, vec![], true)?;
     let nonce = uuid::Uuid::new_v4().to_string();
@@ -1435,6 +1481,65 @@ mod discovery_tests {
         let engine =
             Engine::open_with_identity(paths, Identity::generate_ephemeral().unwrap()).unwrap();
         (dir, engine)
+    }
+    // A late discovery event from the ongoing browser must unblock a cache-miss lookup.
+    #[tokio::test]
+    async fn registration_lookup_waits_for_late_discovery() {
+        let (_dir, engine) = instance();
+        let mut config = engine.config().unwrap();
+        // Documentation-only addresses keep this test off real LAN interfaces.
+        config.listen_addr = "192.0.2.1:47321".parse().unwrap();
+        config.allowed_networks = vec!["192.0.2.0/24".parse().unwrap()];
+        config.discovery_enabled = true;
+        *engine.config.write().unwrap() = config.clone();
+        let mut peer = config.clone();
+        peer.device_id = uuid::Uuid::new_v4().to_string();
+        peer.listen_addr = "192.0.2.2:47321".parse().unwrap();
+        let expected = "192.0.2.2:49152";
+        let target = peer.device_id.clone();
+        let lookup_engine = engine.clone();
+        let lookup =
+            tokio::spawn(async move { resolve_pairing_target(&lookup_engine, &target).await });
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        let info = service_info(&peer, PAIR_SERVICE_TYPE, 49152).unwrap();
+        apply_discovery_event(
+            &engine,
+            &config,
+            mdns_sd::ServiceEvent::ServiceResolved(Box::new(info.as_resolved_service())),
+            true,
+        )
+        .unwrap();
+        let result = tokio::time::timeout(Duration::from_secs(1), lookup)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(result, expected);
+        assert!(engine.sessions.lock().unwrap().is_empty());
+    }
+    // A network change must stop discovery without creating a registration or waiting out its budget.
+    #[tokio::test]
+    async fn registration_lookup_stops_on_network_change() {
+        let (_dir, engine) = instance();
+        {
+            let mut config = engine.config.write().unwrap();
+            config.listen_addr = "192.0.2.1:47321".parse().unwrap();
+            config.allowed_networks = vec!["192.0.2.0/24".parse().unwrap()];
+            config.discovery_enabled = true;
+        }
+        let lookup_engine = engine.clone();
+        let lookup = tokio::spawn(async move {
+            resolve_pairing_target(&lookup_engine, &uuid::Uuid::new_v4().to_string()).await
+        });
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        engine.network_token.cancel();
+        let error = tokio::time::timeout(Duration::from_secs(1), lookup)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.code, "NETWORK_CHANGED");
+        assert!(engine.sessions.lock().unwrap().is_empty());
     }
     // The mDNS event path must select the temporary registration port, never the normal transfer port.
     #[tokio::test]

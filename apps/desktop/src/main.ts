@@ -189,6 +189,8 @@ function userError(error: unknown): string {
     UNTRUSTED: "등록되지 않은 기기입니다. 기기를 먼저 등록하세요.",
     KEY_CHANGED: "기기 인증 정보가 변경되었습니다. 기존 등록을 확인하고 다시 등록하세요.",
     NOT_FOUND: "항목을 찾을 수 없습니다. 기록이 삭제되었거나 더 이상 보관되지 않을 수 있습니다.",
+    // A registration discovery miss is unrelated to deleted history or received files.
+    PAIRING_NOT_FOUND: "상대 기기의 등록용 주소를 찾지 못했습니다. 상대에서 등록 모드를 다시 연 뒤 연결하거나, 상대 등록 화면의 ‘연결 주소’를 입력하세요.",
     VERSION_UNSUPPORTED: "두 기기의 앱 버전이 호환되지 않습니다. 앱을 업데이트하세요.",
     CANCELLED: "전송을 취소했습니다. 이미 저장된 파일은 유지됩니다.",
     HASH_MISMATCH: "파일을 검증하지 못했습니다. 원본 파일을 확인한 뒤 다시 보내세요.",
@@ -431,8 +433,10 @@ async function refresh(): Promise<void> {
           showNotice("기기 등록이 완료되었어요.");
         }
       } catch (error) {
-        activePairSession = "";
-        showNotice(userError(error), true);
+        // The temporary listener expires even if its settings window stays open.
+        const expired = ["TIMEOUT", "NOT_FOUND"].includes(String(error).split(":", 1)[0] ?? "");
+        clearPairSession(expired ? "등록 모드가 만료되었거나 닫혔습니다. 등록 모드를 다시 열어주세요." : "등록 상태를 확인하지 못했습니다.");
+        showNotice(expired ? element("pair-state").textContent ?? "등록 모드를 다시 열어주세요." : userError(error), true);
       }
     }
   } catch (error) {
@@ -523,8 +527,9 @@ async function registerPendingDevice(): Promise<void> {
   if (!target) { element("pair-target").focus(); return; }
   try { await pair("pairing.connect", { target }); }
   catch (error) {
-    if (!String(error).includes("NOT_FOUND")) throw error;
-    showNotice("상대 컴퓨터에서도 이 컴퓨터 아이콘을 누르면 등록을 이어갈 수 있어요.");
+    if (!String(error).startsWith("PAIRING_NOT_FOUND:") && !String(error).startsWith("NOT_FOUND:")) throw error;
+    // Both modes can already be open while discovery is delayed; keep the manual endpoint fallback visible.
+    showNotice("상대 컴퓨터에서 등록 모드를 확인하세요. 이미 열려 있다면 상대 등록 화면의 ‘연결 주소’를 입력해 연결할 수 있습니다.");
   }
 }
 
@@ -699,8 +704,19 @@ async function pendingPairSession(): Promise<JsonObject | undefined> {
     ?? pending[0];
 }
 
+// Expired/cancelled sessions must not leave a usable comparison or a misleading waiting address.
+function clearPairSession(message: string): void {
+  activePairSession = "";
+  element<HTMLInputElement>("pair-session").value = "";
+  element("pair-details").hidden = false;
+  element("pair-state").textContent = message;
+  for (const id of ["pair-peer", "pair-address", "pair-comparison", "pair-expiry"]) element(id).textContent = "";
+  element<HTMLButtonElement>("pair-confirm").disabled = true;
+}
+
 // Restoring engine state must also restore the hidden ID used by confirm and cancel.
 function applyPairSession(result: JsonObject): void {
+  if (result.cancelled === true) { clearPairSession("등록을 취소했습니다."); return; }
   renderPair(result);
   if (typeof result.session_id === "string") element<HTMLInputElement>("pair-session").value = result.session_id;
   if (typeof result.session_id === "string") activePairSession = result.session_id;

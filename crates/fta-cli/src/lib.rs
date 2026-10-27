@@ -460,7 +460,8 @@ fn remote_error(error: &Value) -> CliError {
     let exit_code = match code {
         "INVALID_REQUEST" | "TOO_LARGE" | "CONFIG_ERROR" => EXIT_INVALID,
         "OFFLINE" | "TIMEOUT" | "BUSY" => 3,
-        "UNTRUSTED" | "KEY_CHANGED" => 4,
+        // Missing registration discovery is a pairing failure, not a broken local IPC service.
+        "UNTRUSTED" | "KEY_CHANGED" | "PAIRING_NOT_FOUND" => 4,
         "NO_SPACE" | "PERMISSION_DENIED" | "SOURCE_CHANGED" | "HASH_MISMATCH" => 5,
         "UNKNOWN" | "RESULT_UNKNOWN" => 7,
         "CANCELLED" => EXIT_INTERRUPTED,
