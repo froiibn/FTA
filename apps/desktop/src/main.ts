@@ -268,7 +268,7 @@ function renderDevices(): void {
     const button = document.createElement("button");
     button.className = "device-tile";
     button.dataset.deviceId = device.device_id;
-    button.disabled = !device.online || !device.paired || sending || !networkReady;
+    button.disabled = (device.paired && !device.online) || sending || !networkReady;
     button.setAttribute("aria-pressed", String(device.device_id === selectedId));
     const status = device.paired ? (device.online ? "온라인" : "오프라인") : "등록 필요";
     button.title = `${device.display_name} · ${status}`;
@@ -286,6 +286,11 @@ function renderDevices(): void {
     name.textContent = device.display_name;
     button.append(deviceIcon, name);
     button.addEventListener("click", () => {
+      // Discovery is only a hint: open explicit pairing instead of granting transfer trust.
+      if (!device.paired) {
+        void act(async () => { await invoke("begin_device_registration", { deviceId: device.device_id }); });
+        return;
+      }
       selectedId = device.device_id;
       localStorage.setItem(LAST_DEVICE_KEY, selectedId);
       renderDevices();
@@ -447,6 +452,72 @@ function navigate(destination: string): void {
   if (destination !== "inbox" && destination !== "settings") return;
   if (!desktop) { showNotice("별도 창은 데스크톱 앱에서 열 수 있습니다."); return; }
   void act(async () => { await invoke("open_utility_window", { kind: destination }); });
+}
+
+// Tabs keep existing form nodes alive so switching groups never discards a settings draft.
+function selectSettingsTab(name: string): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]")) {
+    const selected = button.dataset.settingsTab === name;
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    element(button.getAttribute("aria-controls")!).hidden = !selected;
+  }
+}
+function initializeSettingsTabs(): void {
+  if (view !== "settings") return;
+  const panel = element("settings-panel");
+  const groups = Array.from(panel.children).filter((node): node is HTMLElement => node instanceof HTMLElement && node.classList.contains("settings-section"));
+  const tabs = document.createElement("div");
+  tabs.className = "settings-tabs";
+  tabs.setAttribute("role", "tablist");
+  tabs.setAttribute("aria-label", "설정 그룹");
+  const names = ["network", "computer", "app", "devices"];
+  const labels = ["네트워크", "이 컴퓨터", "앱 동작", "기기 등록"];
+  groups.forEach((group, index) => {
+    const name = names[index];
+    const label = labels[index];
+    if (!name || !label) throw new Error("설정 그룹 구성이 일치하지 않습니다.");
+    if (!group.id) group.id = `settings-group-${names[index]}`;
+    group.setAttribute("role", "tabpanel");
+    group.setAttribute("aria-labelledby", `settings-tab-${names[index]}`);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = `settings-tab-${names[index]}`;
+    button.dataset.settingsTab = name;
+    button.textContent = label;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-controls", group.id);
+    button.addEventListener("click", () => selectSettingsTab(name));
+    button.addEventListener("keydown", (event) => {
+      const buttons = Array.from(tabs.querySelectorAll<HTMLButtonElement>("button"));
+      let next = index;
+      if (event.key === "ArrowRight") next = (index + 1) % buttons.length;
+      else if (event.key === "ArrowLeft") next = (index + buttons.length - 1) % buttons.length;
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = buttons.length - 1;
+      else return;
+      event.preventDefault();
+      buttons[next]?.click(); buttons[next]?.focus();
+    });
+    tabs.append(button);
+  });
+  panel.querySelector(".utility-header")!.after(tabs);
+  selectSettingsTab("computer");
+}
+
+// Consume a host-held target after the settings window has installed its listener (also handles cold creation).
+async function registerPendingDevice(): Promise<void> {
+  const target = await invoke<string | null>("take_registration_target");
+  if (!target) return;
+  selectSettingsTab("devices");
+  if (activePairSession) throw new Error("진행 중인 등록을 완료하거나 취소한 뒤 다시 선택하세요.");
+  element<HTMLInputElement>("pair-target").value = target;
+  await pair("pairing.open", {});
+  try { await pair("pairing.connect", { target }); }
+  catch (error) {
+    if (!String(error).includes("NOT_FOUND")) throw error;
+    showNotice("상대 컴퓨터에서도 이 컴퓨터 아이콘을 누르면 등록을 이어갈 수 있어요.");
+  }
 }
 
 // Sending remains pending until the engine reports final storage; failure preserves the selection.
@@ -921,6 +992,7 @@ async function refreshUtility(): Promise<void> {
 
 // In a browser there is no native bridge: controls stay disabled and no fake devices are inserted.
 async function initialize(): Promise<void> {
+  initializeSettingsTabs();
   renderDevices();
   renderHistory();
   if (!desktop) {
@@ -929,9 +1001,13 @@ async function initialize(): Promise<void> {
     return;
   }
   if (!isMain) {
+    if (view === "settings") await listen("fta:registration-target", () => { void act(registerPendingDevice); });
     window.setInterval(() => { void act(refreshUtility); }, REFRESH_INTERVAL_MS);
     await act(refreshUtility);
-    if (view === "settings") await act(initializeSettingsControls);
+    if (view === "settings") {
+      await act(initializeSettingsControls);
+      await act(registerPendingDevice);
+    }
     return;
   }
   await listen<boolean>("fta:fold-state", (event) => applyFolded(event.payload));

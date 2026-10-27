@@ -74,6 +74,8 @@ struct DesktopState {
     exit_allowed: AtomicBool,
     lifecycle_busy: AtomicBool,
     pending_activations: Mutex<VecDeque<String>>,
+    // Retain a discovery click until the separate settings WebView is ready to consume it.
+    registration_target: Mutex<Option<String>>,
 }
 
 /// Serialize restarts and exits so a second click cannot exit while the first is still draining files.
@@ -917,6 +919,56 @@ async fn open_utility_window(app: tauri::AppHandle, kind: String) -> Result<(), 
     window.set_focus().map_err(|error| error.to_string())
 }
 
+/// A discovered icon starts explicit registration, never automatic trust or arbitrary-address access.
+#[tauri::command]
+async fn begin_device_registration(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+    device_id: String,
+) -> Result<(), String> {
+    require_main_window(window.label())?;
+    let devices = request("devices.list", json!({})).await?;
+    validate_registration_target(&devices, &device_id)?;
+    *state
+        .registration_target
+        .lock()
+        .map_err(|_| "등록 상태 오류")? = Some(device_id);
+    open_utility_window(window.app_handle().clone(), "settings".into()).await?;
+    window
+        .app_handle()
+        .emit_to("settings", "fta:registration-target", ())
+        .map_err(|error| error.to_string())
+}
+
+// Reject stale or forged UI hints; registration starts only from the engine's current discovery list.
+fn validate_registration_target(devices: &Value, device_id: &str) -> Result<(), String> {
+    uuid::Uuid::parse_str(device_id).map_err(|_| "잘못된 기기 ID입니다")?;
+    if !devices.as_array().is_some_and(|devices| {
+        devices
+            .iter()
+            .any(|device| device["device_id"] == device_id && device["paired"] == false)
+    }) {
+        return Err("자동 발견된 미등록 기기를 다시 선택하세요".into());
+    }
+    Ok(())
+}
+
+/// Only settings can consume the one-shot target; the actual pairing still uses the engine protocol.
+#[tauri::command]
+fn take_registration_target(
+    window: tauri::WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> Result<Option<String>, String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 등록할 수 있습니다".into());
+    }
+    Ok(state
+        .registration_target
+        .lock()
+        .map_err(|_| "등록 상태 오류")?
+        .take())
+}
+
 // A child close must destroy only its own window, never hide the transfer panel or stop its engine.
 #[tauri::command]
 fn close_utility_window(window: tauri::WebviewWindow) -> Result<(), String> {
@@ -1002,6 +1054,8 @@ fn main() {
             start_window_drag,
             close_app_window,
             open_utility_window,
+            begin_device_registration,
+            take_registration_target,
             close_utility_window,
             set_autostart,
             autostart_status,
@@ -1160,6 +1214,21 @@ mod tests {
     use super::*;
 
     // A history/settings window cannot reuse a file selection or acknowledge the main notification cursor.
+    // A clicked icon cannot substitute an address, registered peer, or absent discovery entry.
+    #[test]
+    fn registration_target_requires_current_unpaired_discovery() {
+        let id = uuid::Uuid::new_v4().to_string();
+        assert!(
+            validate_registration_target(&json!([{"device_id":id,"paired":false}]), &id).is_ok()
+        );
+        assert!(
+            validate_registration_target(&json!([{"device_id":id,"paired":true}]), &id).is_err()
+        );
+        assert!(validate_registration_target(&json!([]), &id).is_err());
+        assert!(validate_registration_target(&json!([{"device_id":id}]), &id).is_err());
+        assert!(validate_registration_target(&json!([]), "127.0.0.1:1").is_err());
+    }
+
     #[test]
     fn transfer_and_notification_actions_belong_to_main_window() {
         assert!(require_main_window("main").is_ok());

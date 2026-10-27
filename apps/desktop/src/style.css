@@ -182,3 +182,10 @@ body.folded .shell { display: none; }
 .settings-toast { position: fixed; z-index: 1000; bottom: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); padding: 7px 12px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
 .settings-toast[hidden] { display: none; }
 .settings-toast.error { background: #382e2e; color: #efaaa4; }
+
+/* Group tabs replace the long settings stack without changing the compact sender geometry. */
+.settings-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.settings-tabs button { flex: 1; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 9px 4px; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.settings-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--navy); }
+.settings-tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+.settings-section[hidden] { display: none; }
