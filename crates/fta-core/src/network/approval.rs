@@ -86,12 +86,23 @@ pub fn check_request(e: &Engine, peer: &Device) -> Result<()> {
 pub async fn listen(e: Arc<Engine>) -> Result<()> {
     loop {
         let config = e.config()?;
-        if config.discovery_enabled
-            && !config.listen_addr.ip().is_loopback()
-            && let Err(error) = pair_open(&e).await
-            && error.code != "BUSY"
-        {
-            eprintln!("registration readiness failed: {}", error.code);
+        if config.discovery_enabled && !config.listen_addr.ip().is_loopback() {
+            // Idle readiness has no user deadline. Renew its lease so its advertised port stays
+            // stable; once a peer connects, only that request's bounded approval budget applies.
+            for session in e.sessions.lock().map_err(|_| lock_error())?.values_mut() {
+                if !session.initiated
+                    && session.peer.is_none()
+                    && session.state == "waiting"
+                    && session.expires_at >= now()
+                {
+                    session.expires_at = now() + PAIR_SECONDS;
+                }
+            }
+            if let Err(error) = pair_open(&e).await
+                && error.code != "BUSY"
+            {
+                eprintln!("registration readiness failed: {}", error.code);
+            }
         }
         tokio::select! {
             _ = e.network_token.cancelled() => return Ok(()),
