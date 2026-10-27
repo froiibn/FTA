@@ -115,6 +115,8 @@ let refreshing = false;
 let autostartEnabled = false;
 let currentDetail: TransferRecord | undefined;
 let activePairSession = "";
+// Keep registration actions ordered while native window recreation resumes engine-owned state.
+let pairOperation: Promise<void> = Promise.resolve();
 let inFlightId = "";
 let progressTimer: number | undefined;
 let activationProcessing = false;
@@ -416,6 +418,10 @@ async function refresh(): Promise<void> {
     if (!selectedDevice()) selectedId = "";
     renderDevices();
     if (connected && isMain) void act(processPendingActivations);
+    if (view === "settings" && !activePairSession) {
+      const pending = await pendingPairSession();
+      if (pending) applyPairSession(pending);
+    }
     if (activePairSession) {
       try {
         const pairState = await rpc<JsonObject>("pairing.status", { session_id: activePairSession });
@@ -510,11 +516,7 @@ async function registerPendingDevice(): Promise<void> {
   const request = await invoke<{ target: string | null } | null>("take_registration_target");
   if (!request) return;
   selectSettingsTab("devices");
-  // Plus may revisit the active comparison without replacing its session or losing confirmation state.
-  if (activePairSession) {
-    if (request.target) throw new Error("진행 중인 등록을 완료하거나 취소한 뒤 다시 선택하세요.");
-    return;
-  }
+  // The engine owns registration lifetime; reopening this window must resume its existing session.
   const target = request.target;
   element<HTMLInputElement>("pair-target").value = target ?? "";
   await pair("pairing.open", {});
@@ -687,14 +689,58 @@ function renderPair(result: JsonObject): void {
   element<HTMLButtonElement>("pair-confirm").disabled = !comparison || result.state === "paired";
 }
 
-// The session ID stays internal once the actual pairing response has supplied it.
-async function pair(method: string, params: JsonObject): Promise<void> {
-  const result = await rpc<JsonObject>(method, params);
+// Prefer an existing comparison over an unused listening slot left by an older two-sided flow.
+async function pendingPairSession(): Promise<JsonObject | undefined> {
+  const sessions = await rpc<JsonObject[]>("pairing.status");
+  const pending = sessions.filter((session) => session.state !== "paired");
+  return pending.find((session) => session.session_id === activePairSession && session.peer !== null && typeof session.peer === "object")
+    ?? pending.find((session) => session.peer !== null && typeof session.peer === "object")
+    ?? pending.find((session) => session.session_id === activePairSession)
+    ?? pending[0];
+}
+
+// Restoring engine state must also restore the hidden ID used by confirm and cancel.
+function applyPairSession(result: JsonObject): void {
   renderPair(result);
   if (typeof result.session_id === "string") element<HTMLInputElement>("pair-session").value = result.session_id;
   if (typeof result.session_id === "string") activePairSession = result.session_id;
-  if (method === "pairing.cancel") activePairSession = "";
-  await refresh();
+}
+
+// Serialize clicks before opening a slot; duplicate opens and connects must not replace a comparison.
+async function pair(method: string, params: JsonObject): Promise<void> {
+  const operation = pairOperation.then(async () => {
+    let result: JsonObject;
+    if (method === "pairing.open") {
+      const pending = await pendingPairSession();
+      if (pending) result = pending;
+      else {
+        try { result = await rpc<JsonObject>(method, params); }
+        catch (error) {
+          // Another client can open a slot between the status query and the open request.
+          if (!String(error).startsWith("BUSY:")) throw error;
+          const current = await pendingPairSession();
+          if (!current) throw error;
+          result = current;
+        }
+      }
+    } else if (method === "pairing.connect") {
+      const pending = await pendingPairSession();
+      const peer = pending?.peer;
+      if (pending && typeof peer === "object" && peer !== null) {
+        applyPairSession(pending);
+        if ((peer as JsonObject).device_id !== params.target && !(pending.initiated === true && pending.address === params.target)) {
+          throw new Error("이미 다른 기기와 등록을 진행 중입니다. 현재 등록의 비교값을 확인하거나 취소한 뒤 다시 선택하세요.");
+        }
+        result = pending;
+      } else result = await rpc<JsonObject>(method, params);
+    } else result = await rpc<JsonObject>(method, params);
+    applyPairSession(result);
+    if (method === "pairing.cancel") activePairSession = "";
+    await refresh();
+  });
+  // A failed request is reported to its caller without poisoning subsequent confirm/cancel actions.
+  pairOperation = operation.catch(() => {});
+  await operation;
 }
 
 // Native authorization is separate from transfer acceptance, and unavailable development builds say so.
