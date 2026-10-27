@@ -600,6 +600,12 @@ fn engine_path() -> Result<PathBuf, String> {
 /// A failed start remains visible; it must never fabricate online peers or successful transfers.
 #[tauri::command]
 async fn start_engine(state: State<'_, DesktopState>) -> Result<Value, String> {
+    let _guard = LifecycleGuard::acquire(&state)?;
+    ensure_engine(&state).await
+}
+
+// Keep the lifecycle guard through readiness so another click cannot interrupt a restart halfway.
+async fn ensure_engine(state: &DesktopState) -> Result<Value, String> {
     if let Ok(status) = request("status", json!({})).await {
         return Ok(status);
     }
@@ -668,22 +674,27 @@ async fn shutdown_child(child: &mut Child) -> Result<(), String> {
     Ok(())
 }
 
-/// Only a child owned by this desktop may be restarted; an independent server is never killed.
+/// Existing same-user services use cooperative IPC shutdown; only owned children permit a kill fallback.
 #[tauri::command]
 async fn restart_engine(state: State<'_, DesktopState>) -> Result<Value, String> {
-    let guard = LifecycleGuard::acquire(&state)?;
-    let mut child = state
+    let _guard = LifecycleGuard::acquire(&state)?;
+    let owned = state
         .child
         .lock()
         .map_err(|_| "엔진 프로세스 상태 오류")?
-        .take()
-        .ok_or("이 앱에서 시작한 서비스가 아닙니다. 해당 서비스를 직접 재시작하세요")?;
-    if let Err(error) = shutdown_child(&mut child).await {
-        *state.child.lock().map_err(|_| "엔진 프로세스 상태 오류")? = Some(child);
-        return Err(error);
+        .take();
+    if let Some(mut child) = owned {
+        if let Err(error) = shutdown_child(&mut child).await {
+            *state.child.lock().map_err(|_| "엔진 프로세스 상태 오류")? = Some(child);
+            return Err(error);
+        }
+    } else {
+        let paths = AppPaths::discover().map_err(|error| error.to_string())?;
+        fta_core::engine::shutdown_existing(&paths)
+            .await
+            .map_err(|error| error.to_string())?;
     }
-    drop(guard);
-    start_engine(state).await
+    ensure_engine(&state).await
 }
 
 /// Register readiness only after the UI listener exists; early native events must remain unacknowledged.

@@ -346,7 +346,11 @@ mod lifecycle {
 
         let mut restarted = spawn_child(directory.path(), &runtime_dir);
         wait_ready(&mut restarted, &paths);
-        terminate(&restarted);
+        // A new desktop has no Child handle: cooperative IPC must still drain and release the lock.
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(fta_core::engine::shutdown_existing(&paths))
+            .unwrap();
         assert!(wait_exit(&mut restarted).status.success());
         assert!(!paths.socket_path().exists());
     }

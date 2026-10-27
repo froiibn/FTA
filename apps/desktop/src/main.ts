@@ -492,10 +492,16 @@ async function sendMessage(): Promise<void> {
     const result = await invoke<TransferRecord>("send_message", { to: target.device_id, kind: messageKind(input.value), body: input.value, transferId: inFlightId });
     if (result.state === "completed") {
       input.value = "";
-      showNotice(`${target.display_name}에 전달했어요.`);
+      // Clearing the confirmed draft is sufficient feedback; a banner would enlarge the compact window.
     } else showNotice(transferFailureMessage(result), true);
     await refreshHistory();
-  } finally { await finishProgress(); sending = false; updateActions(); }
+  } finally {
+    await finishProgress();
+    // Message results already clear the draft or show an error; stale progress also creates scroll.
+    element("transfer-status").hidden = true;
+    sending = false;
+    updateActions();
+  }
 }
 
 // Partial and unknown outcomes must not encourage a blind retry that may duplicate received items.
@@ -672,6 +678,13 @@ on("add-device", "click", () => navigate("settings"));
 on("refresh", "click", () => { void act(refresh); });
 on("reload-inbox", "click", () => { void act(refreshHistory); });
 on("message", "input", updateActions);
+// Enter sends, while Shift+Enter and IME composition retain native multiline editing.
+on("message", "keydown", (raw) => {
+  const event = raw as KeyboardEvent;
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  if (!event.repeat && !element<HTMLButtonElement>("send-message").disabled) void act(sendMessage);
+});
 on("choose-files", "click", () => { void act(async () => { selectedPaths = await invoke<string[]>("choose_files"); renderFiles(); }); });
 on("clear-files", "click", () => { selectedPaths = []; renderFiles(); });
 on("send-files", "click", () => { void act(sendFiles); });
