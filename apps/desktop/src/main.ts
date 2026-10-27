@@ -191,7 +191,7 @@ function userError(error: unknown): string {
     KEY_CHANGED: "기기 인증 정보가 변경되었습니다. 기존 등록을 확인하고 다시 등록하세요.",
     NOT_FOUND: "항목을 찾을 수 없습니다. 기록이 삭제되었거나 더 이상 보관되지 않을 수 있습니다.",
     // A registration discovery miss is unrelated to deleted history or received files.
-    PAIRING_NOT_FOUND: "상대 기기의 등록용 주소를 찾지 못했습니다. 상대에서 등록 모드를 다시 연 뒤 연결하거나, 상대 등록 화면의 ‘연결 주소’를 입력하세요.",
+    PAIRING_NOT_FOUND: "상대 기기의 등록 서비스를 찾지 못했습니다. 상대 앱이 실행 중이며 새 등록 방식을 지원하는 버전인지 확인해주세요.",
     VERSION_UNSUPPORTED: "두 기기의 앱 버전이 호환되지 않습니다. 앱을 업데이트하세요.",
     CANCELLED: "전송을 취소했습니다. 이미 저장된 파일은 유지됩니다.",
     HASH_MISMATCH: "파일을 검증하지 못했습니다. 원본 파일을 확인한 뒤 다시 보내세요.",
