@@ -191,9 +191,17 @@ body.folded .shell { display: none; }
 #network-profile-row .form-actions { margin-top: 10px; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
 
 /* A content-sized, quiet toast confirms actions without covering the settings form. */
-.settings-toast { position: fixed; z-index: 1000; bottom: calc(14px + var(--settings-actions-height, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); padding: 7px 12px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
+.settings-toast { position: fixed; z-index: 1000; bottom: calc(14px + var(--settings-actions-height, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(300px, calc(100% - 32px)); padding: 6px 10px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
+.settings-toast span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .settings-toast[hidden] { display: none; }
 .settings-toast.error { background: #382e2e; color: #efaaa4; }
+
+/* A real pending operation owns the donut; there are no fabricated percentages or minimum delays. */
+.settings-progress { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; background: #00000018; pointer-events: none; }
+.settings-progress-label { display: flex; align-items: center; gap: 9px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 12px; }
+.settings-donut { display: block; width: 24px; height: 24px; border: 3px solid var(--line); border-top-color: var(--navy); border-right-color: var(--navy); border-radius: 50%; animation: settings-spin .8s linear infinite; }
+@keyframes settings-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .settings-donut { animation: none; } }
 
 /* Group tabs replace the long settings stack without changing the compact sender geometry. */
 .settings-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }

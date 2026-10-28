@@ -84,6 +84,8 @@ root.innerHTML = `
       </div>
       <!-- The external form attribute keeps native validation and the existing submit path intact. -->
       <footer id="settings-actions" class="settings-footer"><p class="help">저장 후 ‘서비스 재시작’을 눌러 적용하세요.</p><div class="form-actions"><button id="network-system-settings" data-settings-action="network" class="secondary">시스템 설정 열기</button><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button id="network-apply" data-settings-action="network" class="primary" disabled>연결 설정 저장</button><button id="computer-save" data-settings-action="computer" class="primary" type="submit" form="settings-form" hidden>설정 저장</button></div></footer>
+      <!-- Native settings calls have no measurable percentage, so feedback stays indeterminate. -->
+      <div id="settings-progress" class="settings-progress" role="status" aria-live="polite" hidden><div class="settings-progress-label"><span class="settings-donut" aria-hidden="true"></span><span>처리 중…</span></div></div>
     </section>
   </main>
   <button id="expand-window" class="expand-widget" aria-label="펼치기" title="펼치기" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V5h4m6 0h4v4m0 6v4h-4M9 19H5v-4"/></svg></button>
@@ -134,7 +136,10 @@ let progressTimer: number | undefined;
 let activationProcessing = false;
 const receiptInFlight = new Set<number>();
 
-const TOAST_DURATION_MS = 2000;
+const TOAST_DURATION_MS = 1000;
+// One shared batch includes nested native calls; an inner completion must not hide outer work.
+let settingsActionCount = 0;
+let settingsActionResult: { message: string; error: boolean } | undefined;
 // Settings scroll independently; feedback must stay in the viewport instead of above the form.
 const toast = document.createElement("div");
 toast.className = "settings-toast";
@@ -146,25 +151,58 @@ toast.append(toastMessage);
 document.body.append(toast);
 let toastTimer: number | undefined;
 
-// Keep every result lightweight and brief; a newer message receives its own full two seconds.
+// Each completed action batch gets one small toast for a full second, after its loading state ends.
 function showSettingsToast(message: string, error: boolean): void {
   if (toastTimer !== undefined) window.clearTimeout(toastTimer);
   // A save confirmation must not cover the restart button in the persistent footer.
   const footer = document.getElementById("settings-actions");
   toast.style.setProperty("--settings-actions-height", `${footer && !footer.hidden ? footer.getBoundingClientRect().height : 0}px`);
   toastMessage.textContent = message;
+  toastMessage.title = message;
   toast.classList.toggle("error", error);
   toast.hidden = false;
   toastTimer = window.setTimeout(() => { toast.hidden = true; toastTimer = undefined; }, TOAST_DURATION_MS);
 }
 
+// Inert preserves each control's native disabled state and prevents duplicate settings operations.
+function setSettingsWorking(working: boolean): void {
+  element("settings-progress").hidden = !working;
+  element("settings-content").setAttribute("aria-busy", String(working));
+  for (const region of document.querySelectorAll<HTMLElement>("#settings-content, #settings-actions, .settings-tabs")) region.inert = working;
+}
+
+function rememberSettingsResult(message: string, error: boolean): void {
+  // A later success from cleanup or another nested task must not conceal an earlier failure.
+  if (!settingsActionResult?.error || error) settingsActionResult = { message, error };
+}
+
+function beginSettingsAction(): void {
+  if (settingsActionCount++ > 0) return;
+  settingsActionResult = undefined;
+  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
+  toastTimer = undefined;
+  toast.hidden = true;
+  setSettingsWorking(true);
+}
+
+function finishSettingsAction(): void {
+  if (--settingsActionCount > 0) return;
+  setSettingsWorking(false);
+  const result = settingsActionResult ?? { message: "완료했습니다.", error: false };
+  settingsActionResult = undefined;
+  showSettingsToast(result.message, result.error);
+}
+
 // Errors remain visible without echoing arbitrary received content into HTML.
 function showNotice(message: string, error = false, source = "action"): void {
   const notice = element("notice");
-  // User actions in settings use a fixed toast; background connectivity keeps its own banner.
+  // Initial connection/load errors also prevent the shared batch from reporting generic success.
+  if (view === "settings" && settingsActionCount > 0 && error) rememberSettingsResult(message, true);
+  // Queue action results until all work ends; background connectivity keeps its persistent banner.
   if (view === "settings" && source === "action") {
     if (notice.dataset.source === "action") notice.hidden = true;
-    showSettingsToast(message, error);
+    if (settingsActionCount > 0) rememberSettingsResult(message, error);
+    else showSettingsToast(message, error);
     return;
   }
   // Keep connection recovery from clearing an unrelated transfer or permission failure.
@@ -215,9 +253,13 @@ function userError(error: unknown): string {
   return messages[code] ?? text;
 }
 
-// Every async UI handler reports rejection; an IPC error must never look like a successful send.
-async function act(action: () => Promise<void>): Promise<void> {
-  try { await action(); } catch (error) { showNotice(userError(error), true); }
+// All settings actions share progress and completion; passive polling and other windows opt out.
+async function act(action: () => Promise<void>, options: { settingsFeedback?: boolean } = {}): Promise<void> {
+  const tracked = desktop && view === "settings" && options.settingsFeedback !== false;
+  if (tracked) beginSettingsAction();
+  try { await action(); }
+  catch (error) { showNotice(userError(error), true); }
+  finally { if (tracked) finishSettingsAction(); }
 }
 
 // Browser preview is presentation-only and does not simulate a working engine.
@@ -475,6 +517,8 @@ function initializeSettingsTabs(): void {
   const groups = Array.from(element("settings-content").children).filter((node): node is HTMLElement => node instanceof HTMLElement && node.classList.contains("settings-section"));
   const tabs = document.createElement("div");
   tabs.className = "settings-tabs";
+  // The initial loading batch starts before the tab list is constructed.
+  tabs.inert = settingsActionCount > 0;
   tabs.setAttribute("role", "tablist");
   tabs.setAttribute("aria-label", "설정 그룹");
   const names = ["network", "computer", "app", "devices"];
@@ -756,7 +800,7 @@ async function quit(): Promise<void> {
 
 // Bind each handler once; rerenders replace only dynamic lists and preserve drafts/focus.
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-window]")) button.addEventListener("click", () => navigate(button.dataset.window ?? "send"));
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-close-window]")) button.addEventListener("click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }); });
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-close-window]")) button.addEventListener("click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }, { settingsFeedback: false }); });
 for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) dialog.addEventListener("close", positionNotice);
 on("refresh", "click", () => { void act(refresh); });
 on("reload-inbox", "click", () => { void act(refreshHistory); });
@@ -1005,8 +1049,11 @@ async function refreshNetworkSetup(): Promise<void> {
   } catch (error) {
     element("network-summary").textContent = userError(error);
     element<HTMLSelectElement>("network-interface").replaceChildren(new Option("상태 확인 불가", ""));
+    // The shared action must distinguish a failed inspection from a completed setup.
+    throw error;
+  } finally {
+    updateNetworkSelection();
   }
-  updateNetworkSelection();
 }
 
 // A profile-only action must not silently save unrelated receive or discovery preferences.
@@ -1030,10 +1077,14 @@ async function applyNetworkSetup(profileOnly = false): Promise<void> {
       showNotice("집 네트워크 설정을 저장했습니다. 서비스 재시작을 눌러 적용하세요.");
     }
   } finally {
-    await refreshNetworkSetup();
-    setupBusy = false;
-    element<HTMLButtonElement>("network-refresh").disabled = false;
-    updateNetworkSelection();
+    // A failed reinspection must report failure and still release the controls after OS work.
+    try { await refreshNetworkSetup(); }
+    catch (error) { showNotice(userError(error), true); }
+    finally {
+      setupBusy = false;
+      element<HTMLButtonElement>("network-refresh").disabled = false;
+      updateNetworkSelection();
+    }
   }
 }
 on("network-interface", "change", () => { rememberNetworkSelection(); restoreNetworkTrust(); updateNetworkSelection(); });
@@ -1082,7 +1133,11 @@ async function initialize(): Promise<void> {
     return;
   }
   if (!isMain) {
-    window.setInterval(() => { void act(refreshUtility); }, REFRESH_INTERVAL_MS);
+    // Passive status polling never flashes progress or a completion toast over the user's work.
+    window.setInterval(() => {
+      if (view === "settings" && settingsActionCount > 0) return;
+      void act(refreshUtility, { settingsFeedback: false });
+    }, REFRESH_INTERVAL_MS);
     await act(refreshUtility);
     if (view === "settings") {
       await act(initializeSettingsControls);
