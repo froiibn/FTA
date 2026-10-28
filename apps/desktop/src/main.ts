@@ -852,7 +852,8 @@ for (const handle of document.querySelectorAll<HTMLElement>("[data-drag-handle]"
   handle.addEventListener("pointerdown", (event) => {
     if (!desktop || event.button !== 0 || (event.target as HTMLElement).closest("button, input, textarea, a")) return;
     event.preventDefault();
-    void act(async () => { await invoke("start_window_drag"); });
+    // Moving the native window is chrome interaction, not a settings operation to report completed.
+    void act(async () => { await invoke("start_window_drag"); }, { settingsFeedback: false });
   });
 }
 
