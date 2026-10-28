@@ -78,7 +78,8 @@ root.innerHTML = `
       <div id="network-profile-row" hidden><p id="network-profile-status" aria-live="polite">현재 네트워크: 연결을 선택하세요.</p><p class="help">FTA는 개인 네트워크에서만 사용할 수 있습니다.</p><div class="form-actions"><button id="network-make-private" class="secondary" disabled>개인 네트워크로 변경</button><button id="network-make-public" class="secondary" disabled>공용으로 변경…</button></div><p class="help">변경한 상태는 전송 후에도 유지되며 다른 앱에도 영향을 줍니다.</p><p class="help">공용으로 되돌리려면 Windows 설정에서 현재 연결의 네트워크 프로필을 ‘공용’으로 선택하세요. 변경 후 ‘재점검’을 눌러주세요.</p></div>
       <label class="checkbox-label"><input id="network-firewall" type="checkbox" checked /> 수신 허용</label><p id="network-permission" class="help"></p><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다.</p></section>
       <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label></form>
-      <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong>로그인 시 실행</strong><p>로그인하면 자동 수신을 시작합니다.</p></div><button id="autostart" class="secondary">확인 중</button></div><div class="settings-row"><div><strong>수신 알림</strong><p id="notification-status">알림 권한을 확인합니다.</p></div><button id="notification-permission" class="secondary">알림 허용</button></div></section>
+      <!-- These switches represent saved preferences; unknown native state stays disabled until read. -->
+      <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong id="autostart-label">로그인 시 실행</strong><p id="autostart-status">설정 상태를 확인합니다.</p></div><label class="settings-toggle"><input id="autostart" type="checkbox" role="switch" aria-labelledby="autostart-label" aria-describedby="autostart-status" disabled /><span class="toggle-track" aria-hidden="true"></span></label></div><div class="settings-row"><div><strong id="notification-label">수신 알림</strong><p id="notification-status">설정 상태를 확인합니다.</p></div><label class="settings-toggle"><input id="notification-permission" type="checkbox" role="switch" aria-labelledby="notification-label" aria-describedby="notification-status" disabled /><span class="toggle-track" aria-hidden="true"></span></label></div></section>
       <section class="settings-section"><div class="section-heading"><h2>등록된 기기</h2></div><p class="help">감지된 컴퓨터에 처음 보내면 상대에서 한 번만 등록을 확인합니다. 이후에는 바로 전송됩니다.</p><div id="paired-devices"></div></section>
       </div>
       <!-- The external form attribute keeps native validation and the existing submit path intact. -->
@@ -123,6 +124,8 @@ let connected = false;
 let networkReady = false;
 let refreshing = false;
 let autostartEnabled = false;
+// This is the app's persisted notification preference, separate from the OS authorization result.
+let receiptNotificationsEnabled = true;
 let currentDetail: TransferRecord | undefined;
 // Only one real incoming request owns the native consent prompt.
 let registrationPrompting = false;
@@ -677,23 +680,47 @@ async function processRegistrationRequests(): Promise<void> {
   } finally { registrationPrompting = false; }
 }
 
-// Native authorization is separate from transfer acceptance, and unavailable development builds say so.
+// OS authorization explains display limits; Windows management does not disable the app's own switch.
 function renderNotificationPermission(permission: string): void {
   const labels: Record<string, string> = {
     granted: "알림이 허용되어 있습니다. 표시는 집중 모드 등 OS 설정에 따릅니다.",
     denied: "시스템 설정의 알림에서 FTA를 허용하세요. 수신은 계속됩니다.",
     prompt: "알림을 허용하면 새 수신 항목을 알려드립니다.",
-    "os-managed": "알림 표시·차단은 Windows 알림 설정에서 관리합니다.",
+    "os-managed": "새 수신 항목을 알려드립니다. Windows에서 알림이 차단되어 있으면 표시되지 않습니다.",
     unavailable: "설치된 데스크톱 앱에서 알림을 사용할 수 있습니다.",
   };
-  element("notification-status").textContent = labels[permission] ?? "알림 상태를 확인할 수 없습니다.";
-  element<HTMLButtonElement>("notification-permission").disabled = ["granted", "os-managed", "unavailable"].includes(permission);
-  element("notification-permission").textContent = permission === "granted" ? "허용됨" : permission === "os-managed" ? "OS에서 관리" : permission === "unavailable" ? "설치 앱 필요" : permission === "denied" ? "다시 확인" : "알림 허용";
+  element("notification-status").textContent = receiptNotificationsEnabled ? labels[permission] ?? "알림 상태를 확인할 수 없습니다." : "알림을 끈 상태입니다. 파일 수신과 기록은 계속됩니다.";
+  const toggle = element<HTMLInputElement>("notification-permission");
+  toggle.checked = receiptNotificationsEnabled;
+  toggle.disabled = permission === "unavailable";
 }
 
-// Only a direct user action can trigger the system's initial authorization prompt.
-async function enableNotifications(): Promise<void> {
-  renderNotificationPermission(await invoke<string>("notification_permission", { request: true }));
+// Re-read persisted state after a change or error instead of assuming a switch was applied.
+async function refreshNotificationToggle(): Promise<void> {
+  const toggle = element<HTMLInputElement>("notification-permission");
+  toggle.disabled = true;
+  try {
+    receiptNotificationsEnabled = await invoke<boolean>("receipt_notifications_enabled");
+    renderNotificationPermission(await invoke<string>("notification_permission", { request: false }));
+  } catch (error) {
+    element("notification-status").textContent = "설정 상태를 확인하지 못했습니다. 설정 창을 다시 열어주세요.";
+    throw error;
+  }
+}
+
+// Startup reflects the real OS registration, including failed or partially applied changes.
+async function refreshAutostartToggle(): Promise<void> {
+  const toggle = element<HTMLInputElement>("autostart");
+  toggle.disabled = true;
+  try {
+    autostartEnabled = await invoke<boolean>("autostart_status");
+    toggle.checked = autostartEnabled;
+    element("autostart-status").textContent = "로그인하면 자동 수신을 시작합니다.";
+    toggle.disabled = false;
+  } catch (error) {
+    element("autostart-status").textContent = "설정 상태를 확인하지 못했습니다. 설정 창을 다시 열어주세요.";
+    throw error;
+  }
 }
 
 // Both warm and cold activations carry only a validated ID; contents are read from the persisted local inbox.
@@ -838,12 +865,29 @@ on("pin", "click", () => { void act(async () => {
   element("pin").setAttribute("aria-pressed", String(pinned));
   localStorage.setItem(PINNED_KEY, String(pinned));
 }); });
-on("autostart", "click", () => { void act(async () => {
-  await invoke("set_autostart", { enabled: !autostartEnabled });
-  autostartEnabled = !autostartEnabled;
-  element("autostart").textContent = autostartEnabled ? "켜짐 · 끄기" : "꺼짐 · 켜기";
+on("autostart", "change", () => { void act(async () => {
+  const toggle = element<HTMLInputElement>("autostart");
+  const enabled = toggle.checked;
+  toggle.checked = autostartEnabled;
+  toggle.disabled = true;
+  try { await invoke("set_autostart", { enabled }); }
+  finally { await refreshAutostartToggle(); }
+  if (autostartEnabled !== enabled) throw new Error("로그인 시 실행 설정이 적용되지 않았습니다.");
 }); });
-on("notification-permission", "click", () => { void act(enableNotifications); });
+on("notification-permission", "change", () => { void act(async () => {
+  const toggle = element<HTMLInputElement>("notification-permission");
+  const enabled = toggle.checked;
+  toggle.checked = receiptNotificationsEnabled;
+  toggle.disabled = true;
+  try {
+    // Only turning notifications on may request native authorization; turning them off never does.
+    if (enabled) {
+      const permission = await invoke<string>("notification_permission", { request: true });
+      if (!["granted", "os-managed"].includes(permission)) throw new Error("시스템 설정에서 FTA 알림을 허용한 뒤 다시 켜주세요.");
+    }
+    await invoke("set_receipt_notifications_enabled", { enabled });
+  } finally { await refreshNotificationToggle(); }
+}); });
 // Native required-field validation prevents submit; give it the same visible feedback as RPC errors.
 document.getElementById("settings-form")?.addEventListener("invalid", (event) => {
   const field = event.target;
@@ -871,17 +915,8 @@ on("settings-form", "submit", (event) => {
 
 // Settings-only OS controls are initialized in their own window without starting an engine or receipt loop.
 async function initializeSettingsControls(): Promise<void> {
-  try {
-    autostartEnabled = await invoke<boolean>("autostart_status");
-    element("autostart").textContent = autostartEnabled ? "켜짐 · 끄기" : "꺼짐 · 켜기";
-  } catch (error) {
-    element("autostart").textContent = "상태 확인 불가";
-    element<HTMLButtonElement>("autostart").disabled = true;
-    showNotice(userError(error), true);
-  }
-  await act(async () => {
-    renderNotificationPermission(await invoke<string>("notification_permission", { request: false }));
-  });
+  await act(refreshAutostartToggle);
+  await act(refreshNotificationToggle);
 }
 
 type NetworkInterface = { id: string; name: string; address: string; prefix: number; network: string; profile: "unknown" | "public" | "private" | "domain" };
@@ -1096,7 +1131,7 @@ async function initialize(): Promise<void> {
           && ["granted", "os-managed"].includes(await invoke<string>("notification_permission", { request: false }))) {
         await invoke("notify_receipt", { sequence: receipt.sequence, transferId: receipt.transfer_id });
       }
-      // Disabled OS notifications still acknowledge the persisted record; permission is not receipt approval.
+      // Disabled app or OS notifications still acknowledge the record, without replay when re-enabled.
       await invoke("ack_receipt", { sequence: receipt.sequence });
     } finally {
       receiptInFlight.delete(receipt.sequence);

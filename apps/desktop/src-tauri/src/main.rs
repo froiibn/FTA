@@ -27,6 +27,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 mod drop_coordinates;
+mod notification_preference;
 
 #[cfg(target_os = "macos")]
 mod native_notification;
@@ -859,6 +860,11 @@ async fn notify_receipt(
     {
         return Ok(());
     }
+    // Gate in the shared host so a settings-window change applies to the hidden main window immediately.
+    // Returning success while disabled still lets the UI consume the event without replaying it later.
+    if !receipt_notifications_enabled(_app.clone())? {
+        return Ok(());
+    }
     let body = if record["state"] == "partial" {
         "일부 파일이 저장되었습니다. 전송 기록에서 결과를 확인하세요."
     } else if record["kind"] == "files" {
@@ -886,6 +892,32 @@ async fn notify_receipt(
         let _ = _app;
         Err("데스크톱 알림은 Windows와 macOS에서 지원합니다".into())
     }
+}
+
+// The host owns this fixed per-user path; the WebView can submit only the enabled boolean.
+fn notification_preference_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|directory| directory.join(notification_preference::FILE_NAME))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn receipt_notifications_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    notification_preference::read(&notification_preference_path(&app)?)
+}
+
+// Only the settings view can change app notification policy; transfers and OS authorization stay separate.
+#[tauri::command]
+fn set_receipt_notifications_enabled(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    enabled: bool,
+) -> Result<bool, String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 수신 알림을 변경할 수 있습니다".into());
+    }
+    notification_preference::write(&notification_preference_path(&app)?, enabled)
 }
 
 /// Query native notification authorization without interpreting receipt approval as OS permission.
@@ -1130,6 +1162,8 @@ fn main() {
             ack_receipt,
             notify_receipt,
             notification_permission,
+            receipt_notifications_enabled,
+            set_receipt_notifications_enabled,
             pending_activations,
             ack_activation
         ])
