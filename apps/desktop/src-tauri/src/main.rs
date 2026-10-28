@@ -878,6 +878,15 @@ async fn notify_receipt(
     }
     #[cfg(windows)]
     {
+        // An old installation's shortcut can survive uninstall. Never submit a clickable toast
+        // after registration failed at startup or while its target still refers to the old path.
+        fta_platform::windows::notifications::register(
+            &std::env::current_exe().map_err(|error| error.to_string())?,
+            &_app.config().identifier,
+            "FTA",
+            ACTIVATION_SCHEME,
+        )
+        .map_err(|error| format!("Windows 알림의 실행 경로를 등록하지 못했습니다: {error}"))?;
         fta_platform::windows::notifications::show(
             &_app.config().identifier,
             ACTIVATION_SCHEME,

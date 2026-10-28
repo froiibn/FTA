@@ -19,6 +19,8 @@
 
 Tauri API·플러그인으로 트레이·알림·클립보드·파일 열기를 연결하고 부족한 알림 활성화 기능은 Windows Rust 어댑터로 보완한다. TypeScript에서 임의 셸 명령을 실행하도록 노출하지 않는다. 패키징 방식에 따라 앱 알림 등록과 활성화를 검증한다. Windows App SDK 공식 문서는 비패키지 앱의 알림 클릭을 위한 등록 동작을 설명한다. 알림 비허용·집중 모드에서도 수신 완료는 기록한다. [Microsoft: 앱 알림](https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/app-notifications-dotnet)
 
+2026-10-28 알림 클릭이 Store로 이어진다는 보고를 읽기 전용으로 조사했다. 저장된 FTA 알림은 정상 `fta://inbox/<transfer_id>` 주소였고 Windows의 현재 URI 연결도 설치된 실행 파일을 가리켰지만, 같은 알림 AUMID의 시작 메뉴 바로가기는 이미 삭제된 이전 AppData 실행 파일을 가리켰다. 실행 중인 설치 파일도 최신 로컬 산출물과 달랐다. 설치 이전 후 알림 등록이 불일치한 것은 확인했으며, 실제 클릭을 재현하지 않아 Store 이동의 최종 인과관계는 미확정이다. 소스에서는 새 알림 제출 전에 현재 실행 경로로 소유한 URI·바로가기 등록을 갱신하고, 등록 실패 시 알림 제출을 중단해 이벤트를 소비 완료로 처리하지 않는다. 등록 후에는 [Microsoft의 SHChangeNotify 지침](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shchangenotify)에 따라 URI 연결 캐시 변경을 통지한다. 이전 실행 파일 삭제 후 새 위치로 소유한 등록을 옮기는 회귀 검사도 추가하되 사용자 요청에 따라 실제 테스트·알림 클릭·OS 등록 변경은 실행하지 않았다.
+
 ## 3. 파일·설정·키
 
 | 항목 | 기준 경로·방식 |

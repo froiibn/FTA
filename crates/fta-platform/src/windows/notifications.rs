@@ -27,8 +27,8 @@ use windows::{
             WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize},
         },
         UI::Shell::{
-            IShellLinkW, PropertiesSystem::IPropertyStore, SetCurrentProcessExplicitAppUserModelID,
-            ShellLink,
+            IShellLinkW, PropertiesSystem::IPropertyStore, SHCNE_ASSOCCHANGED, SHCNF_IDLIST,
+            SHChangeNotify, SetCurrentProcessExplicitAppUserModelID, ShellLink,
         },
     },
     core::{GUID, HSTRING, Interface, PCWSTR, PWSTR},
@@ -104,7 +104,11 @@ pub fn register(
         let app_id = HSTRING::from(app_id);
         // SAFETY: app_id is a live UTF-16 string; the API copies the process identity.
         unsafe { SetCurrentProcessExplicitAppUserModelID(PCWSTR(app_id.as_ptr())) }
-            .map_err(native_error)
+            .map_err(native_error)?;
+        // Windows caches URI handlers. Registration changes must invalidate that cache before clicks.
+        // SAFETY: SHCNE_ASSOCCHANGED requires SHCNF_IDLIST and null item pointers, including for protocols.
+        unsafe { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None) };
+        Ok(())
     })
 }
 
@@ -348,6 +352,67 @@ mod tests {
             super::super::known_folder(&windows_sys::Win32::UI::Shell::FOLDERID_Programs)?;
         assert!(programs.join(format!("{}.lnk", fixture.app_id)).is_file());
         Ok(())
+    }
+
+    // A reinstall may delete the old executable while leaving the owned notification shortcut behind.
+    // Re-registration must move both the URI command and native shortcut to the new installation.
+    #[test]
+    fn registration_repairs_an_owned_shortcut_after_installation_moves() -> io::Result<()> {
+        use winreg::{RegKey, enums::HKEY_CURRENT_USER};
+        let fixture = fixture();
+        let directory = tempfile::tempdir()?;
+        let old_executable = directory.path().join("old installation").join("fta.exe");
+        let new_executable = directory.path().join("new installation").join("fta.exe");
+        for path in [&old_executable, &new_executable] {
+            std::fs::create_dir_all(path.parent().expect("test installation parent"))?;
+            std::fs::write(path, b"notification registration fixture; never executed")?;
+        }
+        register(
+            &old_executable,
+            &fixture.app_id,
+            "FTA notification test",
+            &fixture.scheme,
+        )?;
+        std::fs::remove_file(&old_executable)?;
+        register(
+            &new_executable,
+            &fixture.app_id,
+            "FTA notification test",
+            &fixture.scheme,
+        )?;
+        let expected = dunce::canonicalize(&new_executable)?;
+        let key = RegKey::predef(HKEY_CURRENT_USER).open_subkey(format!(
+            "Software\\Classes\\{}\\shell\\open\\command",
+            fixture.scheme
+        ))?;
+        assert_eq!(
+            key.get_value::<String, _>("")?,
+            format!("\"{}\" \"%1\"", expected.display())
+        );
+        let app_id = fixture.app_id.clone();
+        in_apartment(move || {
+            let programs =
+                super::super::known_folder(&windows_sys::Win32::UI::Shell::FOLDERID_Programs)?;
+            let shortcut = HSTRING::from(programs.join(format!("{app_id}.lnk")).as_os_str());
+            // SAFETY: this test worker owns an initialized COM apartment and a live shortcut path.
+            let link: IShellLinkW =
+                unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER) }
+                    .map_err(native_error)?;
+            let persist: IPersistFile = link.cast().map_err(native_error)?;
+            // SAFETY: shortcut owns a live UTF-16 path; loading the test-owned shortcut is read-only.
+            unsafe { persist.Load(PCWSTR(shortcut.as_ptr()), STGM_READ) }.map_err(native_error)?;
+            const MAX_TARGET_UNITS: usize = 32_768;
+            let mut target = vec![0_u16; MAX_TARGET_UNITS];
+            // SAFETY: the writable UTF-16 buffer is live; no find-data structure is requested.
+            unsafe { link.GetPath(&mut target, std::ptr::null_mut(), 0) }.map_err(native_error)?;
+            let end = target
+                .iter()
+                .position(|unit| *unit == 0)
+                .unwrap_or(target.len());
+            let actual = String::from_utf16(&target[..end]).map_err(io::Error::other)?;
+            assert!(same_file::is_same_file(actual, expected)?);
+            Ok(())
+        })
     }
 
     // NSIS creates an unowned handler before first launch. Canonical path aliases must identify

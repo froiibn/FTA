@@ -40,3 +40,5 @@ rustix = { version = "1", features = ["fs"] }
 [target.'cfg(windows)'.dev-dependencies]
 # Native identity regressions use disposable files, never the running installation.
 tempfile = "3"
+# The relocation regression reads the shortcut target through IShellLinkW rather than parsing .lnk bytes.
+windows = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
