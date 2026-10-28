@@ -194,15 +194,21 @@ async fn network_setup_status(
     Ok(status)
 }
 
-// OS changes are verified before persisting LAN configuration; restarting remains an explicit action.
+// OS changes are verified before persisting LAN configuration; a profile-only action must not save it.
 #[tauri::command]
 async fn network_setup_apply(
     window: tauri::WebviewWindow,
     state: State<'_, DesktopState>,
     selection: fta_platform::network_setup::NetworkSetupRequest,
+    profile_only: Option<bool>,
 ) -> Result<Value, String> {
     if window.label() != "settings" {
         return Err("설정 창에서만 네트워크를 변경할 수 있습니다".into());
+    }
+    let profile_only = profile_only.unwrap_or(false);
+    // Reuse the guarded Windows helper without granting a profile button any firewall/settings writes.
+    if profile_only && (!cfg!(windows) || !selection.make_private || selection.configure_firewall) {
+        return Err("네트워크 프로필 변경 요청이 잘못되었습니다".into());
     }
     let _guard = LifecycleGuard::acquire(&state)?;
     let confirmed = state
@@ -231,8 +237,10 @@ async fn network_setup_apply(
             .map_err(|e| e.to_string())?;
     fta_platform::network_setup::verify_scope(&expected, &current_interface)
         .map_err(|e| e.to_string())?;
-    // Check IPC before authorization, without capturing a listener port that another client may change.
-    request("settings.get", json!({})).await?;
+    // Only saving app settings requires engine IPC; a standalone OS profile change does not.
+    if !profile_only {
+        request("settings.get", json!({})).await?;
+    }
     let choice = selection.clone();
     let status = tauri::async_runtime::spawn_blocking(move || {
         fta_platform::network_setup::apply(&engine, &choice)
@@ -245,6 +253,9 @@ async fn network_setup_apply(
     fta_platform::network_setup::verify_scope(&expected, &selected).map_err(|e| {
         format!("OS 변경 중 연결이 바뀌었습니다. 앱 설정은 저장하지 않았습니다: {e}")
     })?;
+    if profile_only {
+        return Ok(json!({"status":status,"restart_required":false}));
+    }
     let config = request("settings.get", json!({})).await?;
     let current: std::net::SocketAddr = config["listen_addr"]
         .as_str()

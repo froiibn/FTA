@@ -170,7 +170,9 @@ body.folded .shell { display: none; }
 /* Network choices use the existing settings rhythm; the transfer widget remains unchanged. */
 #network-interface { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; }
 #network-interface:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-#network-private-row[hidden] { display: none; }
+/* Profile actions are distinct from persistent checkboxes and wrap within a narrow settings window. */
+#network-profile-row { margin-top: 14px; font-size: 12px; }
+#network-profile-row .form-actions { margin-top: 10px; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
 
 /* A content-sized, quiet toast confirms actions without covering the settings form. */
 .settings-toast { position: fixed; z-index: 1000; bottom: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); padding: 7px 12px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }

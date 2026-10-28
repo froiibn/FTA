@@ -71,7 +71,10 @@ root.innerHTML = `
     </section>
     <section id="inbox-panel" class="utility-panel" aria-labelledby="inbox-title"><div class="utility-header" data-drag-handle><h2 id="inbox-title">기록</h2><button data-close-window="inbox" class="quiet" aria-label="기록 닫기">×</button></div><button id="reload-inbox" class="quiet small">새로고침</button><div id="history"></div></section>
     <section id="settings-panel" class="utility-panel" aria-labelledby="settings-title"><div class="utility-header" data-drag-handle><h2 id="settings-title">설정</h2><button data-close-window="settings" class="quiet" aria-label="설정 닫기">×</button></div>
-      <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 신뢰하는 네트워크</label><label id="network-private-row" class="checkbox-label" hidden><input id="network-private" type="checkbox" /> 이 연결의 Windows 프로필을 개인으로 변경합니다. 다른 앱의 개인 프로필 방화벽 규칙에도 영향을 줍니다.</label><label class="checkbox-label"><input id="network-firewall" type="checkbox" checked /> 수신 허용</label><p id="network-permission" class="help"></p><div class="form-actions"><button id="network-system-settings" class="secondary">시스템 설정 열기</button><button id="network-apply" class="primary" disabled>연결 설정 저장</button></div><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다. 저장 후 서비스를 재시작하면 적용됩니다.</p></section>
+      <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 신뢰하는 네트워크</label>
+      <!-- A lasting Windows profile change needs an explicit action, not a temporary-looking checkbox. -->
+      <div id="network-profile-row" hidden><p id="network-profile-status" aria-live="polite">현재 네트워크: 연결을 선택하세요.</p><p class="help">FTA는 개인 네트워크에서만 사용할 수 있습니다.</p><div class="form-actions"><button id="network-make-private" class="secondary" disabled>개인 네트워크로 변경</button><button id="network-make-public" class="secondary" disabled>공용으로 변경…</button></div><p class="help">변경한 상태는 전송 후에도 유지되며 다른 앱에도 영향을 줍니다.</p><p class="help">공용으로 되돌리려면 Windows 설정에서 현재 연결의 네트워크 프로필을 ‘공용’으로 선택하세요. 변경 후 ‘재점검’을 눌러주세요.</p></div>
+      <label class="checkbox-label"><input id="network-firewall" type="checkbox" checked /> 수신 허용</label><p id="network-permission" class="help"></p><div class="form-actions"><button id="network-system-settings" class="secondary">시스템 설정 열기</button><button id="network-apply" class="primary" disabled>연결 설정 저장</button></div><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다. 저장 후 서비스를 재시작하면 적용됩니다.</p></section>
       <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label><p class="help">네트워크 변경은 저장 후 서비스를 재시작하면 적용됩니다.</p><div class="form-actions"><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button class="primary" type="submit">설정 저장</button></div></form>
       <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong>로그인 시 실행</strong><p>로그인하면 자동 수신을 시작합니다.</p></div><button id="autostart" class="secondary">확인 중</button></div><div class="settings-row"><div><strong>수신 알림</strong><p id="notification-status">알림 권한을 확인합니다.</p></div><button id="notification-permission" class="secondary">알림 허용</button></div></section>
       <section class="settings-section"><div class="section-heading"><h2>등록된 기기</h2></div><p class="help">감지된 컴퓨터에 처음 보내면 상대에서 한 번만 등록을 확인합니다. 이후에는 바로 전송됩니다.</p><div id="paired-devices"></div></section>
@@ -915,13 +918,21 @@ function setupSelection(): NetworkInterface | undefined {
 }
 function updateNetworkSelection(): void {
   const selected = setupSelection();
+  // Keep the selected target stable while the native helper is applying its confirmed scope.
+  element<HTMLSelectElement>("network-interface").disabled = setupBusy;
   element<HTMLInputElement>("network-home").disabled = !selected || setupBusy;
   const profile = { unknown: "프로필 확인 불가", public: "공용", private: "개인", domain: "조직 네트워크" };
   element("network-scope").textContent = selected ? `${selected.address} · ${selected.network} · ${setupStatus?.platform === "windows" ? profile[selected.profile] : "선택한 연결만 사용"}` : "집에서 사용하는 유선 또는 Wi-Fi 연결을 선택하세요. VPN·게스트 연결은 선택하지 마세요.";
-  element("network-private-row").hidden = setupStatus?.platform !== "windows";
-  element<HTMLInputElement>("network-private").disabled = selected?.profile !== "public" || setupBusy;
-  if (selected?.profile !== "public") element<HTMLInputElement>("network-private").checked = false;
-  element<HTMLButtonElement>("network-apply").disabled = !selected || !element<HTMLInputElement>("network-home").checked || setupBusy;
+  const windows = setupStatus?.platform === "windows";
+  const trusted = element<HTMLInputElement>("network-home").checked;
+  // Read the actual OS profile; no checked state can pretend that a profile change succeeded.
+  element("network-profile-row").hidden = !windows;
+  element("network-profile-status").textContent = selected ? `현재 네트워크: ${profile[selected.profile]}` : "현재 네트워크: 연결을 선택하세요.";
+  element<HTMLButtonElement>("network-make-private").disabled = !windows || selected?.profile !== "public" || !trusted || setupBusy;
+  element<HTMLButtonElement>("network-make-public").disabled = !windows || selected?.profile !== "private" || setupBusy;
+  element<HTMLButtonElement>("network-system-settings").disabled = setupBusy;
+  // Windows setup is saved only after the separate Private action has been verified.
+  element<HTMLButtonElement>("network-apply").disabled = !selected || !trusted || setupBusy || (windows && selected.profile !== "private");
 }
 
 // Refresh native authorization every time, then restore only the matching connection preference.
@@ -953,21 +964,26 @@ async function refreshNetworkSetup(): Promise<void> {
   updateNetworkSelection();
 }
 
-// OS permission failures never report setup success; settings are saved only after native verification.
-async function applyNetworkSetup(): Promise<void> {
+// A profile-only action must not silently save unrelated receive or discovery preferences.
+async function applyNetworkSetup(profileOnly = false): Promise<void> {
   const selected = setupSelection();
   if (!selected || !element<HTMLInputElement>("network-home").checked || setupBusy) return;
+  if (setupStatus?.platform === "windows" && selected.profile !== (profileOnly ? "public" : "private")) return;
   setupBusy = true;
   updateNetworkSelection();
   element<HTMLButtonElement>("network-refresh").disabled = true;
   try {
-    await invoke("network_setup_apply", { selection: { confirmed_home_network: element<HTMLInputElement>("network-home").checked, interface_id: selected.id, address: selected.address,
-      make_private: element<HTMLInputElement>("network-private").checked,
+    await invoke("network_setup_apply", { profileOnly, selection: { confirmed_home_network: element<HTMLInputElement>("network-home").checked, interface_id: selected.id, address: selected.address,
+      make_private: profileOnly,
       // An already disabled OS firewall needs no rule mutation, even with receiving selected.
-      configure_firewall: element<HTMLInputElement>("network-firewall").checked && !element<HTMLInputElement>("network-firewall").disabled,
+      configure_firewall: !profileOnly && element<HTMLInputElement>("network-firewall").checked && !element<HTMLInputElement>("network-firewall").disabled,
       discovery_enabled: element<HTMLInputElement>("setting-discovery").checked } });
-    await loadSettings();
-    showNotice("집 네트워크 설정을 저장했습니다. 서비스 재시작을 눌러 적용하세요.");
+    if (profileOnly) {
+      showNotice("개인 네트워크로 변경했습니다. 수신 허용 등 필요한 항목을 확인하고 연결 설정을 저장하세요.");
+    } else {
+      await loadSettings();
+      showNotice("집 네트워크 설정을 저장했습니다. 서비스 재시작을 눌러 적용하세요.");
+    }
   } finally {
     await refreshNetworkSetup();
     setupBusy = false;
@@ -979,6 +995,12 @@ on("network-interface", "change", () => { rememberNetworkSelection(); restoreNet
 on("network-home", "change", () => { rememberNetworkSelection(element<HTMLInputElement>("network-home").checked); updateNetworkSelection(); });
 on("network-refresh", "click", () => { void act(refreshNetworkSetup); });
 on("network-apply", "click", () => { void act(applyNetworkSetup); });
+on("network-make-private", "click", () => { void act(() => applyNetworkSetup(true)); });
+// The return route opens fixed Windows settings; opening it is never reported as a profile change.
+on("network-make-public", "click", () => { void act(async () => {
+  await invoke("open_network_settings");
+  showNotice("Windows 설정에서 현재 연결의 네트워크 프로필을 ‘공용’으로 선택한 뒤 재점검을 눌러주세요.");
+}); });
 on("network-system-settings", "click", () => { void act(async () => { await invoke("open_network_settings"); }); });
 
 let settingsLoaded = false;
