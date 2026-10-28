@@ -1,6 +1,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "./style.css";
+// Every rule in this sheet requires the native Windows class; Mac keeps the shared/Mac styles.
+import "./windows.css";
 
 // Keep limits named and aligned with the engine instead of spreading magic values through handlers.
 const REFRESH_INTERVAL_MS = 3_000;
@@ -1118,12 +1120,16 @@ async function refreshUtility(): Promise<void> {
 
 // In a browser there is no native bridge: controls stay disabled and no fake devices are inserted.
 async function initialize(): Promise<void> {
-  // Scope appearance to the real native host; all transfer and close handlers remain shared.
-  if (desktop && await invoke<string>("desktop_platform") === "macos") {
-    document.documentElement.classList.add("platform-macos");
-    document.getElementById("close-app-window")?.setAttribute("title", "창 닫기 · 수신 계속");
-    const close = document.getElementById("close-app-window");
-    if (close) document.querySelector(".app-header")?.prepend(close);
+  // Native platform detection isolates Windows dark chrome without changing Mac material/close behavior.
+  if (desktop) {
+    const platform = await invoke<string>("desktop_platform");
+    if (platform === "windows") document.documentElement.classList.add("platform-windows");
+    if (platform === "macos") {
+      document.documentElement.classList.add("platform-macos");
+      document.getElementById("close-app-window")?.setAttribute("title", "창 닫기 · 수신 계속");
+      const close = document.getElementById("close-app-window");
+      if (close) document.querySelector(".app-header")?.prepend(close);
+    }
   }
   initializeSettingsTabs();
   renderDevices();

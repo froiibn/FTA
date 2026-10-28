@@ -1,0 +1,103 @@
+/* Opt in only on the native Windows host. The shared stylesheet and Mac glass remain untouched. */
+html.platform-windows {
+  --surface: #202020;
+  --paper: #272727;
+  --ink: #f5f5f5;
+  --muted: #b5b5b5;
+  --navy: #60cdff;
+  --line: #3b3b3b;
+  --status: #6ccb5f;
+  --selection: #1e3a46;
+  --error: #ff99a4;
+  --focus: #99dfff;
+  --win-control: #323232;
+  --win-control-hover: #3c3c3c;
+  --win-control-border: #ffffff16;
+  --win-field: #1d1d1d;
+  --win-card: #2b2b2b;
+  --win-close: #c42b1c;
+  color-scheme: dark;
+  font-family: "Segoe UI Variable", "Segoe UI", "Malgun Gothic", sans-serif;
+  background: var(--surface);
+}
+
+/* Neutral solid surfaces keep Windows readable without inheriting Mac transparency or signal lights. */
+.platform-windows body, .platform-windows .utility-window { background: var(--surface); }
+.platform-windows .shell { background: var(--surface); border-color: #454545; border-radius: 8px; overflow: hidden; }
+.platform-windows .app-header { min-height: 36px; padding: 4px 8px; background: var(--surface); border-bottom-color: var(--line); }
+.platform-windows h1 { font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.platform-windows h2 { font-weight: 600; }
+.platform-windows .brand { gap: 6px; }
+.platform-windows .brand-mark svg { width: 19px; height: 19px; }
+.platform-windows .utility-header { min-height: 40px; background: var(--surface); border-color: var(--line); }
+.platform-windows .utility-header h2 { font-size: 13px; }
+.platform-windows .window-actions .quiet { width: 26px; min-height: 28px; padding: 4px; }
+.platform-windows .utility-header [data-close-window] { width: 34px; min-height: 28px; padding: 0; border-radius: 4px; font-size: 19px; }
+.platform-windows #close-app-window:hover:not(:disabled), .platform-windows .utility-header [data-close-window]:hover:not(:disabled) { background: var(--win-close); color: #ffffff; }
+
+/* Fluent-like controls separate their fill, edge and input underline; keyboard focus stays explicit. */
+.platform-windows button { border-radius: 4px; }
+.platform-windows button:hover:not(:disabled) { filter: none; }
+.platform-windows .primary { background: var(--navy); border-color: var(--navy); color: #003247; font-weight: 600; }
+.platform-windows .primary:hover:not(:disabled) { background: #79d6ff; border-color: #79d6ff; }
+.platform-windows .primary:active:not(:disabled) { background: #4bb9ec; border-color: #4bb9ec; }
+.platform-windows .secondary { background: var(--win-control); border-color: var(--win-control-border); border-bottom-color: #ffffff09; color: var(--ink); }
+.platform-windows .secondary:hover:not(:disabled) { background: var(--win-control-hover); }
+.platform-windows .secondary:active:not(:disabled) { background: var(--paper); }
+.platform-windows .quiet { color: var(--muted); }
+.platform-windows .quiet:hover:not(:disabled) { background: var(--win-control-hover); color: var(--ink); }
+.platform-windows .quiet[aria-pressed="true"] { background: var(--selection); color: var(--navy); border-color: #60cdff70; }
+.platform-windows input:not([type="checkbox"]), .platform-windows textarea, .platform-windows #network-interface { background: var(--win-field); border: 1px solid var(--win-control-border); border-bottom-color: #8c8c8c; border-radius: 4px; color: var(--ink); caret-color: var(--navy); }
+.platform-windows input:not([type="checkbox"]):hover, .platform-windows textarea:hover, .platform-windows #network-interface:hover { border-bottom-color: #bdbdbd; }
+.platform-windows input:not([type="checkbox"]):focus-visible, .platform-windows textarea:focus-visible, .platform-windows #network-interface:focus-visible { outline: none; border-bottom-color: var(--navy); box-shadow: inset 0 -1px 0 var(--navy); }
+.platform-windows input::placeholder, .platform-windows textarea::placeholder { color: #a1a1a1; }
+.platform-windows label { color: #dedede; }
+.platform-windows .message-input textarea { padding: 9px 42px 9px 11px; }
+.platform-windows .send-arrow { right: 6px; bottom: 6px; }
+
+/* Quiet settings rows and a short blue tab indicator match Windows while preserving the four groups. */
+.platform-windows .settings-tabs { gap: 4px; margin-bottom: 16px; border-color: var(--line); }
+.platform-windows .settings-tabs button { position: relative; padding: 10px 4px; border-radius: 4px 4px 0 0; font-size: 12px; color: var(--muted); }
+.platform-windows .settings-tabs button:hover:not(:disabled) { background: #ffffff08; color: var(--ink); }
+.platform-windows .settings-tabs button[aria-selected="true"] { border-bottom-color: transparent; color: var(--ink); font-weight: 600; }
+.platform-windows .settings-tabs button[aria-selected="true"]::after { content: ""; position: absolute; bottom: 0; left: calc(50% - 11px); width: 22px; height: 3px; border-radius: 2px; background: var(--navy); }
+.platform-windows .settings-row { padding: 12px; margin: 8px 0; background: var(--win-card); border: 1px solid var(--win-control-border); border-radius: 6px; }
+.platform-windows .settings-row + .settings-row { border-top-color: var(--win-control-border); }
+.platform-windows .settings-row strong { font-size: 13px; font-weight: 600; }
+.platform-windows .help, .platform-windows .section-caption, .platform-windows .settings-row p { color: var(--muted); }
+.platform-windows .settings-footer { border-color: var(--line); }
+.platform-windows #network-profile-row { padding: 10px 12px; background: var(--win-card); border: 1px solid var(--win-control-border); border-radius: 6px; }
+.platform-windows .toggle-track { background: transparent; border-color: #a4a4a4; }
+.platform-windows .toggle-track::after { background: #dedede; }
+.platform-windows .settings-toggle input:checked + .toggle-track { background: var(--navy); border-color: var(--navy); }
+.platform-windows .settings-toggle input:checked + .toggle-track::after { background: #003247; }
+
+/* Transfer state retains its real semantic colors; only Windows chrome and supporting surfaces change. */
+.platform-windows .device-tile { background: var(--win-card); border-radius: 6px; }
+.platform-windows .device-tile:hover:not(:disabled) { background: var(--win-control-hover); }
+.platform-windows .device-tile[aria-pressed="true"], .platform-windows .device-tile.drop-target { background: var(--selection); border-color: var(--navy); }
+.platform-windows .device-icon, .platform-windows .history-icon { color: #d4d4d4; }
+.platform-windows .empty-device { color: var(--muted); }
+.platform-windows .file-selection, .platform-windows .selection-actions, .platform-windows .detail-body { background: var(--win-field); border-color: var(--line); }
+.platform-windows .file-selection li, .platform-windows .history-row { border-color: var(--line); }
+.platform-windows .history-open:hover:not(:disabled) { background: #ffffff08; border-radius: 4px; }
+.platform-windows .notice { background: #25343d; color: #cdeeff; }
+.platform-windows .notice.error { background: #3c252a; border-color: var(--error); color: #ffc1cc; }
+.platform-windows dialog { background: var(--win-card); border-color: var(--line); }
+.platform-windows .settings-progress-label { background: var(--win-card); border-color: #505050; }
+.platform-windows .settings-toast { background: var(--win-card); color: var(--ink); border: 1px solid #505050; }
+.platform-windows .settings-toast.error { background: #3c252a; color: #ffc1cc; border-color: #70404b; }
+.platform-windows .expand-widget { background: var(--surface); border-color: #555555; border-radius: 8px; }
+.platform-windows #settings-content { scrollbar-width: thin; scrollbar-color: #626262 transparent; }
+
+/* Fill the compact sender without changing its dimensions or the existing wide-window rail layout. */
+@media (max-width: 759px) {
+  .platform-windows .shell { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
+  .platform-windows .send-board { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 8px 10px 10px; }
+  .platform-windows .target-rail { flex: none; }
+  .platform-windows .send-workspace { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .platform-windows .composer { display: flex; flex-direction: column; flex: 1; min-height: 58px; }
+  .platform-windows .message-input { display: flex; flex: 1; min-height: 0; }
+  .platform-windows .message-input textarea { flex: 1; height: 100%; min-height: 0; }
+  .platform-windows .transfer-progress:not(:has(> :not([hidden]))) { display: none; }
+}
