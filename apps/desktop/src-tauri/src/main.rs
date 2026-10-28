@@ -27,6 +27,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 mod drop_coordinates;
+mod notification_preference;
 
 #[cfg(target_os = "macos")]
 mod native_notification;
@@ -74,14 +75,8 @@ struct DesktopState {
     exit_allowed: AtomicBool,
     lifecycle_busy: AtomicBool,
     pending_activations: Mutex<VecDeque<String>>,
-    // Retain a discovery click until the separate settings WebView is ready to consume it.
-    registration_target: Mutex<Option<RegistrationRequest>>,
-}
-
-// A request without a target opens manual registration; absence of a request remains distinct.
-#[derive(serde::Serialize)]
-struct RegistrationRequest {
-    target: Option<String>,
+    // The real native dialog owns consent and is never duplicated by refresh polling.
+    registration_prompting: AtomicBool,
 }
 
 /// Serialize restarts and exits so a second click cannot exit while the first is still draining files.
@@ -143,10 +138,18 @@ async fn request(method: &str, params: Value) -> Result<Value, String> {
 #[tauri::command]
 async fn engine_request(method: String, params: Value) -> Result<Value, String> {
     match method.as_str() {
-        "status" | "devices.list" | "devices.probe" | "devices.unpair" | "inbox.list"
-        | "inbox.get" | "inbox.delete" | "settings.get" | "settings.update" | "pairing.open"
-        | "pairing.connect" | "pairing.confirm" | "pairing.cancel" | "pairing.status"
-        | "transfers.get" | "transfers.cancel" => request(&method, params).await,
+        "status"
+        | "devices.list"
+        | "devices.probe"
+        | "devices.unpair"
+        | "inbox.list"
+        | "inbox.get"
+        | "inbox.delete"
+        | "settings.get"
+        | "settings.update"
+        | "registration.requests"
+        | "transfers.get"
+        | "transfers.cancel" => request(&method, params).await,
         _ => Err("이 데스크톱 명령은 허용되지 않습니다".into()),
     }
 }
@@ -192,15 +195,21 @@ async fn network_setup_status(
     Ok(status)
 }
 
-// OS changes are verified before persisting LAN configuration; restarting remains an explicit action.
+// OS changes are verified before persisting LAN configuration; a profile-only action must not save it.
 #[tauri::command]
 async fn network_setup_apply(
     window: tauri::WebviewWindow,
     state: State<'_, DesktopState>,
     selection: fta_platform::network_setup::NetworkSetupRequest,
+    profile_only: Option<bool>,
 ) -> Result<Value, String> {
     if window.label() != "settings" {
         return Err("설정 창에서만 네트워크를 변경할 수 있습니다".into());
+    }
+    let profile_only = profile_only.unwrap_or(false);
+    // Reuse the guarded Windows helper without granting a profile button any firewall/settings writes.
+    if profile_only && (!cfg!(windows) || !selection.make_private || selection.configure_firewall) {
+        return Err("네트워크 프로필 변경 요청이 잘못되었습니다".into());
     }
     let _guard = LifecycleGuard::acquire(&state)?;
     let confirmed = state
@@ -229,8 +238,10 @@ async fn network_setup_apply(
             .map_err(|e| e.to_string())?;
     fta_platform::network_setup::verify_scope(&expected, &current_interface)
         .map_err(|e| e.to_string())?;
-    // Check IPC before authorization, without capturing a listener port that another client may change.
-    request("settings.get", json!({})).await?;
+    // Only saving app settings requires engine IPC; a standalone OS profile change does not.
+    if !profile_only {
+        request("settings.get", json!({})).await?;
+    }
     let choice = selection.clone();
     let status = tauri::async_runtime::spawn_blocking(move || {
         fta_platform::network_setup::apply(&engine, &choice)
@@ -243,6 +254,9 @@ async fn network_setup_apply(
     fta_platform::network_setup::verify_scope(&expected, &selected).map_err(|e| {
         format!("OS 변경 중 연결이 바뀌었습니다. 앱 설정은 저장하지 않았습니다: {e}")
     })?;
+    if profile_only {
+        return Ok(json!({"status":status,"restart_required":false}));
+    }
     let config = request("settings.get", json!({})).await?;
     let current: std::net::SocketAddr = config["listen_addr"]
         .as_str()
@@ -373,7 +387,7 @@ async fn send_files(
         }
     }
     request(
-        "transfers.send",
+        "transfers.send_discovered",
         json!({ "to": to, "kind": "files", "paths": paths, "transfer_id": transfer_id }),
     )
     .await
@@ -400,7 +414,7 @@ async fn send_message(
         _ => return Err("지원하지 않는 메시지 종류입니다".into()),
     }
     request(
-        "transfers.send",
+        "transfers.send_discovered",
         json!({ "to": to, "kind": kind, "body": body, "transfer_id": transfer_id }),
     )
     .await
@@ -846,6 +860,11 @@ async fn notify_receipt(
     {
         return Ok(());
     }
+    // Gate in the shared host so a settings-window change applies to the hidden main window immediately.
+    // Returning success while disabled still lets the UI consume the event without replaying it later.
+    if !receipt_notifications_enabled(_app.clone())? {
+        return Ok(());
+    }
     let body = if record["state"] == "partial" {
         "일부 파일이 저장되었습니다. 전송 기록에서 결과를 확인하세요."
     } else if record["kind"] == "files" {
@@ -859,6 +878,15 @@ async fn notify_receipt(
     }
     #[cfg(windows)]
     {
+        // An old installation's shortcut can survive uninstall. Never submit a clickable toast
+        // after registration failed at startup or while its target still refers to the old path.
+        fta_platform::windows::notifications::register(
+            &std::env::current_exe().map_err(|error| error.to_string())?,
+            &_app.config().identifier,
+            "FTA",
+            ACTIVATION_SCHEME,
+        )
+        .map_err(|error| format!("Windows 알림의 실행 경로를 등록하지 못했습니다: {error}"))?;
         fta_platform::windows::notifications::show(
             &_app.config().identifier,
             ACTIVATION_SCHEME,
@@ -873,6 +901,32 @@ async fn notify_receipt(
         let _ = _app;
         Err("데스크톱 알림은 Windows와 macOS에서 지원합니다".into())
     }
+}
+
+// The host owns this fixed per-user path; the WebView can submit only the enabled boolean.
+fn notification_preference_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|directory| directory.join(notification_preference::FILE_NAME))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn receipt_notifications_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    notification_preference::read(&notification_preference_path(&app)?)
+}
+
+// Only the settings view can change app notification policy; transfers and OS authorization stay separate.
+#[tauri::command]
+fn set_receipt_notifications_enabled(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    enabled: bool,
+) -> Result<bool, String> {
+    if window.label() != "settings" {
+        return Err("설정 창에서만 수신 알림을 변경할 수 있습니다".into());
+    }
+    notification_preference::write(&notification_preference_path(&app)?, enabled)
 }
 
 /// Query native notification authorization without interpreting receipt approval as OS permission.
@@ -955,56 +1009,65 @@ async fn open_utility_window(app: tauri::AppHandle, kind: String) -> Result<(), 
     window.set_focus().map_err(|error| error.to_string())
 }
 
-/// Plus opens manual pairing; a discovered icon additionally validates its untrusted device hint.
+/// Recipient consent is a native user decision; generic WebView RPC cannot accept a peer.
 #[tauri::command]
-async fn begin_registration(
+async fn prompt_registration(
     window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
     state: State<'_, DesktopState>,
-    device_id: Option<String>,
+    session_id: String,
 ) -> Result<(), String> {
     require_main_window(window.label())?;
-    if let Some(id) = &device_id {
-        let devices = request("devices.list", json!({})).await?;
-        validate_registration_target(&devices, id)?;
+    if state.registration_prompting.swap(true, Ordering::AcqRel) {
+        return Err("등록 확인 창이 이미 열려 있습니다".into());
     }
-    *state
-        .registration_target
-        .lock()
-        .map_err(|_| "등록 상태 오류")? = Some(RegistrationRequest { target: device_id });
-    open_utility_window(window.app_handle().clone(), "settings".into()).await?;
-    window
-        .app_handle()
-        .emit_to("settings", "fta:registration-target", ())
-        .map_err(|error| error.to_string())
-}
-
-// Reject stale or forged UI hints; registration starts only from the engine's current discovery list.
-fn validate_registration_target(devices: &Value, device_id: &str) -> Result<(), String> {
-    uuid::Uuid::parse_str(device_id).map_err(|_| "잘못된 기기 ID입니다")?;
-    if !devices.as_array().is_some_and(|devices| {
-        devices
-            .iter()
-            .any(|device| device["device_id"] == device_id && device["paired"] == false)
-    }) {
-        return Err("자동 발견된 미등록 기기를 다시 선택하세요".into());
+    struct PromptGuard<'a>(&'a AtomicBool);
+    impl Drop for PromptGuard<'_> {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::Release);
+        }
     }
+    let _guard = PromptGuard(&state.registration_prompting);
+    let pending = request("registration.requests", json!({})).await?;
+    let incoming = pending
+        .as_array()
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|item| item["session_id"].as_str() == Some(session_id.as_str()))
+        })
+        .ok_or("등록 요청이 만료되었거나 취소되었습니다")?;
+    let name = incoming["display_name"]
+        .as_str()
+        .unwrap_or("알 수 없는 기기");
+    let address = incoming["address"].as_str().unwrap_or("");
+    let content = format!(
+        "{name} ({address})에서 처음으로 전송하려고 합니다.\n\n이 기기를 등록하시겠습니까? 등록하면 이후 파일·텍스트·URL을 자동으로 받습니다. 아는 기기인지 확인하세요."
+    );
+    show_main(&app);
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .message(content)
+        .title("기기 등록 요청")
+        .parent(&window)
+        .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom(
+            "등록 허용".into(),
+            "거절".into(),
+        ))
+        .show(move |accepted| {
+            let _ = sender.send(accepted);
+        });
+    let accepted = receiver.await.unwrap_or(false);
+    request(
+        if accepted {
+            "registration.accept"
+        } else {
+            "registration.reject"
+        },
+        json!({"session_id":session_id}),
+    )
+    .await?;
     Ok(())
-}
-
-/// Only settings can consume the one-shot target; the actual pairing still uses the engine protocol.
-#[tauri::command]
-fn take_registration_target(
-    window: tauri::WebviewWindow,
-    state: State<'_, DesktopState>,
-) -> Result<Option<RegistrationRequest>, String> {
-    if window.label() != "settings" {
-        return Err("설정 창에서만 등록할 수 있습니다".into());
-    }
-    Ok(state
-        .registration_target
-        .lock()
-        .map_err(|_| "등록 상태 오류")?
-        .take())
 }
 
 // A child close must destroy only its own window, never hide the transfer panel or stop its engine.
@@ -1096,8 +1159,7 @@ fn main() {
             start_window_drag,
             close_app_window,
             open_utility_window,
-            begin_registration,
-            take_registration_target,
+            prompt_registration,
             close_utility_window,
             set_autostart,
             autostart_status,
@@ -1109,6 +1171,8 @@ fn main() {
             ack_receipt,
             notify_receipt,
             notification_permission,
+            receipt_notifications_enabled,
+            set_receipt_notifications_enabled,
             pending_activations,
             ack_activation
         ])
@@ -1255,22 +1319,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    // A history/settings window cannot reuse a file selection or acknowledge the main notification cursor.
-    // A clicked icon cannot substitute an address, registered peer, or absent discovery entry.
-    #[test]
-    fn registration_target_requires_current_unpaired_discovery() {
-        let id = uuid::Uuid::new_v4().to_string();
-        assert!(
-            validate_registration_target(&json!([{"device_id":id,"paired":false}]), &id).is_ok()
-        );
-        assert!(
-            validate_registration_target(&json!([{"device_id":id,"paired":true}]), &id).is_err()
-        );
-        assert!(validate_registration_target(&json!([]), &id).is_err());
-        assert!(validate_registration_target(&json!([{"device_id":id}]), &id).is_err());
-        assert!(validate_registration_target(&json!([]), "127.0.0.1:1").is_err());
-    }
-
+    // History/settings cannot borrow the native receiver consent action.
     #[test]
     fn transfer_and_notification_actions_belong_to_main_window() {
         assert!(require_main_window("main").is_ok());

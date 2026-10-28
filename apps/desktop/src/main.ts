@@ -9,6 +9,9 @@ const MAX_MESSAGE_BYTES = 1024 * 1024;
 const HISTORY_LIMIT = 100;
 const LAST_DEVICE_KEY = "fta:last-device";
 const PINNED_KEY = "fta:pinned";
+// Remember the user's exact connection choice, separately from fresh native permission checks.
+const NETWORK_TRUST_KEY = "fta:network-trust:v1";
+const MAX_REMEMBERED_NETWORKS = 32;
 type JsonObject = Record<string, unknown>;
 // Each native window loads one view; only main owns delivery acknowledgements and engine startup.
 const requestedView = new URLSearchParams(window.location.search).get("view");
@@ -59,7 +62,7 @@ root.innerHTML = `
     </header>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
     <section id="send-panel" class="panel send-board">
-      <aside class="target-rail"><div class="section-heading"><h2>기기</h2><div class="device-tools"><button id="refresh" class="quiet icon-label" aria-label="새로고침" title="새로고침"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button><button id="add-device" class="quiet small" aria-label="기기 등록" title="기기 등록">+</button></div></div><div id="devices" class="devices" role="group" aria-label="전송 대상"></div></aside>
+      <aside class="target-rail"><div class="section-heading"><h2>기기</h2><div class="device-tools"><button id="refresh" class="quiet icon-label" aria-label="새로고침" title="새로고침"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button></div></div><div id="devices" class="devices" role="group" aria-label="전송 대상"></div></aside>
       <div class="send-workspace">
         <section class="file-section" aria-labelledby="file-heading"><h2 id="file-heading" class="sr-only">파일</h2><button id="choose-files" class="quiet small" aria-label="파일 선택">파일 선택</button><div id="file-selection" class="file-selection" hidden><ul id="file-list"></ul><div class="selection-actions"><button id="clear-files" class="quiet">선택 해제</button><button id="send-files" class="primary">파일 보내기</button></div></div></section>
         <section class="composer" aria-labelledby="message-heading"><h2 id="message-heading" class="sr-only">텍스트 · 링크</h2><label class="sr-only" for="message">전송할 텍스트 또는 URL</label><div class="message-input"><textarea id="message" rows="2" placeholder="텍스트 또는 URL"></textarea><button id="send-message" class="primary send-arrow" aria-label="보내기" title="보내기" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div></section>
@@ -68,11 +71,21 @@ root.innerHTML = `
     </section>
     <section id="inbox-panel" class="utility-panel" aria-labelledby="inbox-title"><div class="utility-header" data-drag-handle><h2 id="inbox-title">기록</h2><button data-close-window="inbox" class="quiet" aria-label="기록 닫기">×</button></div><button id="reload-inbox" class="quiet small">새로고침</button><div id="history"></div></section>
     <section id="settings-panel" class="utility-panel" aria-labelledby="settings-title"><div class="utility-header" data-drag-handle><h2 id="settings-title">설정</h2><button data-close-window="settings" class="quiet" aria-label="설정 닫기">×</button></div>
-      <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 선택한 연결은 내가 사용하는 집 네트워크입니다.</label><label id="network-private-row" class="checkbox-label" hidden><input id="network-private" type="checkbox" /> 이 연결의 Windows 프로필을 개인으로 변경합니다. 다른 앱의 개인 프로필 방화벽 규칙에도 영향을 줍니다.</label><label class="checkbox-label"><input id="network-firewall" type="checkbox" /> FTA 엔진의 수신 통신 허용</label><p id="network-permission" class="help"></p><div class="form-actions"><button id="network-system-settings" class="secondary">시스템 설정 열기</button><button id="network-apply" class="primary" disabled>연결 설정 저장</button></div><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다. 저장 후 서비스를 재시작하면 적용됩니다.</p></section>
-      <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label><p class="help">네트워크 변경은 저장 후 서비스를 재시작하면 적용됩니다.</p><div class="form-actions"><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button class="primary" type="submit">설정 저장</button></div></form>
-      <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong>로그인 시 실행</strong><p>로그인하면 자동 수신을 시작합니다.</p></div><button id="autostart" class="secondary">확인 중</button></div><div class="settings-row"><div><strong>수신 알림</strong><p id="notification-status">알림 권한을 확인합니다.</p></div><button id="notification-permission" class="secondary">알림 허용</button></div></section>
-      <section class="settings-section"><div class="section-heading"><h2>기기 등록</h2><button id="pair-open" class="secondary small">등록 모드 열기</button></div><p class="help">양쪽 기기의 비교값이 같은지 확인한 뒤 등록하세요.</p><label for="pair-target">상대 기기 또는 LAN 주소</label><div class="inline-field"><input id="pair-target" placeholder="기기 ID 또는 주소" /><button id="pair-connect" class="secondary">연결</button></div><section id="pair-details" class="pair-details" aria-live="polite" hidden><div class="section-heading"><strong id="pair-state">연결 대기</strong><span id="pair-peer"></span></div><p id="pair-address"></p><p id="pair-comparison" class="comparison-value"></p><p id="pair-expiry" class="help"></p></section><input id="pair-session" type="hidden" /><div class="form-actions"><button id="pair-cancel" class="quiet">취소</button><button id="pair-confirm" class="primary">비교값 일치 확인</button></div><div id="paired-devices"></div></section>
-      <div class="quit-row"><p class="help">창을 닫아도 수신은 계속됩니다.</p><button id="quit" class="danger">앱 종료</button></div>
+      <!-- Scroll only the tab content so save and restart remain reachable at the bottom of the window. -->
+      <div id="settings-content">
+      <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 신뢰하는 네트워크</label>
+      <!-- A lasting Windows profile change needs an explicit action, not a temporary-looking checkbox. -->
+      <div id="network-profile-row" hidden><p id="network-profile-status" aria-live="polite">현재 네트워크: 연결을 선택하세요.</p><p class="help">FTA는 개인 네트워크에서만 사용할 수 있습니다.</p><div class="form-actions"><button id="network-make-private" class="secondary" disabled>개인 네트워크로 변경</button><button id="network-make-public" class="secondary" disabled>공용으로 변경…</button></div><p class="help">변경한 상태는 전송 후에도 유지되며 다른 앱에도 영향을 줍니다.</p><p class="help">공용으로 되돌리려면 Windows 설정에서 현재 연결의 네트워크 프로필을 ‘공용’으로 선택하세요. 변경 후 ‘재점검’을 눌러주세요.</p></div>
+      <label class="checkbox-label"><input id="network-firewall" type="checkbox" checked /> 수신 허용</label><p id="network-permission" class="help"></p><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다.</p></section>
+      <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label></form>
+      <!-- These switches represent saved preferences; unknown native state stays disabled until read. -->
+      <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong id="autostart-label">로그인 시 실행</strong><p id="autostart-status">설정 상태를 확인합니다.</p></div><label class="settings-toggle"><input id="autostart" type="checkbox" role="switch" aria-labelledby="autostart-label" aria-describedby="autostart-status" disabled /><span class="toggle-track" aria-hidden="true"></span></label></div><div class="settings-row"><div><strong id="notification-label">수신 알림</strong><p id="notification-status">설정 상태를 확인합니다.</p></div><label class="settings-toggle"><input id="notification-permission" type="checkbox" role="switch" aria-labelledby="notification-label" aria-describedby="notification-status" disabled /><span class="toggle-track" aria-hidden="true"></span></label></div></section>
+      <section class="settings-section"><div class="section-heading"><h2>등록된 기기</h2></div><p class="help">감지된 컴퓨터에 처음 보내면 상대에서 한 번만 등록을 확인합니다. 이후에는 바로 전송됩니다.</p><div id="paired-devices"></div></section>
+      </div>
+      <!-- The external form attribute keeps native validation and the existing submit path intact. -->
+      <footer id="settings-actions" class="settings-footer"><p class="help">저장 후 ‘서비스 재시작’을 눌러 적용하세요.</p><div class="form-actions"><button id="network-system-settings" data-settings-action="network" class="secondary">시스템 설정 열기</button><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button id="network-apply" data-settings-action="network" class="primary" disabled>연결 설정 저장</button><button id="computer-save" data-settings-action="computer" class="primary" type="submit" form="settings-form" hidden>설정 저장</button></div></footer>
+      <!-- Native settings calls have no measurable percentage, so feedback stays indeterminate. -->
+      <div id="settings-progress" class="settings-progress" role="status" aria-live="polite" hidden><div class="settings-progress-label"><span class="settings-donut" aria-hidden="true"></span><span>처리 중…</span></div></div>
     </section>
   </main>
   <button id="expand-window" class="expand-widget" aria-label="펼치기" title="펼치기" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V5h4m6 0h4v4m0 6v4h-4M9 19H5v-4"/></svg></button>
@@ -113,14 +126,20 @@ let connected = false;
 let networkReady = false;
 let refreshing = false;
 let autostartEnabled = false;
+// This is the app's persisted notification preference, separate from the OS authorization result.
+let receiptNotificationsEnabled = true;
 let currentDetail: TransferRecord | undefined;
-let activePairSession = "";
+// Only one real incoming request owns the native consent prompt.
+let registrationPrompting = false;
 let inFlightId = "";
 let progressTimer: number | undefined;
 let activationProcessing = false;
 const receiptInFlight = new Set<number>();
 
-const TOAST_DURATION_MS = 2000;
+const TOAST_DURATION_MS = 1000;
+// One shared batch includes nested native calls; an inner completion must not hide outer work.
+let settingsActionCount = 0;
+let settingsActionResult: { message: string; error: boolean } | undefined;
 // Settings scroll independently; feedback must stay in the viewport instead of above the form.
 const toast = document.createElement("div");
 toast.className = "settings-toast";
@@ -132,22 +151,58 @@ toast.append(toastMessage);
 document.body.append(toast);
 let toastTimer: number | undefined;
 
-// Keep every result lightweight and brief; a newer message receives its own full two seconds.
+// Each completed action batch gets one small toast for a full second, after its loading state ends.
 function showSettingsToast(message: string, error: boolean): void {
   if (toastTimer !== undefined) window.clearTimeout(toastTimer);
+  // A save confirmation must not cover the restart button in the persistent footer.
+  const footer = document.getElementById("settings-actions");
+  toast.style.setProperty("--settings-actions-height", `${footer && !footer.hidden ? footer.getBoundingClientRect().height : 0}px`);
   toastMessage.textContent = message;
+  toastMessage.title = message;
   toast.classList.toggle("error", error);
   toast.hidden = false;
   toastTimer = window.setTimeout(() => { toast.hidden = true; toastTimer = undefined; }, TOAST_DURATION_MS);
 }
 
+// Inert preserves each control's native disabled state and prevents duplicate settings operations.
+function setSettingsWorking(working: boolean): void {
+  element("settings-progress").hidden = !working;
+  element("settings-content").setAttribute("aria-busy", String(working));
+  for (const region of document.querySelectorAll<HTMLElement>("#settings-content, #settings-actions, .settings-tabs")) region.inert = working;
+}
+
+function rememberSettingsResult(message: string, error: boolean): void {
+  // A later success from cleanup or another nested task must not conceal an earlier failure.
+  if (!settingsActionResult?.error || error) settingsActionResult = { message, error };
+}
+
+function beginSettingsAction(): void {
+  if (settingsActionCount++ > 0) return;
+  settingsActionResult = undefined;
+  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
+  toastTimer = undefined;
+  toast.hidden = true;
+  setSettingsWorking(true);
+}
+
+function finishSettingsAction(): void {
+  if (--settingsActionCount > 0) return;
+  setSettingsWorking(false);
+  const result = settingsActionResult ?? { message: "완료했습니다.", error: false };
+  settingsActionResult = undefined;
+  showSettingsToast(result.message, result.error);
+}
+
 // Errors remain visible without echoing arbitrary received content into HTML.
 function showNotice(message: string, error = false, source = "action"): void {
   const notice = element("notice");
-  // User actions in settings use a fixed toast; background connectivity keeps its own banner.
+  // Initial connection/load errors also prevent the shared batch from reporting generic success.
+  if (view === "settings" && settingsActionCount > 0 && error) rememberSettingsResult(message, true);
+  // Queue action results until all work ends; background connectivity keeps its persistent banner.
   if (view === "settings" && source === "action") {
     if (notice.dataset.source === "action") notice.hidden = true;
-    showSettingsToast(message, error);
+    if (settingsActionCount > 0) rememberSettingsResult(message, error);
+    else showSettingsToast(message, error);
     return;
   }
   // Keep connection recovery from clearing an unrelated transfer or permission failure.
@@ -185,8 +240,12 @@ function userError(error: unknown): string {
     PERMISSION_DENIED: "파일 또는 수신 폴더의 접근 권한을 확인하세요.",
     BUSY: "다른 작업을 처리하고 있습니다. 현재 작업이 끝난 뒤 다시 시도하세요.",
     UNTRUSTED: "등록되지 않은 기기입니다. 기기를 먼저 등록하세요.",
+    REGISTRATION_REJECTED: "상대 기기에서 등록을 거절했습니다. 전송하지 않았습니다.",
+    REGISTRATION_EXPIRED: "등록 확인 시간이 지났습니다. 상대에서 확인할 수 있을 때 다시 보내주세요.",
     KEY_CHANGED: "기기 인증 정보가 변경되었습니다. 기존 등록을 확인하고 다시 등록하세요.",
     NOT_FOUND: "항목을 찾을 수 없습니다. 기록이 삭제되었거나 더 이상 보관되지 않을 수 있습니다.",
+    // A registration discovery miss is unrelated to deleted history or received files.
+    PAIRING_NOT_FOUND: "상대 기기의 등록 서비스를 찾지 못했습니다. 상대 앱이 실행 중이며 새 등록 방식을 지원하는 버전인지 확인해주세요.",
     VERSION_UNSUPPORTED: "두 기기의 앱 버전이 호환되지 않습니다. 앱을 업데이트하세요.",
     CANCELLED: "전송을 취소했습니다. 이미 저장된 파일은 유지됩니다.",
     HASH_MISMATCH: "파일을 검증하지 못했습니다. 원본 파일을 확인한 뒤 다시 보내세요.",
@@ -194,9 +253,13 @@ function userError(error: unknown): string {
   return messages[code] ?? text;
 }
 
-// Every async UI handler reports rejection; an IPC error must never look like a successful send.
-async function act(action: () => Promise<void>): Promise<void> {
-  try { await action(); } catch (error) { showNotice(userError(error), true); }
+// All settings actions share progress and completion; passive polling and other windows opt out.
+async function act(action: () => Promise<void>, options: { settingsFeedback?: boolean } = {}): Promise<void> {
+  const tracked = desktop && view === "settings" && options.settingsFeedback !== false;
+  if (tracked) beginSettingsAction();
+  try { await action(); }
+  catch (error) { showNotice(userError(error), true); }
+  finally { if (tracked) finishSettingsAction(); }
 }
 
 // Browser preview is presentation-only and does not simulate a working engine.
@@ -205,10 +268,10 @@ async function rpc<T>(method: string, params: JsonObject = {}): Promise<T> {
   return invoke<T>("engine_request", { method, params });
 }
 
-// Only online registered devices may become a target; a stale selection is cleared during refresh.
+// Discovery entries can request first-use consent; registered offline peers remain blocked.
 function selectedDevice(): Device | undefined {
   if (!networkReady) return undefined;
-  return devices.find((device) => device.device_id === selectedId && device.online && device.paired);
+  return devices.find((device) => device.device_id === selectedId && (!device.paired || device.online));
 }
 
 // Keep the destination in accessible action names without duplicating the selected device row.
@@ -270,7 +333,7 @@ function renderDevices(): void {
     button.dataset.deviceId = device.device_id;
     button.disabled = (device.paired && !device.online) || sending || !networkReady;
     button.setAttribute("aria-pressed", String(device.device_id === selectedId));
-    const status = device.paired ? (device.online ? "온라인" : "오프라인") : "등록 필요";
+    const status = device.paired ? (device.online ? "온라인" : "오프라인") : "처음 전송 시 등록 확인";
     button.title = `${device.display_name} · ${status}`;
     button.setAttribute("aria-label", `${device.display_name}, ${status}`);
     const deviceIcon = document.createElement("span");
@@ -286,11 +349,6 @@ function renderDevices(): void {
     name.textContent = device.display_name;
     button.append(deviceIcon, name);
     button.addEventListener("click", () => {
-      // Discovery is only a hint: open explicit pairing instead of granting transfer trust.
-      if (!device.paired) {
-        void act(async () => { await invoke("begin_registration", { deviceId: device.device_id }); });
-        return;
-      }
       selectedId = device.device_id;
       localStorage.setItem(LAST_DEVICE_KEY, selectedId);
       renderDevices();
@@ -310,7 +368,7 @@ function dropTarget(point: DropPoint): Device | undefined {
   if (!connected || !networkReady || sending || document.querySelector("dialog[open]") !== null) return undefined;
   const tile = document.elementFromPoint(point.x, point.y)?.closest<HTMLButtonElement>(".device-tile");
   if (!tile || tile.disabled) return undefined;
-  return devices.find((device) => device.device_id === tile.dataset.deviceId && device.online && device.paired);
+  return devices.find((device) => device.device_id === tile.dataset.deviceId && (!device.paired || device.online));
 }
 function highlightDropTarget(): void {
   const target = dragPoint ? dropTarget(dragPoint) : undefined;
@@ -415,20 +473,7 @@ async function refresh(): Promise<void> {
     if (!networkReady) showNotice("네트워크가 변경되었습니다. 설정 확인 후 서비스를 재시작하세요.", true, "connection");
     if (!selectedDevice()) selectedId = "";
     renderDevices();
-    if (connected && isMain) void act(processPendingActivations);
-    if (activePairSession) {
-      try {
-        const pairState = await rpc<JsonObject>("pairing.status", { session_id: activePairSession });
-        renderPair(pairState);
-        if (pairState.state === "paired") {
-          activePairSession = "";
-          showNotice("기기 등록이 완료되었어요.");
-        }
-      } catch (error) {
-        activePairSession = "";
-        showNotice(userError(error), true);
-      }
-    }
+    if (connected && isMain) { void act(processPendingActivations); void act(processRegistrationRequests); }
   } catch (error) {
     connected = false;
     networkReady = false;
@@ -462,17 +507,22 @@ function selectSettingsTab(name: string): void {
     button.tabIndex = selected ? 0 : -1;
     element(button.getAttribute("aria-controls")!).hidden = !selected;
   }
+  // Footer saves belong to their own tab; a computer save must never apply the network shortcut.
+  element("settings-actions").hidden = name !== "network" && name !== "computer";
+  for (const action of document.querySelectorAll<HTMLElement>("[data-settings-action]")) action.hidden = action.dataset.settingsAction !== name;
 }
 function initializeSettingsTabs(): void {
   if (view !== "settings") return;
   const panel = element("settings-panel");
-  const groups = Array.from(panel.children).filter((node): node is HTMLElement => node instanceof HTMLElement && node.classList.contains("settings-section"));
+  const groups = Array.from(element("settings-content").children).filter((node): node is HTMLElement => node instanceof HTMLElement && node.classList.contains("settings-section"));
   const tabs = document.createElement("div");
   tabs.className = "settings-tabs";
+  // The initial loading batch starts before the tab list is constructed.
+  tabs.inert = settingsActionCount > 0;
   tabs.setAttribute("role", "tablist");
   tabs.setAttribute("aria-label", "설정 그룹");
   const names = ["network", "computer", "app", "devices"];
-  const labels = ["네트워크", "이 컴퓨터", "앱 동작", "기기 등록"];
+  const labels = ["네트워크", "이 컴퓨터", "앱 동작", "등록 기기"];
   groups.forEach((group, index) => {
     const name = names[index];
     const label = labels[index];
@@ -505,42 +555,25 @@ function initializeSettingsTabs(): void {
   selectSettingsTab("computer");
 }
 
-// Consume a host-held target after the settings window has installed its listener (also handles cold creation).
-async function registerPendingDevice(): Promise<void> {
-  const request = await invoke<{ target: string | null } | null>("take_registration_target");
-  if (!request) return;
-  selectSettingsTab("devices");
-  // Plus may revisit the active comparison without replacing its session or losing confirmation state.
-  if (activePairSession) {
-    if (request.target) throw new Error("진행 중인 등록을 완료하거나 취소한 뒤 다시 선택하세요.");
-    return;
-  }
-  const target = request.target;
-  element<HTMLInputElement>("pair-target").value = target ?? "";
-  await pair("pairing.open", {});
-  if (!target) { element("pair-target").focus(); return; }
-  try { await pair("pairing.connect", { target }); }
-  catch (error) {
-    if (!String(error).includes("NOT_FOUND")) throw error;
-    showNotice("상대 컴퓨터에서도 이 컴퓨터 아이콘을 누르면 등록을 이어갈 수 있어요.");
-  }
-}
-
 // Sending remains pending until the engine reports final storage; failure preserves the selection.
 async function sendFiles(): Promise<void> {
   const target = selectedDevice();
   if (!target || sending) throw new Error("온라인 기기를 먼저 선택해주세요.");
   sending = true;
-  beginProgress();
+  beginProgress(target);
   updateActions();
   element("transfer-status").hidden = false;
-  element("transfer-status").textContent = `${target.display_name}에 파일을 전송하고 있어요…`;
+  element("transfer-status").textContent = target.paired ? `${target.display_name}에 파일을 전송하고 있어요…` : `${target.display_name}에서 처음 한 번 등록을 허용해주세요.`;
   try {
     const result = await invoke<TransferRecord>("send_files", { to: target.device_id, paths: selectedPaths, transferId: inFlightId });
     element("transfer-status").textContent = `파일 전송 ${stateLabel(result.state)}`;
     if (result.state === "completed") selectedPaths = [];
     else showNotice(transferFailureMessage(result), true);
     await refreshHistory();
+  } catch (error) {
+    // Failed approval creates no transfer row; do not leave its old waiting caption visible.
+    element("transfer-status").textContent = userError(error);
+    throw error;
   } finally {
     await finishProgress();
     sending = false;
@@ -563,7 +596,7 @@ async function sendMessage(): Promise<void> {
   const input = element<HTMLTextAreaElement>("message");
   if (!target || !input.value || sending) throw new Error("받는 기기와 내용을 확인해주세요.");
   sending = true;
-  beginProgress();
+  beginProgress(target);
   updateActions();
   try {
     const result = await invoke<TransferRecord>("send_message", { to: target.device_id, kind: messageKind(input.value), body: input.value, transferId: inFlightId });
@@ -591,12 +624,12 @@ function transferFailureMessage(record: TransferRecord): string {
 }
 
 // Caller-generated IDs make cancellation possible before the long-running send IPC returns.
-function beginProgress(): void {
+function beginProgress(target: Device): void {
   inFlightId = crypto.randomUUID();
   element("cancel-transfer").hidden = false;
   element<HTMLButtonElement>("cancel-transfer").disabled = false;
   element("transfer-status").hidden = false;
-  element("transfer-status").textContent = "전송 준비 중…";
+  element("transfer-status").textContent = target.paired ? "전송 준비 중…" : "상대 기기의 등록 승인 대기 중…";
   element("transfer-progress-bar").hidden = true;
   progressTimer = window.setInterval(() => { void updateProgress(); }, PROGRESS_INTERVAL_MS);
 }
@@ -622,6 +655,12 @@ async function updateProgress(): Promise<void> {
   try {
     const record = await rpc<TransferRecord>("transfers.get", { transfer_id: id });
     if (inFlightId !== id) return;
+    // Consent waiting has no transferred bytes; do not show an invented percentage.
+    if (record.state === "awaiting_registration") {
+      element("transfer-progress-bar").hidden = true;
+      element("transfer-status").textContent = "상대 기기의 등록 승인 대기 중… 상대에서 등록 허용을 눌러주세요.";
+      return;
+    }
     const count = record.items.filter((item) => item.state === "completed").length;
     const total = record.items.reduce((sum, item) => sum + byteCount(item.size), 0n);
     const transferred = record.items.reduce((sum, item) => sum + byteCount(item.bytes_transferred ?? (item.state === "completed" ? item.size : "0")), 0n);
@@ -673,47 +712,59 @@ async function loadSettings(): Promise<void> {
   }
 }
 
-// Show only the comparison and actionable connection data, not certificate or protocol internals.
-function renderPair(result: JsonObject): void {
-  element("pair-details").hidden = false;
-  const states: Record<string, string> = { waiting: "상대 기기 연결 대기", compare: "양쪽 비교값을 확인하세요", paired: "등록 완료" };
-  element("pair-state").textContent = result.cancelled ? "등록 취소됨" : states[String(result.state)] ?? "등록 상태 확인";
-  const peer = typeof result.peer === "object" && result.peer !== null ? result.peer as JsonObject : undefined;
-  element("pair-peer").textContent = typeof peer?.display_name === "string" ? peer.display_name : "";
-  element("pair-address").textContent = typeof result.address === "string" ? `연결 주소  ${result.address}` : "";
-  const comparison = typeof result.comparison === "string" ? result.comparison : "";
-  element("pair-comparison").textContent = comparison ? comparison.match(/.{1,8}/g)?.join(" ") ?? comparison : "상대 기기에서 위 주소로 연결하면 비교값이 표시됩니다.";
-  element("pair-expiry").textContent = typeof result.expires_at === "number" ? `${new Date(result.expires_at * 1000).toLocaleTimeString()}까지 확인할 수 있습니다.` : "";
-  element<HTMLButtonElement>("pair-confirm").disabled = !comparison || result.state === "paired";
+// The main window owns native recipient consent; polling never auto-approves a request.
+async function processRegistrationRequests(): Promise<void> {
+  if (!isMain || registrationPrompting) return;
+  registrationPrompting = true;
+  try {
+    const requests = await rpc<JsonObject[]>("registration.requests");
+    if (typeof requests[0]?.session_id !== "string") return;
+    await invoke("prompt_registration", { sessionId: requests[0].session_id });
+    await refresh();
+  } finally { registrationPrompting = false; }
 }
 
-// The session ID stays internal once the actual pairing response has supplied it.
-async function pair(method: string, params: JsonObject): Promise<void> {
-  const result = await rpc<JsonObject>(method, params);
-  renderPair(result);
-  if (typeof result.session_id === "string") element<HTMLInputElement>("pair-session").value = result.session_id;
-  if (typeof result.session_id === "string") activePairSession = result.session_id;
-  if (method === "pairing.cancel") activePairSession = "";
-  await refresh();
-}
-
-// Native authorization is separate from transfer acceptance, and unavailable development builds say so.
+// OS authorization explains display limits; Windows management does not disable the app's own switch.
 function renderNotificationPermission(permission: string): void {
   const labels: Record<string, string> = {
     granted: "알림이 허용되어 있습니다. 표시는 집중 모드 등 OS 설정에 따릅니다.",
     denied: "시스템 설정의 알림에서 FTA를 허용하세요. 수신은 계속됩니다.",
     prompt: "알림을 허용하면 새 수신 항목을 알려드립니다.",
-    "os-managed": "알림 표시·차단은 Windows 알림 설정에서 관리합니다.",
+    "os-managed": "새 수신 항목을 알려드립니다. Windows에서 알림이 차단되어 있으면 표시되지 않습니다.",
     unavailable: "설치된 데스크톱 앱에서 알림을 사용할 수 있습니다.",
   };
-  element("notification-status").textContent = labels[permission] ?? "알림 상태를 확인할 수 없습니다.";
-  element<HTMLButtonElement>("notification-permission").disabled = ["granted", "os-managed", "unavailable"].includes(permission);
-  element("notification-permission").textContent = permission === "granted" ? "허용됨" : permission === "os-managed" ? "OS에서 관리" : permission === "unavailable" ? "설치 앱 필요" : permission === "denied" ? "다시 확인" : "알림 허용";
+  element("notification-status").textContent = receiptNotificationsEnabled ? labels[permission] ?? "알림 상태를 확인할 수 없습니다." : "알림을 끈 상태입니다. 파일 수신과 기록은 계속됩니다.";
+  const toggle = element<HTMLInputElement>("notification-permission");
+  toggle.checked = receiptNotificationsEnabled;
+  toggle.disabled = permission === "unavailable";
 }
 
-// Only a direct user action can trigger the system's initial authorization prompt.
-async function enableNotifications(): Promise<void> {
-  renderNotificationPermission(await invoke<string>("notification_permission", { request: true }));
+// Re-read persisted state after a change or error instead of assuming a switch was applied.
+async function refreshNotificationToggle(): Promise<void> {
+  const toggle = element<HTMLInputElement>("notification-permission");
+  toggle.disabled = true;
+  try {
+    receiptNotificationsEnabled = await invoke<boolean>("receipt_notifications_enabled");
+    renderNotificationPermission(await invoke<string>("notification_permission", { request: false }));
+  } catch (error) {
+    element("notification-status").textContent = "설정 상태를 확인하지 못했습니다. 설정 창을 다시 열어주세요.";
+    throw error;
+  }
+}
+
+// Startup reflects the real OS registration, including failed or partially applied changes.
+async function refreshAutostartToggle(): Promise<void> {
+  const toggle = element<HTMLInputElement>("autostart");
+  toggle.disabled = true;
+  try {
+    autostartEnabled = await invoke<boolean>("autostart_status");
+    toggle.checked = autostartEnabled;
+    element("autostart-status").textContent = "로그인하면 자동 수신을 시작합니다.";
+    toggle.disabled = false;
+  } catch (error) {
+    element("autostart-status").textContent = "설정 상태를 확인하지 못했습니다. 설정 창을 다시 열어주세요.";
+    throw error;
+  }
 }
 
 // Both warm and cold activations carry only a validated ID; contents are read from the persisted local inbox.
@@ -749,10 +800,8 @@ async function quit(): Promise<void> {
 
 // Bind each handler once; rerenders replace only dynamic lists and preserve drafts/focus.
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-window]")) button.addEventListener("click", () => navigate(button.dataset.window ?? "send"));
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-close-window]")) button.addEventListener("click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }); });
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-close-window]")) button.addEventListener("click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }, { settingsFeedback: false }); });
 for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) dialog.addEventListener("close", positionNotice);
-// Plus is a registration action, not a generic settings shortcut; the host retains it across window creation.
-on("add-device", "click", () => { void act(async () => { await invoke("begin_registration", { deviceId: null }); }); });
 on("refresh", "click", () => { void act(refresh); });
 on("reload-inbox", "click", () => { void act(refreshHistory); });
 on("message", "input", updateActions);
@@ -777,7 +826,6 @@ on("close-detail", "click", () => element<HTMLDialogElement>("detail-dialog").cl
 on("copy-detail", "click", () => { void act(async () => { await invoke("copy_text", { value: currentDetail?.body ?? "" }); showNotice("복사했어요."); }); });
 on("open-detail", "click", () => { void act(async () => { if (currentDetail?.body) await invoke("open_link", { value: currentDetail.body }); }); });
 on("reveal-detail", "click", () => { void act(async () => { if (currentDetail) await invoke("reveal_transfer", { transferId: currentDetail.transfer_id }); }); });
-on("quit", "click", () => { void act(quit); });
 on("restart-engine", "click", () => { void act(async () => {
   if (sending) throw new Error("현재 전송이 끝난 뒤 엔진을 재시작해주세요.");
   await invoke("restart_engine");
@@ -804,7 +852,8 @@ for (const handle of document.querySelectorAll<HTMLElement>("[data-drag-handle]"
   handle.addEventListener("pointerdown", (event) => {
     if (!desktop || event.button !== 0 || (event.target as HTMLElement).closest("button, input, textarea, a")) return;
     event.preventDefault();
-    void act(async () => { await invoke("start_window_drag"); });
+    // Moving the native window is chrome interaction, not a settings operation to report completed.
+    void act(async () => { await invoke("start_window_drag"); }, { settingsFeedback: false });
   });
 }
 
@@ -861,16 +910,29 @@ on("pin", "click", () => { void act(async () => {
   element("pin").setAttribute("aria-pressed", String(pinned));
   localStorage.setItem(PINNED_KEY, String(pinned));
 }); });
-on("autostart", "click", () => { void act(async () => {
-  await invoke("set_autostart", { enabled: !autostartEnabled });
-  autostartEnabled = !autostartEnabled;
-  element("autostart").textContent = autostartEnabled ? "켜짐 · 끄기" : "꺼짐 · 켜기";
+on("autostart", "change", () => { void act(async () => {
+  const toggle = element<HTMLInputElement>("autostart");
+  const enabled = toggle.checked;
+  toggle.checked = autostartEnabled;
+  toggle.disabled = true;
+  try { await invoke("set_autostart", { enabled }); }
+  finally { await refreshAutostartToggle(); }
+  if (autostartEnabled !== enabled) throw new Error("로그인 시 실행 설정이 적용되지 않았습니다.");
 }); });
-on("notification-permission", "click", () => { void act(enableNotifications); });
-on("pair-open", "click", () => { void act(() => pair("pairing.open", {})); });
-on("pair-connect", "click", () => { void act(() => pair("pairing.connect", { target: element<HTMLInputElement>("pair-target").value.trim() })); });
-on("pair-confirm", "click", () => { void act(() => pair("pairing.confirm", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
-on("pair-cancel", "click", () => { void act(() => pair("pairing.cancel", { session_id: element<HTMLInputElement>("pair-session").value.trim() })); });
+on("notification-permission", "change", () => { void act(async () => {
+  const toggle = element<HTMLInputElement>("notification-permission");
+  const enabled = toggle.checked;
+  toggle.checked = receiptNotificationsEnabled;
+  toggle.disabled = true;
+  try {
+    // Only turning notifications on may request native authorization; turning them off never does.
+    if (enabled) {
+      const permission = await invoke<string>("notification_permission", { request: true });
+      if (!["granted", "os-managed"].includes(permission)) throw new Error("시스템 설정에서 FTA 알림을 허용한 뒤 다시 켜주세요.");
+    }
+    await invoke("set_receipt_notifications_enabled", { enabled });
+  } finally { await refreshNotificationToggle(); }
+}); });
 // Native required-field validation prevents submit; give it the same visible feedback as RPC errors.
 document.getElementById("settings-form")?.addEventListener("invalid", (event) => {
   const field = event.target;
@@ -898,17 +960,8 @@ on("settings-form", "submit", (event) => {
 
 // Settings-only OS controls are initialized in their own window without starting an engine or receipt loop.
 async function initializeSettingsControls(): Promise<void> {
-  try {
-    autostartEnabled = await invoke<boolean>("autostart_status");
-    element("autostart").textContent = autostartEnabled ? "켜짐 · 끄기" : "꺼짐 · 켜기";
-  } catch (error) {
-    element("autostart").textContent = "상태 확인 불가";
-    element<HTMLButtonElement>("autostart").disabled = true;
-    showNotice(userError(error), true);
-  }
-  await act(async () => {
-    renderNotificationPermission(await invoke<string>("notification_permission", { request: false }));
-  });
+  await act(refreshAutostartToggle);
+  await act(refreshNotificationToggle);
 }
 
 type NetworkInterface = { id: string; name: string; address: string; prefix: number; network: string; profile: "unknown" | "public" | "private" | "domain" };
@@ -916,22 +969,65 @@ type NetworkSetupStatus = { platform: string; interfaces: NetworkInterface[]; fi
 let setupStatus: NetworkSetupStatus | undefined;
 let setupBusy = false;
 
-// Only an explicit home confirmation enables applying an actual OS-provided connection.
+type NetworkTrustPreferences = { selected: string | null; trusted: string[] };
+// A changed OS network identity, address, or subnet cannot inherit another connection's check mark.
+function networkTrustIdentity(connection: NetworkInterface): string {
+  return JSON.stringify([setupStatus?.platform, connection.id, connection.address, connection.prefix, connection.network]);
+}
+function networkTrustPreferences(): NetworkTrustPreferences {
+  try {
+    const saved = JSON.parse(localStorage.getItem(NETWORK_TRUST_KEY) ?? "null") as Partial<NetworkTrustPreferences> | null;
+    return {
+      selected: typeof saved?.selected === "string" ? saved.selected : null,
+      trusted: Array.isArray(saved?.trusted) ? saved.trusted.filter((key): key is string => typeof key === "string").slice(-MAX_REMEMBERED_NETWORKS) : [],
+    };
+  } catch { return { selected: null, trusted: [] }; }
+}
+// Unchecking is persistent too; remembering a choice never applies firewall/profile settings itself.
+function rememberNetworkSelection(trusted?: boolean): void {
+  const selected = setupSelection();
+  if (!selected) { element<HTMLInputElement>("network-home").checked = false; return; }
+  const preferences = networkTrustPreferences();
+  const identity = networkTrustIdentity(selected);
+  const known = new Set(preferences.trusted);
+  if (trusted === true) known.add(identity);
+  if (trusted === false) known.delete(identity);
+  try {
+    localStorage.setItem(NETWORK_TRUST_KEY, JSON.stringify({ selected: identity, trusted: [...known].slice(-MAX_REMEMBERED_NETWORKS) }));
+  } catch { showNotice("신뢰하는 네트워크 선택을 저장하지 못했습니다. 앱을 다시 열면 다시 확인해야 할 수 있습니다.", true); }
+}
+function restoreNetworkTrust(): void {
+  const selected = setupSelection();
+  element<HTMLInputElement>("network-home").checked = !!selected && networkTrustPreferences().trusted.includes(networkTrustIdentity(selected));
+}
+
+// Only a user-confirmed current OS connection enables applying network settings.
 function setupSelection(): NetworkInterface | undefined {
   return setupStatus?.interfaces.find((item) => `${item.id}|${item.address}` === element<HTMLSelectElement>("network-interface").value);
 }
 function updateNetworkSelection(): void {
   const selected = setupSelection();
+  // Keep the selected target stable while the native helper is applying its confirmed scope.
+  element<HTMLSelectElement>("network-interface").disabled = setupBusy;
+  element<HTMLInputElement>("network-home").disabled = !selected || setupBusy;
   const profile = { unknown: "프로필 확인 불가", public: "공용", private: "개인", domain: "조직 네트워크" };
   element("network-scope").textContent = selected ? `${selected.address} · ${selected.network} · ${setupStatus?.platform === "windows" ? profile[selected.profile] : "선택한 연결만 사용"}` : "집에서 사용하는 유선 또는 Wi-Fi 연결을 선택하세요. VPN·게스트 연결은 선택하지 마세요.";
-  element("network-private-row").hidden = setupStatus?.platform !== "windows";
-  element<HTMLInputElement>("network-private").disabled = selected?.profile !== "public" || setupBusy;
-  if (selected?.profile !== "public") element<HTMLInputElement>("network-private").checked = false;
-  element<HTMLButtonElement>("network-apply").disabled = !selected || !element<HTMLInputElement>("network-home").checked || setupBusy;
+  const windows = setupStatus?.platform === "windows";
+  const trusted = element<HTMLInputElement>("network-home").checked;
+  // Read the actual OS profile; no checked state can pretend that a profile change succeeded.
+  element("network-profile-row").hidden = !windows;
+  element("network-profile-status").textContent = selected ? `현재 네트워크: ${profile[selected.profile]}` : "현재 네트워크: 연결을 선택하세요.";
+  element<HTMLButtonElement>("network-make-private").disabled = !windows || selected?.profile !== "public" || !trusted || setupBusy;
+  element<HTMLButtonElement>("network-make-public").disabled = !windows || selected?.profile !== "private" || setupBusy;
+  element<HTMLButtonElement>("network-system-settings").disabled = setupBusy;
+  element<HTMLButtonElement>("restart-engine").disabled = setupBusy;
+  // Windows setup is saved only after the separate Private action has been verified.
+  element<HTMLButtonElement>("network-apply").disabled = !selected || !trusted || setupBusy || (windows && selected.profile !== "private");
 }
 
-// A failed query clears old authorization data; no remembered state is shown as current permission.
+// Refresh native authorization every time, then restore only the matching connection preference.
 async function refreshNetworkSetup(): Promise<void> {
+  const previousSelection = setupSelection();
   setupStatus = undefined;
   element<HTMLInputElement>("network-home").checked = false;
   updateNetworkSelection();
@@ -942,43 +1038,66 @@ async function refreshNetworkSetup(): Promise<void> {
     select.replaceChildren(new Option("연결 선택", ""), ...setupStatus.interfaces.map((item) => new Option(`${item.name} · ${item.address}`, `${item.id}|${item.address}`)));
     const listen = element<HTMLInputElement>("setting-listen").value;
     const current = setupStatus.interfaces.find((item) => listen === `${item.address}:${listen.split(":").at(-1)}`);
-    if (current) select.value = `${current.id}|${current.address}`;
+    const previous = setupStatus.interfaces.find((item) => item.id === previousSelection?.id && item.address === previousSelection?.address);
+    const remembered = setupStatus.interfaces.find((item) => networkTrustIdentity(item) === networkTrustPreferences().selected);
+    const selection = previous ?? remembered ?? current;
+    if (selection) select.value = `${selection.id}|${selection.address}`;
+    restoreNetworkTrust();
     element("network-summary").textContent = setupStatus.firewall.detail;
     element("network-permission").textContent = setupStatus.local_network_permission;
-    element<HTMLInputElement>("network-firewall").checked = setupStatus.firewall.enabled !== false;
+    // The template defaults to checked; reinspection must preserve the user's choice.
     element<HTMLInputElement>("network-firewall").disabled = setupStatus.firewall.enabled === false;
   } catch (error) {
     element("network-summary").textContent = userError(error);
     element<HTMLSelectElement>("network-interface").replaceChildren(new Option("상태 확인 불가", ""));
+    // The shared action must distinguish a failed inspection from a completed setup.
+    throw error;
+  } finally {
+    updateNetworkSelection();
   }
-  updateNetworkSelection();
 }
 
-// OS permission failures never report setup success; settings are saved only after native verification.
-async function applyNetworkSetup(): Promise<void> {
+// A profile-only action must not silently save unrelated receive or discovery preferences.
+async function applyNetworkSetup(profileOnly = false): Promise<void> {
   const selected = setupSelection();
   if (!selected || !element<HTMLInputElement>("network-home").checked || setupBusy) return;
+  if (setupStatus?.platform === "windows" && selected.profile !== (profileOnly ? "public" : "private")) return;
   setupBusy = true;
   updateNetworkSelection();
   element<HTMLButtonElement>("network-refresh").disabled = true;
   try {
-    await invoke("network_setup_apply", { selection: { confirmed_home_network: element<HTMLInputElement>("network-home").checked, interface_id: selected.id, address: selected.address,
-      make_private: element<HTMLInputElement>("network-private").checked,
-      configure_firewall: element<HTMLInputElement>("network-firewall").checked,
+    await invoke("network_setup_apply", { profileOnly, selection: { confirmed_home_network: element<HTMLInputElement>("network-home").checked, interface_id: selected.id, address: selected.address,
+      make_private: profileOnly,
+      // An already disabled OS firewall needs no rule mutation, even with receiving selected.
+      configure_firewall: !profileOnly && element<HTMLInputElement>("network-firewall").checked && !element<HTMLInputElement>("network-firewall").disabled,
       discovery_enabled: element<HTMLInputElement>("setting-discovery").checked } });
-    await loadSettings();
-    showNotice("집 네트워크 설정을 저장했습니다. 서비스 재시작을 눌러 적용하세요.");
+    if (profileOnly) {
+      showNotice("개인 네트워크로 변경했습니다. 수신 허용 등 필요한 항목을 확인하고 연결 설정을 저장하세요.");
+    } else {
+      await loadSettings();
+      showNotice("집 네트워크 설정을 저장했습니다. 서비스 재시작을 눌러 적용하세요.");
+    }
   } finally {
-    await refreshNetworkSetup();
-    setupBusy = false;
-    element<HTMLButtonElement>("network-refresh").disabled = false;
-    updateNetworkSelection();
+    // A failed reinspection must report failure and still release the controls after OS work.
+    try { await refreshNetworkSetup(); }
+    catch (error) { showNotice(userError(error), true); }
+    finally {
+      setupBusy = false;
+      element<HTMLButtonElement>("network-refresh").disabled = false;
+      updateNetworkSelection();
+    }
   }
 }
-on("network-interface", "change", () => { element<HTMLInputElement>("network-home").checked = false; updateNetworkSelection(); });
-on("network-home", "change", updateNetworkSelection);
+on("network-interface", "change", () => { rememberNetworkSelection(); restoreNetworkTrust(); updateNetworkSelection(); });
+on("network-home", "change", () => { rememberNetworkSelection(element<HTMLInputElement>("network-home").checked); updateNetworkSelection(); });
 on("network-refresh", "click", () => { void act(refreshNetworkSetup); });
 on("network-apply", "click", () => { void act(applyNetworkSetup); });
+on("network-make-private", "click", () => { void act(() => applyNetworkSetup(true)); });
+// The return route opens fixed Windows settings; opening it is never reported as a profile change.
+on("network-make-public", "click", () => { void act(async () => {
+  await invoke("open_network_settings");
+  showNotice("Windows 설정에서 현재 연결의 네트워크 프로필을 ‘공용’으로 선택한 뒤 재점검을 눌러주세요.");
+}); });
 on("network-system-settings", "click", () => { void act(async () => { await invoke("open_network_settings"); }); });
 
 let settingsLoaded = false;
@@ -1015,12 +1134,14 @@ async function initialize(): Promise<void> {
     return;
   }
   if (!isMain) {
-    if (view === "settings") await listen("fta:registration-target", () => { void act(registerPendingDevice); });
-    window.setInterval(() => { void act(refreshUtility); }, REFRESH_INTERVAL_MS);
+    // Passive status polling never flashes progress or a completion toast over the user's work.
+    window.setInterval(() => {
+      if (view === "settings" && settingsActionCount > 0) return;
+      void act(refreshUtility, { settingsFeedback: false });
+    }, REFRESH_INTERVAL_MS);
     await act(refreshUtility);
     if (view === "settings") {
       await act(initializeSettingsControls);
-      await act(registerPendingDevice);
     }
     return;
   }
@@ -1066,7 +1187,7 @@ async function initialize(): Promise<void> {
           && ["granted", "os-managed"].includes(await invoke<string>("notification_permission", { request: false }))) {
         await invoke("notify_receipt", { sequence: receipt.sequence, transferId: receipt.transfer_id });
       }
-      // Disabled OS notifications still acknowledge the persisted record; permission is not receipt approval.
+      // Disabled app or OS notifications still acknowledge the record, without replay when re-enabled.
       await invoke("ack_receipt", { sequence: receipt.sequence });
     } finally {
       receiptInFlight.delete(receipt.sequence);

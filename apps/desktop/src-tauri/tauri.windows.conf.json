@@ -8,7 +8,7 @@
         "silent": false
       },
       "nsis": {
-        "installMode": "currentUser",
+        "installMode": "perMachine",
         "languages": ["Korean", "English"],
         "displayLanguageSelector": true
       }
