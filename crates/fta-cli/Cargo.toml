@@ -1,6 +1,7 @@
 [package]
 name = "fta-cli"
-version = "0.1.0"
+# Keep local release executables aligned with the installer version.
+version = "0.1.1"
 edition = "2024"
 publish = false
 
