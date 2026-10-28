@@ -9,6 +9,9 @@ const MAX_MESSAGE_BYTES = 1024 * 1024;
 const HISTORY_LIMIT = 100;
 const LAST_DEVICE_KEY = "fta:last-device";
 const PINNED_KEY = "fta:pinned";
+// Remember the user's exact connection choice, separately from fresh native permission checks.
+const NETWORK_TRUST_KEY = "fta:network-trust:v1";
+const MAX_REMEMBERED_NETWORKS = 32;
 type JsonObject = Record<string, unknown>;
 // Each native window loads one view; only main owns delivery acknowledgements and engine startup.
 const requestedView = new URLSearchParams(window.location.search).get("view");
@@ -68,7 +71,7 @@ root.innerHTML = `
     </section>
     <section id="inbox-panel" class="utility-panel" aria-labelledby="inbox-title"><div class="utility-header" data-drag-handle><h2 id="inbox-title">기록</h2><button data-close-window="inbox" class="quiet" aria-label="기록 닫기">×</button></div><button id="reload-inbox" class="quiet small">새로고침</button><div id="history"></div></section>
     <section id="settings-panel" class="utility-panel" aria-labelledby="settings-title"><div class="utility-header" data-drag-handle><h2 id="settings-title">설정</h2><button data-close-window="settings" class="quiet" aria-label="설정 닫기">×</button></div>
-      <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 선택한 연결은 내가 사용하는 집 네트워크입니다.</label><label id="network-private-row" class="checkbox-label" hidden><input id="network-private" type="checkbox" /> 이 연결의 Windows 프로필을 개인으로 변경합니다. 다른 앱의 개인 프로필 방화벽 규칙에도 영향을 줍니다.</label><label class="checkbox-label"><input id="network-firewall" type="checkbox" /> FTA 엔진의 수신 통신 허용</label><p id="network-permission" class="help"></p><div class="form-actions"><button id="network-system-settings" class="secondary">시스템 설정 열기</button><button id="network-apply" class="primary" disabled>연결 설정 저장</button></div><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다. 저장 후 서비스를 재시작하면 적용됩니다.</p></section>
+      <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 신뢰하는 네트워크</label><label id="network-private-row" class="checkbox-label" hidden><input id="network-private" type="checkbox" /> 이 연결의 Windows 프로필을 개인으로 변경합니다. 다른 앱의 개인 프로필 방화벽 규칙에도 영향을 줍니다.</label><label class="checkbox-label"><input id="network-firewall" type="checkbox" /> FTA 엔진의 수신 통신 허용</label><p id="network-permission" class="help"></p><div class="form-actions"><button id="network-system-settings" class="secondary">시스템 설정 열기</button><button id="network-apply" class="primary" disabled>연결 설정 저장</button></div><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다. 저장 후 서비스를 재시작하면 적용됩니다.</p></section>
       <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label><p class="help">네트워크 변경은 저장 후 서비스를 재시작하면 적용됩니다.</p><div class="form-actions"><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button class="primary" type="submit">설정 저장</button></div></form>
       <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong>로그인 시 실행</strong><p>로그인하면 자동 수신을 시작합니다.</p></div><button id="autostart" class="secondary">확인 중</button></div><div class="settings-row"><div><strong>수신 알림</strong><p id="notification-status">알림 권한을 확인합니다.</p></div><button id="notification-permission" class="secondary">알림 허용</button></div></section>
       <section class="settings-section"><div class="section-heading"><h2>등록된 기기</h2></div><p class="help">감지된 컴퓨터에 처음 보내면 상대에서 한 번만 등록을 확인합니다. 이후에는 바로 전송됩니다.</p><div id="paired-devices"></div></section>
@@ -874,12 +877,45 @@ type NetworkSetupStatus = { platform: string; interfaces: NetworkInterface[]; fi
 let setupStatus: NetworkSetupStatus | undefined;
 let setupBusy = false;
 
-// Only an explicit home confirmation enables applying an actual OS-provided connection.
+type NetworkTrustPreferences = { selected: string | null; trusted: string[] };
+// A changed OS network identity, address, or subnet cannot inherit another connection's check mark.
+function networkTrustIdentity(connection: NetworkInterface): string {
+  return JSON.stringify([setupStatus?.platform, connection.id, connection.address, connection.prefix, connection.network]);
+}
+function networkTrustPreferences(): NetworkTrustPreferences {
+  try {
+    const saved = JSON.parse(localStorage.getItem(NETWORK_TRUST_KEY) ?? "null") as Partial<NetworkTrustPreferences> | null;
+    return {
+      selected: typeof saved?.selected === "string" ? saved.selected : null,
+      trusted: Array.isArray(saved?.trusted) ? saved.trusted.filter((key): key is string => typeof key === "string").slice(-MAX_REMEMBERED_NETWORKS) : [],
+    };
+  } catch { return { selected: null, trusted: [] }; }
+}
+// Unchecking is persistent too; remembering a choice never applies firewall/profile settings itself.
+function rememberNetworkSelection(trusted?: boolean): void {
+  const selected = setupSelection();
+  if (!selected) { element<HTMLInputElement>("network-home").checked = false; return; }
+  const preferences = networkTrustPreferences();
+  const identity = networkTrustIdentity(selected);
+  const known = new Set(preferences.trusted);
+  if (trusted === true) known.add(identity);
+  if (trusted === false) known.delete(identity);
+  try {
+    localStorage.setItem(NETWORK_TRUST_KEY, JSON.stringify({ selected: identity, trusted: [...known].slice(-MAX_REMEMBERED_NETWORKS) }));
+  } catch { showNotice("신뢰하는 네트워크 선택을 저장하지 못했습니다. 앱을 다시 열면 다시 확인해야 할 수 있습니다.", true); }
+}
+function restoreNetworkTrust(): void {
+  const selected = setupSelection();
+  element<HTMLInputElement>("network-home").checked = !!selected && networkTrustPreferences().trusted.includes(networkTrustIdentity(selected));
+}
+
+// Only a user-confirmed current OS connection enables applying network settings.
 function setupSelection(): NetworkInterface | undefined {
   return setupStatus?.interfaces.find((item) => `${item.id}|${item.address}` === element<HTMLSelectElement>("network-interface").value);
 }
 function updateNetworkSelection(): void {
   const selected = setupSelection();
+  element<HTMLInputElement>("network-home").disabled = !selected || setupBusy;
   const profile = { unknown: "프로필 확인 불가", public: "공용", private: "개인", domain: "조직 네트워크" };
   element("network-scope").textContent = selected ? `${selected.address} · ${selected.network} · ${setupStatus?.platform === "windows" ? profile[selected.profile] : "선택한 연결만 사용"}` : "집에서 사용하는 유선 또는 Wi-Fi 연결을 선택하세요. VPN·게스트 연결은 선택하지 마세요.";
   element("network-private-row").hidden = setupStatus?.platform !== "windows";
@@ -888,8 +924,9 @@ function updateNetworkSelection(): void {
   element<HTMLButtonElement>("network-apply").disabled = !selected || !element<HTMLInputElement>("network-home").checked || setupBusy;
 }
 
-// A failed query clears old authorization data; no remembered state is shown as current permission.
+// Refresh native authorization every time, then restore only the matching connection preference.
 async function refreshNetworkSetup(): Promise<void> {
+  const previousSelection = setupSelection();
   setupStatus = undefined;
   element<HTMLInputElement>("network-home").checked = false;
   updateNetworkSelection();
@@ -900,7 +937,11 @@ async function refreshNetworkSetup(): Promise<void> {
     select.replaceChildren(new Option("연결 선택", ""), ...setupStatus.interfaces.map((item) => new Option(`${item.name} · ${item.address}`, `${item.id}|${item.address}`)));
     const listen = element<HTMLInputElement>("setting-listen").value;
     const current = setupStatus.interfaces.find((item) => listen === `${item.address}:${listen.split(":").at(-1)}`);
-    if (current) select.value = `${current.id}|${current.address}`;
+    const previous = setupStatus.interfaces.find((item) => item.id === previousSelection?.id && item.address === previousSelection?.address);
+    const remembered = setupStatus.interfaces.find((item) => networkTrustIdentity(item) === networkTrustPreferences().selected);
+    const selection = previous ?? remembered ?? current;
+    if (selection) select.value = `${selection.id}|${selection.address}`;
+    restoreNetworkTrust();
     element("network-summary").textContent = setupStatus.firewall.detail;
     element("network-permission").textContent = setupStatus.local_network_permission;
     element<HTMLInputElement>("network-firewall").checked = setupStatus.firewall.enabled !== false;
@@ -933,8 +974,8 @@ async function applyNetworkSetup(): Promise<void> {
     updateNetworkSelection();
   }
 }
-on("network-interface", "change", () => { element<HTMLInputElement>("network-home").checked = false; updateNetworkSelection(); });
-on("network-home", "change", updateNetworkSelection);
+on("network-interface", "change", () => { rememberNetworkSelection(); restoreNetworkTrust(); updateNetworkSelection(); });
+on("network-home", "change", () => { rememberNetworkSelection(element<HTMLInputElement>("network-home").checked); updateNetworkSelection(); });
 on("network-refresh", "click", () => { void act(refreshNetworkSetup); });
 on("network-apply", "click", () => { void act(applyNetworkSetup); });
 on("network-system-settings", "click", () => { void act(async () => { await invoke("open_network_settings"); }); });
