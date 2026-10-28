@@ -21,13 +21,13 @@ FTA는 **File Transfer Anything**의 약자다.
 
 | 플랫폼 | 제공 파일 | 설치·사용 안내 |
 |---|---|---|
-| macOS · Apple Silicon | [DMG · v0.1.0](https://github.com/froiibn/FTA/releases/download/v0.1.0/FTA_0.1.0_aarch64.dmg) | [앱 설치·메뉴 막대·빌드](packaging/macos/README.md) |
+| macOS · Apple Silicon | [서명·공증 DMG · v0.1.1](https://github.com/froiibn/FTA/releases/download/v0.1.1/FTA_0.1.1_aarch64.dmg) | [앱 설치·메뉴 막대·빌드](packaging/macos/README.md) |
 | Windows · x64 | [설치 프로그램 · v0.1.1](https://github.com/froiibn/FTA/releases/download/v0.1.1/FTA_0.1.1_x64-setup.exe) | [앱 설치·트레이·빌드](packaging/windows/README.md) |
 | Linux | 소스에서 CLI·엔진 빌드 | [서버 설치·systemd 서비스](packaging/linux/README.md) |
 
 macOS는 DMG에서 `FTA.app`을 Applications로 옮겨 설치하고, Windows는 설치 마법사에서 설치 폴더를 선택한다. 설정·등록 정보는 사용자별 데이터 폴더에, 수신 파일은 사용자가 지정한 수신 폴더에 저장한다.
 
-현재 공개된 설치 파일의 버전은 플랫폼별로 다르다. GitHub의 macOS v0.1.0 DMG는 수동 등록 방식이며, 아래의 최초 전송 승인 방식은 이 기능이 포함된 최신 소스를 양쪽 기기에 적용해야 사용할 수 있다.
+macOS와 Windows의 현재 설치 파일은 모두 v0.1.1이며 최초 전송 시 수신자 등록 확인을 지원한다. Mac 배포본은 Developer ID 서명·Apple 공증을 적용한다. 이전 v0.1.0 릴리스의 수동 등록 방식과 구분하며, 최초 전송 승인 기능은 양쪽 기기에 지원 버전이 필요하다.
 
 ## 처음 사용하기
 
