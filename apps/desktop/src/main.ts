@@ -71,14 +71,18 @@ root.innerHTML = `
     </section>
     <section id="inbox-panel" class="utility-panel" aria-labelledby="inbox-title"><div class="utility-header" data-drag-handle><h2 id="inbox-title">기록</h2><button data-close-window="inbox" class="quiet" aria-label="기록 닫기">×</button></div><button id="reload-inbox" class="quiet small">새로고침</button><div id="history"></div></section>
     <section id="settings-panel" class="utility-panel" aria-labelledby="settings-title"><div class="utility-header" data-drag-handle><h2 id="settings-title">설정</h2><button data-close-window="settings" class="quiet" aria-label="설정 닫기">×</button></div>
+      <!-- Scroll only the tab content so save and restart remain reachable at the bottom of the window. -->
+      <div id="settings-content">
       <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 신뢰하는 네트워크</label>
       <!-- A lasting Windows profile change needs an explicit action, not a temporary-looking checkbox. -->
       <div id="network-profile-row" hidden><p id="network-profile-status" aria-live="polite">현재 네트워크: 연결을 선택하세요.</p><p class="help">FTA는 개인 네트워크에서만 사용할 수 있습니다.</p><div class="form-actions"><button id="network-make-private" class="secondary" disabled>개인 네트워크로 변경</button><button id="network-make-public" class="secondary" disabled>공용으로 변경…</button></div><p class="help">변경한 상태는 전송 후에도 유지되며 다른 앱에도 영향을 줍니다.</p><p class="help">공용으로 되돌리려면 Windows 설정에서 현재 연결의 네트워크 프로필을 ‘공용’으로 선택하세요. 변경 후 ‘재점검’을 눌러주세요.</p></div>
-      <label class="checkbox-label"><input id="network-firewall" type="checkbox" checked /> 수신 허용</label><p id="network-permission" class="help"></p><div class="form-actions"><button id="network-system-settings" class="secondary">시스템 설정 열기</button><button id="network-apply" class="primary" disabled>연결 설정 저장</button></div><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다. 저장 후 서비스를 재시작하면 적용됩니다.</p></section>
-      <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label><p class="help">네트워크 변경은 저장 후 서비스를 재시작하면 적용됩니다.</p><div class="form-actions"><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button class="primary" type="submit">설정 저장</button></div></form>
+      <label class="checkbox-label"><input id="network-firewall" type="checkbox" checked /> 수신 허용</label><p id="network-permission" class="help"></p><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다.</p></section>
+      <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label></form>
       <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong>로그인 시 실행</strong><p>로그인하면 자동 수신을 시작합니다.</p></div><button id="autostart" class="secondary">확인 중</button></div><div class="settings-row"><div><strong>수신 알림</strong><p id="notification-status">알림 권한을 확인합니다.</p></div><button id="notification-permission" class="secondary">알림 허용</button></div></section>
       <section class="settings-section"><div class="section-heading"><h2>등록된 기기</h2></div><p class="help">감지된 컴퓨터에 처음 보내면 상대에서 한 번만 등록을 확인합니다. 이후에는 바로 전송됩니다.</p><div id="paired-devices"></div></section>
-      <div class="quit-row"><p class="help">창을 닫아도 수신은 계속됩니다.</p><button id="quit" class="danger">앱 종료</button></div>
+      </div>
+      <!-- The external form attribute keeps native validation and the existing submit path intact. -->
+      <footer id="settings-actions" class="settings-footer"><p class="help">저장 후 ‘서비스 재시작’을 눌러 적용하세요.</p><div class="form-actions"><button id="network-system-settings" data-settings-action="network" class="secondary">시스템 설정 열기</button><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button id="network-apply" data-settings-action="network" class="primary" disabled>연결 설정 저장</button><button id="computer-save" data-settings-action="computer" class="primary" type="submit" form="settings-form" hidden>설정 저장</button></div></footer>
     </section>
   </main>
   <button id="expand-window" class="expand-widget" aria-label="펼치기" title="펼치기" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V5h4m6 0h4v4m0 6v4h-4M9 19H5v-4"/></svg></button>
@@ -142,6 +146,9 @@ let toastTimer: number | undefined;
 // Keep every result lightweight and brief; a newer message receives its own full two seconds.
 function showSettingsToast(message: string, error: boolean): void {
   if (toastTimer !== undefined) window.clearTimeout(toastTimer);
+  // A save confirmation must not cover the restart button in the persistent footer.
+  const footer = document.getElementById("settings-actions");
+  toast.style.setProperty("--settings-actions-height", `${footer && !footer.hidden ? footer.getBoundingClientRect().height : 0}px`);
   toastMessage.textContent = message;
   toast.classList.toggle("error", error);
   toast.hidden = false;
@@ -455,11 +462,14 @@ function selectSettingsTab(name: string): void {
     button.tabIndex = selected ? 0 : -1;
     element(button.getAttribute("aria-controls")!).hidden = !selected;
   }
+  // Footer saves belong to their own tab; a computer save must never apply the network shortcut.
+  element("settings-actions").hidden = name !== "network" && name !== "computer";
+  for (const action of document.querySelectorAll<HTMLElement>("[data-settings-action]")) action.hidden = action.dataset.settingsAction !== name;
 }
 function initializeSettingsTabs(): void {
   if (view !== "settings") return;
   const panel = element("settings-panel");
-  const groups = Array.from(panel.children).filter((node): node is HTMLElement => node instanceof HTMLElement && node.classList.contains("settings-section"));
+  const groups = Array.from(element("settings-content").children).filter((node): node is HTMLElement => node instanceof HTMLElement && node.classList.contains("settings-section"));
   const tabs = document.createElement("div");
   tabs.className = "settings-tabs";
   tabs.setAttribute("role", "tablist");
@@ -745,7 +755,6 @@ on("close-detail", "click", () => element<HTMLDialogElement>("detail-dialog").cl
 on("copy-detail", "click", () => { void act(async () => { await invoke("copy_text", { value: currentDetail?.body ?? "" }); showNotice("복사했어요."); }); });
 on("open-detail", "click", () => { void act(async () => { if (currentDetail?.body) await invoke("open_link", { value: currentDetail.body }); }); });
 on("reveal-detail", "click", () => { void act(async () => { if (currentDetail) await invoke("reveal_transfer", { transferId: currentDetail.transfer_id }); }); });
-on("quit", "click", () => { void act(quit); });
 on("restart-engine", "click", () => { void act(async () => {
   if (sending) throw new Error("현재 전송이 끝난 뒤 엔진을 재시작해주세요.");
   await invoke("restart_engine");
@@ -931,6 +940,7 @@ function updateNetworkSelection(): void {
   element<HTMLButtonElement>("network-make-private").disabled = !windows || selected?.profile !== "public" || !trusted || setupBusy;
   element<HTMLButtonElement>("network-make-public").disabled = !windows || selected?.profile !== "private" || setupBusy;
   element<HTMLButtonElement>("network-system-settings").disabled = setupBusy;
+  element<HTMLButtonElement>("restart-engine").disabled = setupBusy;
   // Windows setup is saved only after the separate Private action has been verified.
   element<HTMLButtonElement>("network-apply").disabled = !selected || !trusted || setupBusy || (windows && selected.profile !== "private");
 }

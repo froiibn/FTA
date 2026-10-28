@@ -30,7 +30,7 @@ button:hover:not(:disabled) { filter: brightness(1.1); }
 [hidden] { display: none !important; }
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .shell { max-width: 1100px; min-height: 100vh; margin: 0 auto; background: var(--paper); border: 1px solid var(--line); }
-.app-header, .brand, .section-heading, .selection-actions, .settings-row, .detail-header, .detail-actions, .form-actions, .quit-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.app-header, .brand, .section-heading, .selection-actions, .settings-row, .detail-header, .detail-actions, .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .app-header { padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--line); user-select: none; cursor: default; }
 .window-actions { display: flex; align-items: center; gap: 2px; }
 .brand { justify-content: flex-start; gap: 10px; }
@@ -107,9 +107,6 @@ label { display: block; margin: 13px 0 5px; font-size: 12px; color: #bdcad8; }
 .checkbox-label { display: flex; align-items: center; gap: 7px; margin-top: 14px; }
 .checkbox-label input { width: 14px; height: 14px; accent-color: var(--navy); }
 .form-actions { justify-content: flex-end; margin-top: 14px; }
-.quit-row { margin-top: 2px; }
-.quit-row .help { margin: 0; }
-.danger { padding: 6px 12px; color: #efa6a0; background: var(--paper); border-color: #78534f; font-size: 12px; }
 dialog { width: min(560px, calc(100vw - 32px)); padding: 20px; border: 1px solid #445261; border-radius: 8px; color: var(--ink); background: var(--paper); box-shadow: 0 14px 50px #00000066; }
 dialog::backdrop { background: #090d12aa; }
 .detail-body { font: inherit; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 45vh; overflow: auto; background: #171d24; border: 1px solid var(--line); padding: 12px; border-radius: 5px; }
@@ -154,6 +151,14 @@ dialog::backdrop { background: #090d12aa; }
 .utility-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -14px -18px 14px; padding: 8px 18px; background: var(--paper); border-bottom: 1px solid var(--line); user-select: none; cursor: default; }
 .utility-header button { font-size: 20px; line-height: 1; }
 .utility-window .notice, dialog .notice { margin: 8px 0; }
+/* Keep actions in the viewport while long tab content scrolls; narrow windows wrap the buttons. */
+#settings-panel.utility-window { display: flex; flex-direction: column; height: 100dvh; min-height: 0; padding-bottom: 0; overflow: hidden; }
+#settings-panel > .utility-header, #settings-panel > .settings-tabs, #settings-panel > .notice, .settings-footer { flex-shrink: 0; }
+#settings-content { flex: 1; min-height: 0; overflow: auto; }
+#settings-content > .settings-section { margin-bottom: 0; border-bottom: 0; }
+.settings-footer { padding: 12px 0 18px; border-top: 1px solid var(--line); }
+.settings-footer .help { margin: 0; }
+.settings-footer .form-actions { flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .message-input { position: relative; }
 .message-input textarea { padding-right: 43px; resize: none; }
 .send-arrow { position: absolute; right: 6px; bottom: 6px; display: grid; place-items: center; width: 28px; min-height: 28px; padding: 0; border-radius: 4px; }
@@ -175,7 +180,7 @@ body.folded .shell { display: none; }
 #network-profile-row .form-actions { margin-top: 10px; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
 
 /* A content-sized, quiet toast confirms actions without covering the settings form. */
-.settings-toast { position: fixed; z-index: 1000; bottom: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); padding: 7px 12px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
+.settings-toast { position: fixed; z-index: 1000; bottom: calc(14px + var(--settings-actions-height, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); padding: 7px 12px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
 .settings-toast[hidden] { display: none; }
 .settings-toast.error { background: #382e2e; color: #efaaa4; }
 
@@ -204,7 +209,7 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos input, .platform-macos textarea, .platform-macos #network-interface { background: rgb(0 0 0 / 24%); border-color: #ffffff24; border-radius: 9px; }
 .platform-macos button { border-radius: 7px; }
 .platform-macos .primary { background: #dadada; border-color: #dadada; color: #171717; }
-.platform-macos .secondary, .platform-macos .danger { background: #ffffff08; border-color: #ffffff25; }
+.platform-macos .secondary { background: #ffffff08; border-color: #ffffff25; }
 .platform-macos .message-input textarea { background: rgb(0 0 0 / 28%); }
 .platform-macos .send-arrow { background: #ffffff18; color: #eeeeee; border: 0; }
 .platform-macos .utility-window { background: rgb(20 20 20 / 18%); border-radius: 14px; }
