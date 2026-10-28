@@ -1,6 +1,6 @@
 # FTA · File Transfer Anything
 
-같은 로컬 네트워크에 있는 내 컴퓨터 사이에서 **파일·텍스트·URL을 보내는 전송 앱**이다. Windows·macOS에서는 작은 데스크톱 창으로, 화면 없는 Linux 서버에서는 CLI와 백그라운드 엔진으로 사용한다. 클라우드 중계 없이 기기 사이에서 직접 전송하며, Codex·Claude 같은 MCP 클라이언트에서도 등록된 기기로 보낼 수 있다.
+같은 로컬 네트워크에 있는 내 컴퓨터 사이에서 **파일·텍스트·URL을 보내는 전송 앱**이다. macOS·Windows에서는 작은 데스크톱 창으로, 화면 없는 Linux 서버에서는 CLI와 백그라운드 엔진으로 사용한다. 클라우드 중계 없이 기기 사이에서 직접 전송하며, Codex·Claude 같은 MCP 클라이언트에서도 등록된 기기로 보낼 수 있다.
 
 FTA는 **File Transfer Anything**의 약자다.
 
@@ -10,33 +10,35 @@ FTA는 **File Transfer Anything**의 약자다.
 - **텍스트·URL 전송**: 짧은 메모와 링크를 보내고 수신 기록에서 내용을 확인·복사하거나 링크를 연다.
 - **처음 한 번 기기 등록**: 감지된 컴퓨터에 처음 보내면 상대가 등록을 허용한다. 이후 등록된 온라인 기기는 매번 승인하지 않고 수신한다.
 - **지정 폴더에 자동 저장**: 수신 파일을 설정한 폴더에 저장하며 같은 이름의 기존 파일을 덮어쓰지 않는다.
-- **백그라운드 수신**: Windows 트레이와 macOS 메뉴 막대에서 앱을 유지하고 수신 알림을 받는다.
+- **OS에 맞는 데스크톱 앱**: macOS는 Mac 스타일과 메뉴 막대, Windows는 Windows 스타일과 트레이를 제공한다. 두 플랫폼 모두 파일 드래그 전송과 백그라운드 수신·알림을 지원한다.
 - **Linux·MCP 지원**: GUI 없이 파일·텍스트·URL을 송수신하고, MCP에서는 허용한 폴더의 파일을 등록된 온라인 기기로 보낸다.
 
 현재 연결 가능한 기기에 전송한다. 외부 네트워크 접속, 상대 폴더 탐색, 오프라인 기기로의 나중 전달은 지원 범위에 포함하지 않는다. 수신 파일과 URL은 자동 실행하지 않는다.
 
 ## 다운로드와 플랫폼
 
-Windows x64 설치 파일은 [Releases](https://github.com/froiibn/FTA/releases)에서 다운로드한다. 현재 Windows 배포본은 [v0.1.1](https://github.com/froiibn/FTA/releases/tag/v0.1.1)이며 SHA-256과 빌드 정보를 함께 제공한다. 설치 파일을 사용할 때는 Rust·Node.js 같은 개발 도구가 필요 없다.
+**macOS와 Windows 설치 파일을 모두 제공한다.** [Releases](https://github.com/froiibn/FTA/releases)에서 플랫폼에 맞는 설치 파일과 SHA-256·빌드 정보를 내려받는다. 설치 파일을 사용할 때는 Rust·Node.js 같은 개발 도구가 필요 없다.
 
-| 플랫폼 | 사용 형태 | 설치·빌드 안내 |
+| 플랫폼 | 제공 파일 | 설치·사용 안내 |
 |---|---|---|
-| Windows | 데스크톱 앱·트레이, Windows 전용 어두운 스타일 | [x64 설치·빌드](packaging/windows/README.md) |
-| macOS | 데스크톱 앱·메뉴 막대, Mac 전용 스타일 | [앱·DMG 설치·빌드](packaging/macos/README.md) |
-| Linux | CLI·백그라운드 엔진, systemd 사용자 서비스 | [서버 설치·서비스](packaging/linux/README.md) |
+| macOS · Apple Silicon | [DMG · v0.1.0](https://github.com/froiibn/FTA/releases/download/v0.1.0/FTA_0.1.0_aarch64.dmg) | [앱 설치·메뉴 막대·빌드](packaging/macos/README.md) |
+| Windows · x64 | [설치 프로그램 · v0.1.1](https://github.com/froiibn/FTA/releases/download/v0.1.1/FTA_0.1.1_x64-setup.exe) | [앱 설치·트레이·빌드](packaging/windows/README.md) |
+| Linux | 소스에서 CLI·엔진 빌드 | [서버 설치·systemd 서비스](packaging/linux/README.md) |
 
-Windows 설치 기본 위치는 OS의 Program Files 아래 `FTA`이며 설치 마법사에서 다른 폴더를 선택할 수 있다. 설정·등록 정보는 사용자별 데이터 폴더에, 수신 파일은 사용자가 지정한 수신 폴더에 저장한다.
+macOS는 DMG에서 `FTA.app`을 Applications로 옮겨 설치하고, Windows는 설치 마법사에서 설치 폴더를 선택한다. 설정·등록 정보는 사용자별 데이터 폴더에, 수신 파일은 사용자가 지정한 수신 폴더에 저장한다.
+
+현재 공개된 설치 파일의 버전은 플랫폼별로 다르다. GitHub의 macOS v0.1.0 DMG는 수동 등록 방식이며, 아래의 최초 전송 승인 방식은 이 기능이 포함된 최신 소스를 양쪽 기기에 적용해야 사용할 수 있다.
 
 ## 처음 사용하기
 
 1. 보내는 기기와 받는 기기에 앱 또는 엔진을 실행한다. 최초 전송 등록을 사용하려면 양쪽 모두 이 기능이 포함된 버전을 사용한다.
-2. 설정에서 기기 이름·수신 폴더·LAN 연결을 확인한다. Windows는 신뢰하는 연결을 개인 네트워크로 설정하고 FTA의 수신을 허용한다.
+2. 각 기기의 설정에서 기기 이름·수신 폴더·신뢰하는 LAN 연결을 확인하고 필요한 수신 권한을 허용한다. OS별 설정은 위의 설치·사용 안내를 따른다.
 3. 연결 설정을 저장한 뒤 **서비스 재시작**으로 적용한다. 같은 네트워크 기기 자동 발견도 켠다.
 4. 감지된 컴퓨터를 선택해 파일·텍스트·URL을 보낸다. 처음 한 번 상대의 등록 허용을 받으면 이후에는 바로 전송한다.
 
 등록 승인 전에는 파일 본문·텍스트·URL을 상대에게 보내지 않는다. 등록된 기기도 실제 온라인 상태와 인증을 확인한 뒤 전송한다. Linux에서 받는 경우 CLI로 등록 요청을 확인하고 허용한다. 자세한 동작과 CLI 명령은 [최초 전송 등록 안내](docs/first-send-registration.md)를 참고한다.
 
-현재 구현과 OS별 실기 검증·남은 항목은 [구현 현황](docs/implementation-status.md)과 [검증 계획](docs/verification-plan.md)에 정리한다. Windows v0.1.1은 로컬 컴파일·패키징과 배포 파일 해시를 확인한 빌드이며, 해당 설치본의 설치·실행·실제 전송 검증과는 구분한다.
+플랫폼별 빌드 정보·서명·검증 범위는 각 릴리스에서 확인한다. 현재 구현과 macOS·Windows·Linux의 실기 검증·남은 항목은 [구현 현황](docs/implementation-status.md)과 [검증 계획](docs/verification-plan.md)에 정리한다.
 
 ## 확정 기술 스택
 
