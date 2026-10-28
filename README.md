@@ -1,8 +1,8 @@
-# FTA
+# FTA · File Transfer Anything
 
 같은 로컬 네트워크에 있는 내 컴퓨터 사이에서 **파일·텍스트·URL을 보내는 전송 앱**이다. Windows·macOS에서는 작은 데스크톱 창으로, 화면 없는 Linux 서버에서는 CLI와 백그라운드 엔진으로 사용한다. 클라우드 중계 없이 기기 사이에서 직접 전송하며, Codex·Claude 같은 MCP 클라이언트에서도 등록된 기기로 보낼 수 있다.
 
-FTA는 현재 프로젝트의 작업 명칭이다.
+FTA는 **File Transfer Anything**의 약자다.
 
 ## 주요 기능
 
