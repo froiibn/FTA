@@ -2,7 +2,11 @@
 
 현재 릴리즈는 Apple Silicon(arm64)용이다. Intel Mac용 실행·빌드 검증은 수행하지 않았다.
 
-## 설치
+## 0.1.2 사전 릴리스
+
+[0.1.2 릴리스](https://github.com/froiibn/FTA/releases/tag/v0.1.2)의 `FTA_0.1.2_aarch64.dmg`는 로컬 Mac에서 만든 Developer ID 서명 설치 파일이다. 이번 빌드에서는 공증 인증 정보를 사용할 수 없어 공증·티켓 첨부를 수행하지 않는다. Gatekeeper 공증 통과를 주장하지 않으며 인터넷 다운로드 실행이 차단될 수 있다. 공증 완료 배포본이 필요하면 아래 0.1.1을 사용한다. 0.1.2의 소스·검증·Windows 후속 빌드는 [릴리스 기록](../../docs/releases/0.1.2.md)을 따른다.
+
+## 0.1.1 설치
 
 1. 공개된 [v0.1.1 릴리스](https://github.com/froiibn/FTA/releases/tag/v0.1.1)에서 [FTA_0.1.1_aarch64.dmg](https://github.com/froiibn/FTA/releases/download/v0.1.1/FTA_0.1.1_aarch64.dmg)와 [SHA256SUMS-macos-0.1.1.txt](https://github.com/froiibn/FTA/releases/download/v0.1.1/SHA256SUMS-macos-0.1.1.txt)를 내려받는다.
 2. `shasum -a 256 FTA_0.1.1_aarch64.dmg` 결과를 체크섬 파일과 비교한다.

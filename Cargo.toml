@@ -1,6 +1,6 @@
 # Keep headless builds independent of the desktop WebView dependency graph.
 [workspace]
-members = ["crates/fta-core", "crates/fta-engine", "crates/fta-cli", "crates/fta-platform", "crates/fta-mcp", "crates/fta-network-helper", "apps/desktop/src-tauri"]
+members = ["crates/fta-core", "crates/fta-engine", "crates/fta-cli", "crates/fta-platform", "crates/fta-mcp", "crates/fta-network-helper", "apps/desktop/src-tauri", "apps/ios/bridge"]
 default-members = ["crates/fta-core", "crates/fta-engine", "crates/fta-cli", "crates/fta-platform", "crates/fta-mcp"]
 resolver = "2"
 

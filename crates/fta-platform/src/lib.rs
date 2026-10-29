@@ -50,3 +50,9 @@ pub fn publish_noreplace(
         windows::publish_noreplace(source, destination)
     }
 }
+
+// iOS receives sandbox locations from Foundation; desktop path discovery remains unchanged.
+#[cfg(target_os = "ios")]
+pub mod ios;
+#[cfg(target_os = "ios")]
+pub use ios::paths;

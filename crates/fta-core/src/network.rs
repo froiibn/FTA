@@ -19,11 +19,14 @@ use tokio::io::AsyncWriteExt;
 // First-send approval reuses the isolated registration transport, never the file receiver.
 pub mod approval;
 
+#[cfg(not(target_os = "ios"))]
 const SERVICE_TYPE: &str = "_fta._tcp.local.";
 const MAX_META: usize = 256 * 1024;
 const CHUNK_SIZE: usize = 64 * 1024;
 const MAX_CONNECTIONS: usize = 32;
+#[cfg(not(target_os = "ios"))]
 const MAX_DISCOVERED_DEVICES: usize = 1000;
+#[cfg(not(target_os = "ios"))]
 const PAIR_SERVICE_TYPE: &str = "_fta-pair._tcp.local.";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 const REVOCATION_POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -272,6 +275,7 @@ fn cached_pairing_target(e: &Engine, target: &str) -> Result<Option<String>> {
 }
 
 // Refresh only registration discovery; never guess the ordinary transfer port or replay /pair/hello.
+#[cfg(not(target_os = "ios"))]
 async fn resolve_pairing_target(e: &Engine, target: &str) -> Result<String> {
     if target.parse::<SocketAddr>().is_ok() {
         return Ok(target.into());
@@ -697,9 +701,8 @@ async fn route(
             let root = e.store.receive_root(id)?;
             for (index, item) in transfer.items.iter().enumerate() {
                 if item.state != "completed" {
-                    let path = root
-                        .join(".fta-partials")
-                        .join(format!("{id}-{index}.part"));
+                    let path =
+                        crate::storage::partials_dir(&root)?.join(format!("{id}-{index}.part"));
                     match tokio::fs::remove_file(path).await {
                         Ok(()) => {}
                         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
@@ -758,9 +761,7 @@ async fn route(
     }
     let root = e.store.receive_root(id)?;
     receiving_dir(&root)?;
-    let temp = root
-        .join(".fta-partials")
-        .join(format!("{id}-{index}.part"));
+    let temp = crate::storage::partials_dir(&root)?.join(format!("{id}-{index}.part"));
     if parts[5] == "body" && method == hyper::Method::PUT {
         // A duplicate upload must not replace a terminal record with a new failure or remove committed data.
         if transfer.items[index].state != "pending" {
@@ -1060,6 +1061,21 @@ pub fn validate_url(text: &str) -> Result<()> {
     }
     Ok(())
 }
+/// A discovered device is still untrusted. A bounded TCP check only keeps dead advertisements
+/// out of the picker; first-send TLS identity binding and recipient consent remain mandatory.
+pub async fn discovered_reachable(e: &Engine, device: &Device) -> bool {
+    if e.ensure_network().is_err() {
+        return false;
+    }
+    let Ok(address) = allowed_address(e, &device.address) else {
+        return false;
+    };
+    tokio::select! {
+        result=tokio::time::timeout(Duration::from_secs(CONNECT_SECONDS),tokio::net::TcpStream::connect(address))=>matches!(result,Ok(Ok(_))),
+        _=e.network_token.cancelled()=>false,
+    }
+}
+
 pub async fn probe(e: &Engine, device: &Device) -> Result<Value> {
     let address = allowed_address(e, &device.address)?;
     let cert = hex::decode(&device.certificate)
@@ -1379,6 +1395,7 @@ impl Drop for PairAdvertisement {
         }
     }
 }
+#[cfg(not(target_os = "ios"))]
 fn discovery_daemon(config: &Config) -> Result<mdns_sd::ServiceDaemon> {
     let daemon = mdns_sd::ServiceDaemon::new().map_err(net_error)?;
     daemon
@@ -1389,6 +1406,7 @@ fn discovery_daemon(config: &Config) -> Result<mdns_sd::ServiceDaemon> {
         .map_err(net_error)?;
     Ok(daemon)
 }
+#[cfg(not(target_os = "ios"))]
 fn service_info(config: &Config, service_type: &str, port: u16) -> Result<mdns_sd::ServiceInfo> {
     let host = format!("fta-{}.local.", config.device_id);
     let properties = [
@@ -1407,6 +1425,7 @@ fn service_info(config: &Config, service_type: &str, port: u16) -> Result<mdns_s
     )
     .map_err(net_error)
 }
+#[cfg(not(target_os = "ios"))]
 fn advertise_pairing(e: &Engine, session: &PairSession) -> Result<Option<mdns_sd::ServiceDaemon>> {
     let config = e.config()?;
     if !config.discovery_enabled || config.listen_addr.ip().is_loopback() {
@@ -1423,6 +1442,7 @@ fn advertise_pairing(e: &Engine, session: &PairSession) -> Result<Option<mdns_sd
     Ok(Some(daemon))
 }
 /// Only address hints are accepted from discovery; authentication always happens on the TLS socket.
+#[cfg(not(target_os = "ios"))]
 fn apply_discovery_event(
     e: &Engine,
     config: &Config,
@@ -1490,6 +1510,7 @@ fn apply_discovery_event(
     Ok(())
 }
 /// Browse temporary registration endpoints separately from ordinary transfer listeners.
+#[cfg(not(target_os = "ios"))]
 pub fn start_discovery(e: Arc<Engine>) -> Result<Option<mdns_sd::ServiceDaemon>> {
     let config = e.config()?;
     e.ensure_network()?;
@@ -1800,5 +1821,37 @@ mod discovery_tests {
         assert_eq!(reconciled["state"], "completed");
         assert_eq!(receiver.store.history(100).unwrap().len(), 1);
         server.abort();
+    }
+}
+
+// The iOS host publishes actual bound ports with NetService and feeds resolved LAN hints back.
+#[cfg(target_os = "ios")]
+fn advertise_pairing(_: &Engine, _: &PairSession) -> Result<Option<mdns_sd::ServiceDaemon>> {
+    Ok(None)
+}
+#[cfg(target_os = "ios")]
+pub fn start_discovery(_: Arc<Engine>) -> Result<Option<mdns_sd::ServiceDaemon>> {
+    Ok(None)
+}
+
+// Native Bonjour may resolve after the send tap; wait only within the existing online budget.
+#[cfg(target_os = "ios")]
+async fn resolve_pairing_target(e: &Engine, target: &str) -> Result<String> {
+    if target.parse::<SocketAddr>().is_ok() {
+        return Ok(target.into());
+    }
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(CONNECT_SECONDS);
+    loop {
+        e.ensure_network()?;
+        if let Some(address) = cached_pairing_target(e, target)? {
+            return Ok(address);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(Error::new(
+                "PAIRING_NOT_FOUND",
+                "registration endpoint not discovered",
+            ));
+        }
+        tokio::time::sleep(PAIR_LOOKUP_POLL_INTERVAL).await;
     }
 }

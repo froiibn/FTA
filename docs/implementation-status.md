@@ -110,3 +110,25 @@ npm --prefix apps/desktop run build
 ## 실제 Mac ↔ Windows LAN 시험 (2026-10-25)
 
 실제 기기의 양방향 파일 전송과 해시 대조, 양쪽 수신의 기존 파일 보존을 확인했다. 시험 환경·전송 ID·검증 범위는 [실기 결과](lan-test-2026-10-25.md)를 따른다. 이는 전체 4대 12방향·GUI 드롭·OS 알림 검증을 대체하지 않는다.
+
+## iOS 네이티브 초안 (2026-10-29)
+
+사용자 지시로 별도 `apps/ios`의 SwiftUI 기본 컨트롤·탭바 앱과 공통 Rust 정적 라이브러리 브리지를 추가했다. 파일·텍스트·URL 송수신, 최초 수신자 등록 승인, 실제 기기 목록·PC와 동일한 컴퓨터 아이콘·휴대폰 아이콘, 파일 앱 수신 폴더, 기록·Quick Look·공유·복사·사용자 링크 열기·취소·등록 해제·알림 커서를 연결했다. 앱 전면 수신을 기준으로 하며 백그라운드·잠금 시 중지한다. 기존 데스크톱 소스와 Linux·MCP 경로는 유지한다.
+
+Mac headless 79개(기존 ignored 1개 별도), 데스크톱 10개, 브리지 실제 localhost TLS 검사 1개, 시뮬레이터 UI 검사 2개가 통과했다. fmt·headless/desktop/bridge Clippy·iOS 두 타깃 Clippy·TypeScript/Vite·시뮬레이터 빌드·기기용 unsigned Debug 빌드를 확인했다. 실제 iPhone 설치·LAN 전송·OS 알림 및 Windows/Linux 재실행은 미검증이다. [설계·정확한 검증 범위](platforms/ios.md), [로컬 빌드](../apps/ios/README.md). GitHub Actions는 사용하지 않았다.
+
+## 온라인 기기 목록 정리 (2026-10-29)
+
+Windows·macOS 전송·드롭 목록과 iOS 보내기 목록에서 오프라인 등록을 제외했다. 설정의 등록 해제 정보는 보존한다. 같은 ID의 주소 변경은 기존 pin 인증 후 갱신하고, 이름만 같은 다른 ID를 신뢰하거나 병합하지 않는다. 미등록 발견 후보도 TCP 접속 가능성을 확인해 갑작스러운 Wi-Fi 단절로 mDNS goodbye가 유실된 항목을 다음 조회에서 제외한다. 이 확인은 자동 등록·본문 전송을 하지 않는다. iOS는 NWPath의 Wi-Fi/유선 LAN 상실 시 확인·선택을 즉시 해제하고 이전 연결의 늦은 조회 응답을 폐기한다.
+
+Mac에서 headless 81개 통과(기존 ignored 1개), 데스크톱 10개, 브리지 1개와 fmt·headless/desktop/bridge Clippy·iOS 두 타깃 Clippy·TypeScript/Vite를 확인했다. 주소 변경·동일 이름의 이전 등록·goodbye 없는 리스너 단절·신뢰 저장 미변경 회귀를 포함한다. iOS 시뮬레이터 UI 2개가 통과했고 중지 후 빈 전송 목록을 시각 검토했다(`output/ios-online-only.xcresult`). 사용자 상태 확인 요청 후 실행 중인 빌드·테스트가 없고 마지막 UI 검사가 통과했음을 확인한 뒤 마지막 네트워크 중지 경계를 포함해 Rust·Mac 검사를 다시 실행했다. iPhone용 unsigned 빌드도 통과했다. 실제 iPhone Wi-Fi 차단·원격 모바일 단절과 Windows/Linux 재실행은 아직 미검증이며 GitHub Actions는 사용하지 않았다.
+
+## 모바일 미디어·기기 아이콘 보완과 iPhone 업데이트 (2026-10-29)
+
+사용자 확인으로 실제 모바일 LAN 연결과 메시지 전송이 성공했다. PC 목록은 여전히 컴퓨터 아이콘으로 고정되어 있음을 코드에서 확인해 ios/android를 휴대폰 윤곽으로 분기했다. TypeScript/Vite 빌드와 Mac 데스크톱 check·테스트 10개·Clippy가 통과했다. PC 설치본은 이번 작업에서 교체하지 않았다.
+
+iOS의 텍스트/URL Picker를 제거하고 단일 TextEditor와 HTTP(S) 자동 판별로 바꿨다. 사진은 갤러리 PHPicker와 권한 확인 후 시스템 카메라, 파일은 기존 파일 앱으로 나눴다. 사진·파일 초안을 분리하고 실제 사진 파일을 비공개 Outgoing으로 준비해 기존 Rust 스트리밍을 사용한다. 대상은 흰색 윤곽·짙은 중성색 받침·PC와 같은 초록/주황 상태 점을 사용한다. 새 외부 라이브러리는 추가하지 않았다.
+
+메시지 판별 11개 경계가 통과했다. 시뮬레이터 UI 3개가 통과했으며 최종 결과는 `output/ios-media-final.xcresult`다. 갤러리를 실제 로딩하고 사진을 선택·추가하여 사진 보내기 준비 완료와 파일 초안 미변경을 검사했다. 자체 앱 아이콘 PNG를 시뮬레이터 사진 fixture로 추가해 준비 파일의 SHA-256이 원본과 같음을 확인했다. 실제 LAN 발견 기기·사진/파일 분리·단일 입력 화면을 시각 검토했다. iPhone 카메라 촬영·실제 사진 송신은 아직 미검증이다.
+
+사용자가 Xcode에서 설정한 서명 팀과 bundle ID를 유지한 서명 빌드가 성공했다. 연결된 실제 iPhone에 기존 앱을 삭제하지 않고 0.1.0 빌드 2를 설치했다. devicectl에서 설치 버전과 새 앱 프로세스 실행을 확인했고, 업데이트 전후 기기 ID가 동일함을 확인했다. 카메라·사진 권한을 사용자를 대신해 승인하거나 사진을 임의 촬영하지 않았다. GitHub Actions·릴리스 배포는 수행하지 않았다.

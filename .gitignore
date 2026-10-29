@@ -9,3 +9,7 @@
 # Sidecars and platform tool caches are regenerated from tracked Rust sources.
 /apps/desktop/src-tauri/binaries/
 **/__pycache__/
+
+# Keep Xcode device/window state and personal signing choices outside published source.
+**/xcuserdata/
+/apps/ios/FTA/LocalSigning.xcconfig

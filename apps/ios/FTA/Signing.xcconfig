@@ -1,0 +1,2 @@
+// Each developer supplies their own signing team without changing published project settings.
+#include? "LocalSigning.xcconfig"

@@ -1,0 +1,23 @@
+[package]
+name = "fta-ios"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+fta-core = { path = "../../../crates/fta-core" }
+fta-platform = { path = "../../../crates/fta-platform" }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "net"] }
+uuid = { version = "1", features = ["v4"] }
+ipnet = "2"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tempfile = "3"

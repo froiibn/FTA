@@ -371,3 +371,96 @@ mod lifecycle {
             .expect("fixture engine must shut down cleanly");
     }
 }
+
+// DHCP/port changes reuse one authenticated identity; old offline registrations stay out of send targets.
+#[tokio::test]
+async fn available_targets_replace_old_endpoints_and_hide_disconnected_peers() {
+    let (_ad, a) = engine();
+    let (_bd, b) = engine();
+    let closed = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let old_address = closed.local_addr().unwrap().to_string();
+    drop(closed);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    b.config.write().unwrap().listen_addr = listener.local_addr().unwrap();
+    let mut saved = b.own_device().unwrap();
+    saved.address = old_address;
+    a.store.save_device(&saved).unwrap();
+    b.store.save_device(&a.own_device().unwrap()).unwrap();
+    let server = b.clone();
+    let task = tokio::spawn(async move { network::serve(server, listener, false).await });
+    let discovered = b.own_device().unwrap();
+    a.discovered
+        .lock()
+        .unwrap()
+        .insert(discovered.device_id.clone(), discovered);
+    // Another saved identity with the same display name must not be merged or trusted by name.
+    let (_retired_dir, retired) = engine();
+    let mut retired_device = retired.own_device().unwrap();
+    retired_device.address = saved.address.clone();
+    retired_device.display_name = saved.display_name.clone();
+    a.store.save_device(&retired_device).unwrap();
+    let targets = a
+        .dispatch("devices.list", json!({"available_only":true}))
+        .await
+        .unwrap();
+    assert_eq!(targets.as_array().unwrap().len(), 1);
+    assert_eq!(targets[0]["device_id"], b.config().unwrap().device_id);
+    assert_eq!(targets[0]["online"], true);
+    assert_eq!(
+        a.store.device(&saved.device_id).unwrap().address,
+        b.config().unwrap().listen_addr.to_string()
+    );
+    assert_eq!(a.store.devices().unwrap().len(), 2);
+    task.abort();
+    let _ = task.await;
+    assert!(
+        a.dispatch("devices.list", json!({"available_only":true}))
+            .await
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(a.store.devices().unwrap().len(), 2);
+}
+
+// Abrupt Wi-Fi loss can omit mDNS removal. A stale unregistered advertisement must not linger forever.
+#[tokio::test]
+async fn discovered_targets_require_reachability_without_starting_registration() {
+    let (_ad, a) = engine();
+    let (_bd, b) = engine();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    b.config.write().unwrap().listen_addr = listener.local_addr().unwrap();
+    let discovered = b.own_device().unwrap();
+    a.discovered
+        .lock()
+        .unwrap()
+        .insert(discovered.device_id.clone(), discovered);
+    let targets = a
+        .dispatch("devices.list", json!({"available_only":true}))
+        .await
+        .unwrap();
+    assert_eq!(targets.as_array().unwrap().len(), 1);
+    assert_eq!(targets[0]["paired"], false);
+    assert!(a.store.devices().unwrap().is_empty());
+    assert!(a.sessions.lock().unwrap().is_empty());
+    drop(listener);
+    assert!(
+        a.dispatch("devices.list", json!({"available_only":true}))
+            .await
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(a.discovered.lock().unwrap().len(), 1); // no goodbye was delivered
+    a.suspend_network().unwrap();
+    assert!(
+        a.dispatch("devices.list", json!({"available_only":true}))
+            .await
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+}
