@@ -1,0 +1,9 @@
+FTA has no user-account login. Device registration is a recipient-approved trust step, not an account login.
+
+Use two iOS devices with this review build on the same private IPv4 Wi-Fi/LAN, or use a desktop FTA peer from https://github.com/froiibn/FTA/releases . The network must permit traffic between devices (guest/client isolation prevents LAN discovery).
+
+On each iOS device, open Settings, confirm the displayed LAN as trusted and enable sending/receiving. Keep FTA in the foreground. Select the discovered peer and send text. The recipient approves initial device registration before message bodies or file names are sent. Subsequent transfers between registered online peers need no per-transfer approval. This is a private LAN device-transfer utility, without a public feed, a public discovery service or random chat.
+
+Photos offers the native library picker or explicit camera capture. Files uses the native document picker. Final received files are in Files > On My iPhone / On My iPad > FTA > 받은 파일 (the established folder name is retained). The history distinguishes completed, partial, failed and unknown results. Files and links never open automatically.
+
+Sending/receiving stop in the background, when locked, or when Wi-Fi disconnects. There is no Internet relay or offline queue. Local history and legal documents remain available offline. Privacy Policy, Support and Open Source Notices are under Settings > Privacy and support in English, or 개인정보 및 지원 in Korean. The policy is provided in Korean and English; license originals are preserved.
