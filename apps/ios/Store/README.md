@@ -19,7 +19,7 @@
 python3 apps/ios/scripts/generate-localizations.py --check
 python3 apps/ios/scripts/generate-notices.py --check
 python3 apps/ios/scripts/generate-project.py
-python3 apps/ios/scripts/validate-release.py output/FTA-iOS-0.1.2-build9-global.xcarchive
+python3 apps/ios/scripts/validate-release.py output/FTA-iOS-0.1.2-build9-runtime-notices.xcarchive
 xcrun swiftc -parse-as-library apps/ios/scripts/render-store-images.swift -o output/render-store-images
 output/render-store-images
 ```
@@ -28,7 +28,7 @@ output/render-store-images
 
 `PrivacyInfo.xcprivacy`에는 실제 사용하는 UserDefaults(CA92.1), 파일 메타데이터(C617.1/3B52.1)만 선언한다. iOS는 Apple 시스템 SQLite를 연결한다. Android·데스크톱은 bundled SQLite를 유지한다. 최종 archive는 statfs/fstatfs/statvfs/fstatvfs를 import하지 않으며 시스템 SQLite와 실제 연결됨을 검사한다. 존재하지 않는 디스크 공간 사용 목적을 선언하지 않는다.
 
-`generate-notices.py`는 잠긴 iOS normal/build 의존성 그래프의 외부 패키지 169개와 원문 라이선스/저작권을 재현한다. 배포 바이너리와 빌드 도구의 구분을 고지한다. 누락된 asn1-rs-impl 원문 라이선스의 출처와 해시는 `../LegalSources/`에 보존한다.
+`generate-notices.py`는 잠긴 iOS normal/build 의존성 그래프의 외부 패키지 169개와 Rust 표준 라이브러리 별도 항목의 원문 라이선스/저작권을 재현한다. Rust sysroot는 Cargo 그래프에 나오지 않으므로 `generate-runtime-notices.py`가 동일 툴체인의 공식 COPYRIGHT/라이선스와 iOS target rlib 목록에서 런타임 의존성 계열의 고지를 추출한다. 이 고지는 일부 빌드/디버그·플랫폼 변형을 포함할 수 있으며 모든 나열 버전이 앱에 링크됐다는 주장은 아니다. 툴체인 commit과 고지 해시가 다르면 빌드를 차단하고 재검토한다. 배포 바이너리와 빌드 도구의 구분을 고지한다. 누락된 asn1-rs-impl 원문 라이선스의 출처와 해시는 `../LegalSources/`에 보존한다.
 
 ## 스크린샷과 메타데이터
 
@@ -75,3 +75,5 @@ output/render-store-images
 - [Export compliance](https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance/).
 
 최종 추가 검사: `cargo fmt --all --check`, 기본 `cargo test --locked`(83 통과·기존 수동 1 제외), iOS bridge 검사(1 통과), 기본 및 iOS bridge `clippy --all-targets -- -D warnings`를 macOS에서 통과했다. iPhone 시뮬레이터를 실제 다크 외관·접근성 큰 텍스트로 설정해 10개 언어의 사진/파일 버튼 도달과 사진 소스 메뉴 조작도 추가로 통과했다(한 테스트가 10개 로케일을 순회). VoiceOver 사용성 전체를 검증했다거나 App Store 손쉬운 사용 인증을 받았다는 의미는 아니다.
+
+Rust 표준 라이브러리 고지까지 포함한 최신 archive는 `output/FTA-iOS-0.1.2-build9-runtime-notices.xcarchive`다. 앞선 `global`/`system-sqlite` archive와 사전 IPA는 최종 업로드 대상이 아니다. Cargo 외부 의존성 169개에 더해 Rust 툴체인 런타임의 공식 저작권/라이선스 항목을 별도로 포함하며, 소스 구현이나 새 라이브러리는 추가하지 않는다. 배포 검증은 디버깅 권한뿐 아니라 실제 Apple Distribution 서명과 App Store 프로파일의 유형·만료·앱/팀 식별자 일치도 확인한다.

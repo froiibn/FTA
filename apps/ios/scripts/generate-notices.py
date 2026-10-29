@@ -64,8 +64,31 @@ def generate():
         entries.append(f"{key[0]} {key[1]}\nLicense expression: {package['license']}\nSource: {package['repository'] or package['source']}{source_note}\n" + "\n".join(references))
         index.append({"name": key[0], "version": key[1], "license": package["license"],
                       "source": package["repository"] or package["source"], "notices": linked_texts})
+    # Cargo omits sysroot libraries: retain the matching toolchain's runtime copyrights as well.
+    compiler = dict(line.split(": ", 1) for line in subprocess.check_output(
+        ["rustc", "--version", "--verbose"], text=True).splitlines() if ": " in line)
+    runtime = IOS / "LegalSources" / f"rust-runtime-{compiler['release']}"
+    provenance = json.loads((runtime / "provenance.json").read_text())
+    if compiler["commit-hash"] != provenance["commit"]:
+        raise RuntimeError("Rust runtime attribution does not match this compiler; refresh/review runtime notices")
+    references = []
+    linked_texts = []
+    for name, expected in provenance["files"].items():
+        text = (runtime / name).read_text()
+        digest = hashlib.sha256(text.encode()).hexdigest()
+        if digest != expected:
+            raise RuntimeError(f"Runtime notice hash mismatch: {name}")
+        texts[digest] = text
+        references.append(f"  {name}: {digest}")
+        linked_texts.append({"file": name, "digest": digest})
+    source = "https://github.com/rust-lang/rust/tree/" + provenance["commit"] + "/library"
+    entries.append(f"Rust standard libraries {compiler['release']}\nSource: {source}\n" + "\n".join(references))
+    index.append({"name": "Rust standard libraries", "version": compiler["release"],
+                  "license": "Multiple licenses; see reproduced runtime notices", "source": source,
+                  "notices": linked_texts})
     header = ("FTA iOS — Third-party notices\n\n"
               "This inventory covers existing normal and build-time dependencies of fta-ios for aarch64-apple-ios.\n"
+              "Rust sysroot attribution is separately included because Cargo does not inventory standard libraries.\n"
               "Build tools/procedural macros and optional source notices may be listed even when their code is not shipped.\n"
               "License texts are reproduced unchanged; identical texts share their SHA-256 reference.\n"
               "No dependency implementation source is included in this notice document.\n\n")

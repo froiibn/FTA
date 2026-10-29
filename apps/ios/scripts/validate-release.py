@@ -3,8 +3,27 @@
 from pathlib import Path
 import argparse
 import json
+from datetime import datetime
 import plistlib
 import subprocess
+
+
+def validate_distribution_signing(bundle, info, entitlements):
+    # A non-debug ad-hoc signature is insufficient: validate the actual App Store profile type.
+    details = subprocess.run(["codesign", "-dv", "--verbose=2", str(bundle)], capture_output=True, text=True, check=True).stderr
+    if not any(line.startswith(("Authority=Apple Distribution:", "Authority=iPhone Distribution:")) for line in details.splitlines()):
+        raise SystemExit("Expected an Apple distribution signing identity")
+    profile = plistlib.loads(subprocess.check_output(["security", "cms", "-D", "-i", str(bundle / "embedded.mobileprovision")]))
+    granted = profile["Entitlements"]
+    if profile.get("ProvisionedDevices") or profile.get("ProvisionsAllDevices") or granted.get("get-task-allow"):
+        raise SystemExit("Expected an App Store profile, not development/ad-hoc/enterprise provisioning")
+    if profile["ExpirationDate"] <= datetime.utcnow():
+        raise SystemExit("App Store profile has expired")
+    application = entitlements.get("application-identifier", "")
+    if application != granted.get("application-identifier") or not application.endswith("." + info["CFBundleIdentifier"]):
+        raise SystemExit("Signed app and provisioning profile identifiers differ")
+    if entitlements.get("com.apple.developer.team-identifier") != granted.get("com.apple.developer.team-identifier"):
+        raise SystemExit("Signed app and provisioning team differ")
 
 
 def validate(bundle, require_distribution):
@@ -24,7 +43,7 @@ def validate(bundle, require_distribution):
     for category, values in expected.items():
         if not values.issubset(reasons.get(category, set())):
             raise SystemExit(f"Missing reviewed privacy API reason: {category}")
-    if manifest["NSPrivacyTracking"] or manifest["NSPrivacyTrackingDomains"]:
+    if manifest["NSPrivacyTracking"] or manifest["NSPrivacyTrackingDomains"] or manifest.get("NSPrivacyCollectedDataTypes"):
         raise SystemExit("Unexpected tracking declaration; review actual data handling")
     root = Path(__file__).resolve().parents[1]
     # Check the packaged tables, not only source catalogs: stale Xcode resources can otherwise pass.
@@ -54,6 +73,8 @@ def validate(bundle, require_distribution):
     development = entitlements.get("get-task-allow", False)
     if require_distribution and development:
         raise SystemExit("Development signing is not an App Store distribution export")
+    if require_distribution:
+        validate_distribution_signing(bundle, info, entitlements)
     if archived:
         # System SQLite is intentional on iOS; a feature-unification regression must not reintroduce
         # bundled SQLite's filesystem probes under a made-up available-disk-space reason.
