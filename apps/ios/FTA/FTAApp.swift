@@ -144,7 +144,7 @@ struct SendView: View {
                     Text("연결 가능한 기기").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                     if model.targets.isEmpty {
                         ContentUnavailableView(model.running ? "발견된 기기가 없습니다" : "송수신을 시작하세요",systemImage:"network",description:Text(model.running ? "같은 LAN에서 상대 FTA를 실행하세요." : "설정에서 집 네트워크를 확인하세요."))
-                            .fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity).padding(.vertical,8)
+                            .frame(maxWidth:.infinity).padding(.vertical,8)
                     } else {
                         // Native horizontal scrolling responds to a finger drag without a visible scrollbar.
                         ScrollView(.horizontal) {
@@ -305,18 +305,18 @@ struct SendView: View {
     }
 }
 
+// Keep the existing history layout/background; only the explicitly requested text color changes.
 struct HistoryView: View {
     @EnvironmentObject var model: AppModel
     @State private var filter = "all"
     var body: some View {
         List {
-            Text("기록").font(.largeTitle.bold()).foregroundStyle(.white).listRowBackground(Color.clear).accessibilityIdentifier("history-heading")
-            Picker("표시",selection:$filter) { Text("전체").tag("all");Text("받음").tag("receive");Text("보냄").tag("send") }.pickerStyle(.segmented).environment(\.colorScheme,.dark).listRowBackground(Color.clear)
-            if model.history.isEmpty { ContentUnavailableView { Label("아직 전송 기록이 없습니다",systemImage:"tray").foregroundStyle(.white) } description: { Text("파일·텍스트·URL의 송수신 결과가 여기에 표시됩니다.").foregroundStyle(.white.opacity(0.7)) }.listRowBackground(Color.clear) }
+            Picker("표시",selection:$filter) { Text("전체").tag("all");Text("받음").tag("receive");Text("보냄").tag("send") }.pickerStyle(.segmented)
+            if model.history.isEmpty { ContentUnavailableView { Label("아직 전송 기록이 없습니다",systemImage:"tray").foregroundStyle(.white) } description: { Text("파일·텍스트·URL의 송수신 결과가 여기에 표시됩니다.").foregroundStyle(.white.opacity(0.7)) } }
             ForEach(model.history.filter { filter == "all" || $0.direction == filter }) { record in
                 Button { Task { await model.openRecord(record.id) } } label: {
                     HStack(spacing:12) {
-                        Image(systemName:record.direction == "receive" ? "arrow.down.circle" : "arrow.up.circle").foregroundStyle(.white)
+                        Image(systemName:record.direction == "receive" ? "arrow.down.circle" : "arrow.up.circle").foregroundStyle(Color.accentColor)
                         VStack(alignment:.leading,spacing:4) {
                             Text(record.title).foregroundStyle(.white).lineLimit(1)
                             Text("\(record.direction == "receive" ? "받음" : "보냄") · \(record.status)").font(.caption).foregroundStyle(.white.opacity(0.7))
@@ -324,9 +324,9 @@ struct HistoryView: View {
                         Spacer()
                         Text(Date(timeIntervalSince1970:record.created_at ?? 0),style:.date).font(.caption2).foregroundStyle(.white.opacity(0.7))
                     }
-                }.listRowBackground(Color.white.opacity(0.08))
+                }
             }
-        }.foregroundStyle(.white).scrollContentBackground(.hidden).background(GlassBackground().environment(\.colorScheme,.dark)).toolbar(.hidden,for:.navigationBar).refreshable { await model.refreshActivity() }
+        }.scrollContentBackground(.hidden).background(GlassBackground()).navigationTitle("기록").refreshable { await model.refreshActivity() }
     }
 }
 
@@ -405,7 +405,6 @@ struct SettingsView: View {
     @State private var removing: Peer?
     var body: some View {
         Form {
-            Text("설정").font(.largeTitle.bold()).listRowBackground(Color.clear)
             Section {
                 TextField("기기 이름",text:$model.name).textContentType(.name)
                 Button("이름 저장") { Task { await model.saveName() } }
@@ -436,7 +435,7 @@ struct SettingsView: View {
                     HStack { PeerIcon(mobile:peer.mobile); Text(peer.display_name); Spacer(); Button("해제",role:.destructive) { removing = peer } }
                 }
             }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
-        }.scrollContentBackground(.hidden).background(GlassBackground()).toolbar(.hidden,for:.navigationBar)
+        }.scrollContentBackground(.hidden).background(GlassBackground()).navigationTitle("설정")
             .confirmationDialog("기기 등록을 해제할까요?",isPresented:Binding(get:{removing != nil},set:{if !$0 {removing = nil}}),titleVisibility:.visible) {
                 if let peer = removing { Button("등록 해제",role:.destructive) { Task { await model.unpair(peer); removing = nil } } }
             } message:{ Text("이 기기의 새 전송을 차단합니다. 다시 보내려면 수신자의 등록 승인이 필요합니다.") }

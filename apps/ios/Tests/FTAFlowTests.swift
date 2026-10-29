@@ -12,7 +12,7 @@ final class FTAFlowTests: XCTestCase {
         XCTAssertFalse(app.buttons["send-message"].isEnabled)
         capture("send-glass",app)
         app.tabBars.buttons["기록"].tap()
-        XCTAssertTrue(app.staticTexts["history-heading"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.navigationBars["기록"].waitForExistence(timeout:5))
         capture("history-glass",app)
         app.tabBars.buttons["설정"].tap()
         XCTAssertTrue(app.switches["신뢰하는 집 네트워크입니다"].waitForExistence(timeout:5))
