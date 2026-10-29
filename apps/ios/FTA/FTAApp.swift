@@ -89,20 +89,26 @@ private struct GlassBackground: View {
         }.ignoresSafeArea(.container)
     }
 }
-// File progress follows real byte counts. Waiting/text transfers use a travelling dash, not a fake percent.
+// Unknown progress stays empty: only measured bytes may fill the green device border.
 private struct TransferBorder: View {
     let fraction: Double?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
-        Group {
+        ZStack {
+            RoundedRectangle(cornerRadius:20).stroke(.white.opacity(0.2),lineWidth:3)
             if let fraction {
-                RoundedRectangle(cornerRadius:20).trim(from:0,to:fraction).stroke(.white,style:StrokeStyle(lineWidth:3,lineCap:.round))
-            } else {
-                TimelineView(.animation(minimumInterval:0.1,paused:reduceMotion)) { context in
-                    RoundedRectangle(cornerRadius:20).stroke(.white,style:StrokeStyle(lineWidth:3,dash:[6,5],dashPhase:reduceMotion ? 0 : -context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:1)*22))
-                }
+                RoundedRectangle(cornerRadius:20).trim(from:0,to:fraction).stroke(.green,style:StrokeStyle(lineWidth:3,lineCap:.round))
             }
         }.accessibilityLabel("전송 진행률").accessibilityValue(fraction.map { "\(Int($0*100))%" } ?? "진행률 확인 중")
+    }
+}
+// Receipt time drives two finite blinks; a new send cannot inherit a repeating animation or stale timer.
+private struct TransferCompletionBlink: ViewModifier {
+    let deadline: Date?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func body(content: Content) -> some View {
+        TimelineView(.animation(minimumInterval:1.0/30,paused:deadline == nil || reduceMotion)) { context in
+            content.opacity(TransferFeedback.completionIconOpacity(deadline:deadline,now:context.date,reduceMotion:reduceMotion))
+        }
     }
 }
 struct SendView: View {
@@ -155,6 +161,7 @@ struct SendView: View {
                                                             TransferBorder(fraction:model.transferFeedback.fraction)
                                                         }
                                                     }
+                                                    .modifier(TransferCompletionBlink(deadline:model.transferFeedback.completionDeadline(for:peer.id)))
                                                 // Attach presence to the silhouette, rather than the far corner of its tile.
                                                 Circle().fill(peer.paired && peer.online ? Color.green : Color.orange)
                                                     .frame(width:9,height:9).overlay(Circle().stroke(Color(white:0.15),lineWidth:2))

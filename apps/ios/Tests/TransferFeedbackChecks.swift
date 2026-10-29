@@ -25,6 +25,17 @@ import Foundation
         precondition(feedback.completedUntil == nil)
         feedback.finish(id:"new",completed:false,now:start)
         precondition(feedback.peerID == nil,"Partial, failed, unknown or cancelled outcomes must not display success")
-        print("Transfer feedback checks passed: saved receipt, exact 1.5s expiry, new-recipient isolation, late polls, stale timers, non-success cleanup")
+        // Exactly two dim/recover cycles, no animation before a receipt, after expiry, or with Reduce Motion.
+        let end = start.addingTimeInterval(TransferFeedback.completionSeconds)
+        for offset in [0.0, 0.6, 1.2, 1.5, 2.0] {
+            precondition(abs(TransferFeedback.completionIconOpacity(deadline:end,now:start.addingTimeInterval(offset)) - 1) < 0.00001)
+        }
+        for offset in [0.3, 0.9] {
+            precondition(abs(TransferFeedback.completionIconOpacity(deadline:end,now:start.addingTimeInterval(offset)) - 0.25) < 0.00001)
+        }
+        precondition(TransferFeedback.completionIconOpacity(deadline:nil,now:start) == 1)
+        precondition(TransferFeedback.completionIconOpacity(deadline:end,now:start.addingTimeInterval(0.3),reduceMotion:true) == 1)
+        precondition(TransferFeedback.completionIconOpacity(deadline:end,now:start.addingTimeInterval(-0.1)) == 1)
+        print("Transfer feedback checks passed: saved receipt, exact 1.5s expiry, new-recipient isolation, late polls, stale timers, non-success cleanup, two receipt blinks, reduced motion")
     }
 }

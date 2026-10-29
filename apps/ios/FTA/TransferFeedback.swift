@@ -3,6 +3,18 @@ import Foundation
 // A receipt, not byte upload completion, earns the transient success badge. IDs reject late polls/timers.
 struct TransferFeedback {
     static let completionSeconds: TimeInterval = 1.5
+    private static let blinkCycleSeconds: TimeInterval = 0.6
+    private static let blinkCount = 2
+    private static let dimmedIconOpacity = 0.25
+    // Keep the receipt badge steady while the device alone dims twice within its existing 1.5s window.
+    static func completionIconOpacity(deadline: Date?, now: Date, reduceMotion: Bool = false) -> Double {
+        guard !reduceMotion, let deadline else { return 1 }
+        let elapsed = now.timeIntervalSince(deadline.addingTimeInterval(-completionSeconds))
+        guard elapsed >= 0, elapsed < blinkCycleSeconds * Double(blinkCount) else { return 1 }
+        let phase = elapsed.truncatingRemainder(dividingBy:blinkCycleSeconds) / blinkCycleSeconds
+        let dimming = 1 - abs(2 * phase - 1)
+        return 1 - (1 - dimmedIconOpacity) * dimming
+    }
     private(set) var transferID: String?
     private(set) var peerID: String?
     private(set) var fraction: Double?
