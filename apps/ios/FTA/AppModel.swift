@@ -25,7 +25,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     @Published var files: [URL] = []
     @Published var photos: [URL] = []
     @Published var message = ""
-    @Published var progress: Transfer?
+    @Published var transferFeedback = TransferFeedback()
     @Published var sending = false
     @Published var importing = false
     @Published var running = false
@@ -217,7 +217,11 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
             guard running else { return }
             requests = incoming; history = records; bonjour.advertise(advert, name:name)
             if let id = activeID {
-                do { progress = try await Engine.decode(Transfer.self,"transfers.get",["transfer_id":id]) }
+                do {
+                    let result = try await Engine.decode(Transfer.self,"transfers.get",["transfer_id":id])
+                    guard activeID == id else { return }
+                    transferFeedback.update(id:id,fraction:result.kind == "files" && result.items.contains(where:{ (Double($0.size) ?? 0) > 0 }) ? result.fraction : nil)
+                }
                 catch let failure as EngineFailure where failure.code == "NOT_FOUND" { /* send is opening its first request */ }
             }
             try await consumeEvents()
@@ -253,15 +257,28 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     private func send(kind: String, extras: [String:Any]) async {
         guard canSend, let peer = selected else { return }
         guard kind == "files" ? !(photos + files).isEmpty : !message.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { return }
-        sending = true; let id = UUID().uuidString.lowercased(); activeID = id; progress = nil
-        defer { sending = false; activeID = nil }
+        sending = true; let id = UUID().uuidString.lowercased(); activeID = id
+        transferFeedback.begin(id:id,peer:peer.id)
+        // Terminal results stay in History, never as an indefinitely retained status card on Send.
+        defer {
+            sending = false; activeID = nil
+            if transferFeedback.isActive { transferFeedback.finish(id:id,completed:false) }
+        }
         var params = extras; params["kind"] = kind; params["to"] = peer.id; params["transfer_id"] = id
         do {
             let result = try await Engine.decode(Transfer.self,"transfers.send_discovered",params)
-            progress = result; notice = result.status
+            transferFeedback.finish(id:id,completed:result.state == "completed")
             if result.state == "completed" {
+                if let deadline = transferFeedback.completedUntil {
+                    // Each saved receipt keeps its own deadline even if another recipient is sent to immediately.
+                    Task { [weak self] in
+                        do { try await Task.sleep(for:.seconds(max(0,deadline.timeIntervalSinceNow))) }
+                        catch { return }
+                        self?.transferFeedback.expire(id:id)
+                    }
+                }
                 if kind == "files" { clearPhotos(); clearFiles() } else { message = "" }
-            }
+            } else { error = result.error ?? result.status }
             await refreshActivity()
         } catch { self.error = error.localizedDescription; await refreshActivity() }
     }

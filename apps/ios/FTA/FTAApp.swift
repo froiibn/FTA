@@ -54,6 +54,7 @@ struct RootView: View {
 // The computer outline copies desktop main.ts's two SVG paths exactly, rather than substituting an SF icon.
 struct PeerIcon: View {
     let mobile: Bool
+    var side: CGFloat = 30
     var body: some View {
         Group {
             if mobile { Image(systemName:"iphone").resizable().scaledToFit().padding(3) }
@@ -66,7 +67,7 @@ struct PeerIcon: View {
                     context.stroke(p,with:.foreground,lineWidth:1.7)
                 }
             }
-        }.frame(width:30,height:30).accessibilityHidden(true)
+        }.frame(width:side,height:side).accessibilityHidden(true)
     }
 }
 // Materials retain native blur/accessibility while white actions echo the desktop transfer panel.
@@ -88,15 +89,51 @@ private struct GlassBackground: View {
         }.ignoresSafeArea(.container)
     }
 }
+// File progress follows real byte counts. Waiting/text transfers use a travelling dash, not a fake percent.
+private struct TransferBorder: View {
+    let fraction: Double?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        Group {
+            if let fraction {
+                RoundedRectangle(cornerRadius:20).trim(from:0,to:fraction).stroke(.white,style:StrokeStyle(lineWidth:3,lineCap:.round))
+            } else {
+                TimelineView(.animation(minimumInterval:0.1,paused:reduceMotion)) { context in
+                    RoundedRectangle(cornerRadius:20).stroke(.white,style:StrokeStyle(lineWidth:3,dash:[6,5],dashPhase:reduceMotion ? 0 : -context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:1)*22))
+                }
+            }
+        }.accessibilityLabel("전송 진행률").accessibilityValue(fraction.map { "\(Int($0*100))%" } ?? "진행률 확인 중")
+    }
+}
+// Observe growth, not every keystroke: repeated scrollTo while deleting fights native caret scrolling.
+private struct ComposerHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
 struct SendView: View {
     @EnvironmentObject var model: AppModel
     @State private var picking = false
     @State private var pickingPhotos = false
     @State private var takingPhoto = false
     @State private var choosingPhotoSource = false
+    @FocusState private var messageFocused: Bool
+    @State private var composerHeight: CGFloat = 0
     var body: some View {
+        GeometryReader { geometry in
+        ScrollViewReader { scroll in
         ScrollView {
             VStack(alignment:.leading,spacing:24) {
+                // Branding is ordinary scroll content, so no collapsed navigation strip remains above it.
+                HStack(spacing:12) {
+                    Image("AppMark").resizable().scaledToFit().frame(width:52,height:52).accessibilityHidden(true)
+                    VStack(alignment:.leading,spacing:3) {
+                        Text("FTA").font(.largeTitle.weight(.bold))
+                        Text("File Transfer Anything").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button { Task { await model.refreshDevices() } } label: { Image(systemName:"arrow.clockwise") }
+                        .disabled(!model.running).accessibilityLabel("기기 새로고침")
+                }.accessibilityIdentifier("app-header")
                 HStack {
                     Label(model.serviceText,systemImage:model.running ? "dot.radiowaves.left.and.right" : "pause.circle")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -107,7 +144,7 @@ struct SendView: View {
                     Text("연결 가능한 기기").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                     if model.targets.isEmpty {
                         ContentUnavailableView(model.running ? "발견된 기기가 없습니다" : "송수신을 시작하세요",systemImage:"network",description:Text(model.running ? "같은 LAN에서 상대 FTA를 실행하세요." : "설정에서 집 네트워크를 확인하세요."))
-                            .frame(maxWidth:.infinity).padding(.vertical,8)
+                            .fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity).padding(.vertical,8)
                     } else {
                         // Native horizontal scrolling responds to a finger drag without a visible scrollbar.
                         ScrollView(.horizontal) {
@@ -115,20 +152,33 @@ struct SendView: View {
                                 ForEach(model.targets) { peer in
                                     Button { model.selectedPeer = peer.id } label: {
                                         VStack(spacing:10) {
-                                            PeerIcon(mobile:peer.mobile).foregroundStyle(.white)
-                                                .frame(width:70,height:66)
-                                                .background(Color(white:0.12).opacity(0.8),in:RoundedRectangle(cornerRadius:20))
-                                                .modifier(GlassSurface(radius:20))
-                                                .overlay(RoundedRectangle(cornerRadius:20).stroke(.white.opacity(model.selectedPeer == peer.id ? 0.95 : 0),lineWidth:2))
-                                                .overlay(alignment:.bottomTrailing) {
-                                                    Circle().fill(peer.paired && peer.online ? Color.green : Color.orange)
-                                                        .frame(width:9,height:9).overlay(Circle().stroke(Color(white:0.15),lineWidth:2)).offset(x:1,y:1)
+                                            ZStack(alignment:.bottomTrailing) {
+                                                PeerIcon(mobile:peer.mobile,side:34).foregroundStyle(.white)
+                                                    .frame(width:76,height:72)
+                                                    .background(Color(white:0.12).opacity(0.8),in:RoundedRectangle(cornerRadius:20))
+                                                    .modifier(GlassSurface(radius:20))
+                                                    .overlay(RoundedRectangle(cornerRadius:20).stroke(.white.opacity(model.selectedPeer == peer.id && !(model.transferFeedback.peerID == peer.id && model.transferFeedback.isActive) ? 0.95 : 0),lineWidth:2))
+                                                    .overlay {
+                                                        if model.transferFeedback.peerID == peer.id && model.transferFeedback.isActive {
+                                                            TransferBorder(fraction:model.transferFeedback.fraction)
+                                                        }
+                                                    }
+                                                // Attach presence to the silhouette, rather than the far corner of its tile.
+                                                Circle().fill(peer.paired && peer.online ? Color.green : Color.orange)
+                                                    .frame(width:9,height:9).overlay(Circle().stroke(Color(white:0.15),lineWidth:2))
+                                                    .offset(x:peer.mobile ? -26 : -20,y:peer.mobile ? -22 : -26)
+                                                if let deadline = model.transferFeedback.completionDeadline(for:peer.id), Date() < deadline {
+                                                    Image(systemName:"checkmark.circle.fill").symbolRenderingMode(.palette)
+                                                        .foregroundStyle(.white,Color.green).font(.system(size:24))
+                                                        .padding(3).accessibilityLabel("전송 완료").accessibilityIdentifier("transfer-completed")
                                                 }
+                                            }
                                             Text(peer.display_name).font(.caption).foregroundStyle(.primary).lineLimit(2)
                                                 .multilineTextAlignment(.center).frame(width:86)
                                         }
                                     }.buttonStyle(.plain).disabled(!peer.selectable || model.sending)
                                         .accessibilityLabel("\(peer.display_name), \(peer.status)")
+                                        .accessibilityValue(transferStatus(for:peer.id))
                                         .accessibilityAddTraits(model.selectedPeer == peer.id ? .isSelected : [])
                                 }
                             }.padding(4)
@@ -137,8 +187,17 @@ struct SendView: View {
                 }
                 // Photos and Files are two freestanding actions, with no surrounding section box.
                 HStack(spacing:14) {
-                    mediaButton("사진",symbol:"photo.on.rectangle") { choosingPhotoSource = true }
-                    mediaButton("파일",symbol:"folder") { picking = true }
+                    mediaButton("사진",symbol:"photo.on.rectangle") { messageFocused = false; choosingPhotoSource = true }
+                        // Anchor the native popover to the actual source button, with its arrow above the menu.
+                        .popover(isPresented:$choosingPhotoSource,attachmentAnchor:.rect(.bounds),arrowEdge:.top) {
+                            VStack(alignment:.leading,spacing:0) {
+                                Button { choosingPhotoSource = false; pickingPhotos = true } label: { Label("갤러리에서 선택",systemImage:"photo.on.rectangle").frame(maxWidth:.infinity,alignment:.leading).padding(14) }
+                                Divider()
+                                Button { choosingPhotoSource = false; Task { await openCamera() } } label: { Label("촬영",systemImage:"camera").frame(maxWidth:.infinity,alignment:.leading).padding(14) }
+                            }.buttonStyle(.plain).frame(minWidth:200).padding(4).presentationCompactAdaptation(.popover)
+                                .accessibilityIdentifier("photo-source-menu")
+                        }
+                    mediaButton("파일",symbol:"folder") { messageFocused = false; picking = true }
                 }.disabled(model.sending || model.importing)
                 if model.importing { ProgressView("선택한 항목 준비 중").font(.footnote) }
                 if !(model.photos + model.files).isEmpty {
@@ -154,31 +213,35 @@ struct SendView: View {
                         }.disabled(model.sending || model.importing)
                     }.padding(16).modifier(GlassSurface())
                 }
-                if model.sending || model.progress != nil {
-                    VStack(alignment:.leading,spacing:12) {
-                        if let progress = model.progress {
-                            Text(progress.status)
-                            if !progress.terminal { ProgressView(value:progress.fraction) }
-                        } else { ProgressView("연결 및 등록 확인 중") }
-                        if model.sending { Button("전송 취소",role:.destructive) { Task { await model.cancel() } } }
-                    }.padding(16).modifier(GlassSurface())
+                composer.id("message-composer")
+                    .background { GeometryReader { bounds in Color.clear.preference(key:ComposerHeightKey.self,value:bounds.size.height) } }
+                if model.sending {
+                    Button("전송 취소",role:.destructive) { Task { await model.cancel() } }
                 }
                 if let notice = model.notice {
                     HStack { Text(notice).font(.footnote).foregroundStyle(.secondary); Spacer(); Button("닫기") { model.notice = nil } }
                 }
-            }.padding(20)
-        }.scrollDismissesKeyboard(.interactively).scrollIndicators(.hidden)
-        // The safe-area inset keeps all four lines and the send control above the system keyboard.
-        .safeAreaInset(edge:.bottom,spacing:0) { composer.padding(.horizontal,20).padding(.vertical,12) }
-        .background(GlassBackground())
-        .navigationTitle("보내기")
-        .toolbar { ToolbarItem(placement:.topBarTrailing) { Button { Task { await model.refreshDevices() } } label:{ Image(systemName:"arrow.clockwise") }.disabled(!model.running).accessibilityLabel("기기 새로고침") } }
-        .refreshable { await model.refreshDevices() }
-        .confirmationDialog("사진",isPresented:$choosingPhotoSource,titleVisibility:.visible) {
-            Button("갤러리에서 선택") { pickingPhotos = true }
-            Button("촬영") { Task { await openCamera() } }
-            Button("취소",role:.cancel) {}
+            }.padding(20).frame(maxWidth:.infinity,minHeight:geometry.size.height,alignment:.top)
+                // Only unoccupied content receives this gesture; TextField and buttons retain native taps.
+                .background { Color.clear.contentShape(Rectangle()).onTapGesture { messageFocused = false } }
+        }.accessibilityIdentifier("send-scroll").scrollDismissesKeyboard(.interactively).scrollIndicators(.hidden)
+        .onPreferenceChange(ComposerHeightKey.self) { height in
+            let grew = height > composerHeight + 0.5
+            composerHeight = height
+            if grew && messageFocused {
+                Task { @MainActor in
+                    await Task.yield()
+                    if messageFocused { scroll.scrollTo("message-composer",anchor:.bottom) }
+                }
+            }
         }
+        .onReceive(NotificationCenter.default.publisher(for:UIResponder.keyboardDidShowNotification)) { _ in
+            if messageFocused { scroll.scrollTo("message-composer",anchor:.bottom) }
+        }
+        .refreshable { await model.refreshDevices() }
+        }
+        }.background(GlassBackground())
+        .toolbar(.hidden,for:.navigationBar)
         .sheet(isPresented:$pickingPhotos) {
             PhotoLibraryPicker { providers in
                 pickingPhotos = false
@@ -200,7 +263,7 @@ struct SendView: View {
                     HStack(alignment:.bottom,spacing:10) {
                         // Native vertical TextField grows from one to four lines, then scrolls internally.
                         TextField("텍스트 또는 URL",text:$model.message,axis:.vertical)
-                            .lineLimit(1...4).textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .focused($messageFocused).lineLimit(1...4).textInputAutocapitalization(.never).autocorrectionDisabled()
                             .accessibilityLabel("전송할 텍스트 또는 URL").accessibilityIdentifier("message-input")
                             .padding(.vertical,10)
                         Button { Task { await model.sendMessage() } } label: {
@@ -215,6 +278,13 @@ struct SendView: View {
                     }.padding(.leading,16).padding(.trailing,6).padding(.vertical,4).modifier(GlassSurface())
                         .disabled(model.sending)
                 }
+    }
+    // The icon replaces visible status text, so its enclosing native button must retain a spoken result.
+    private func transferStatus(for peerID: String) -> String {
+        let feedback = model.transferFeedback
+        if let end = feedback.completionDeadline(for:peerID), Date() < end { return "전송 완료" }
+        guard feedback.peerID == peerID, feedback.isActive else { return "" }
+        return feedback.fraction.map { "전송 중 \(Int($0*100))%" } ?? "전송 중"
     }
     private func mediaButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action:action) { Label(title,systemImage:symbol).font(.body.weight(.medium)).foregroundStyle(.white).frame(maxWidth:.infinity).padding(.vertical,16) }
@@ -240,22 +310,23 @@ struct HistoryView: View {
     @State private var filter = "all"
     var body: some View {
         List {
-            Picker("표시",selection:$filter) { Text("전체").tag("all");Text("받음").tag("receive");Text("보냄").tag("send") }.pickerStyle(.segmented)
-            if model.history.isEmpty { ContentUnavailableView("아직 전송 기록이 없습니다",systemImage:"tray",description:Text("파일·텍스트·URL의 송수신 결과가 여기에 표시됩니다.")) }
+            Text("기록").font(.largeTitle.bold()).foregroundStyle(.white).listRowBackground(Color.clear).accessibilityIdentifier("history-heading")
+            Picker("표시",selection:$filter) { Text("전체").tag("all");Text("받음").tag("receive");Text("보냄").tag("send") }.pickerStyle(.segmented).environment(\.colorScheme,.dark).listRowBackground(Color.clear)
+            if model.history.isEmpty { ContentUnavailableView { Label("아직 전송 기록이 없습니다",systemImage:"tray").foregroundStyle(.white) } description: { Text("파일·텍스트·URL의 송수신 결과가 여기에 표시됩니다.").foregroundStyle(.white.opacity(0.7)) }.listRowBackground(Color.clear) }
             ForEach(model.history.filter { filter == "all" || $0.direction == filter }) { record in
                 Button { Task { await model.openRecord(record.id) } } label: {
                     HStack(spacing:12) {
-                        Image(systemName:record.direction == "receive" ? "arrow.down.circle" : "arrow.up.circle").foregroundStyle(Color.accentColor)
+                        Image(systemName:record.direction == "receive" ? "arrow.down.circle" : "arrow.up.circle").foregroundStyle(.white)
                         VStack(alignment:.leading,spacing:4) {
-                            Text(record.title).foregroundStyle(.primary).lineLimit(1)
-                            Text("\(record.direction == "receive" ? "받음" : "보냄") · \(record.status)").font(.caption).foregroundStyle(.secondary)
+                            Text(record.title).foregroundStyle(.white).lineLimit(1)
+                            Text("\(record.direction == "receive" ? "받음" : "보냄") · \(record.status)").font(.caption).foregroundStyle(.white.opacity(0.7))
                         }
                         Spacer()
-                        Text(Date(timeIntervalSince1970:record.created_at ?? 0),style:.date).font(.caption2).foregroundStyle(.secondary)
+                        Text(Date(timeIntervalSince1970:record.created_at ?? 0),style:.date).font(.caption2).foregroundStyle(.white.opacity(0.7))
                     }
-                }
+                }.listRowBackground(Color.white.opacity(0.08))
             }
-        }.scrollContentBackground(.hidden).background(GlassBackground()).navigationTitle("기록").refreshable { await model.refreshActivity() }
+        }.foregroundStyle(.white).scrollContentBackground(.hidden).background(GlassBackground().environment(\.colorScheme,.dark)).toolbar(.hidden,for:.navigationBar).refreshable { await model.refreshActivity() }
     }
 }
 
@@ -334,6 +405,7 @@ struct SettingsView: View {
     @State private var removing: Peer?
     var body: some View {
         Form {
+            Text("설정").font(.largeTitle.bold()).listRowBackground(Color.clear)
             Section {
                 TextField("기기 이름",text:$model.name).textContentType(.name)
                 Button("이름 저장") { Task { await model.saveName() } }
@@ -364,7 +436,7 @@ struct SettingsView: View {
                     HStack { PeerIcon(mobile:peer.mobile); Text(peer.display_name); Spacer(); Button("해제",role:.destructive) { removing = peer } }
                 }
             }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
-        }.scrollContentBackground(.hidden).background(GlassBackground()).navigationTitle("설정")
+        }.scrollContentBackground(.hidden).background(GlassBackground()).toolbar(.hidden,for:.navigationBar)
             .confirmationDialog("기기 등록을 해제할까요?",isPresented:Binding(get:{removing != nil},set:{if !$0 {removing = nil}}),titleVisibility:.visible) {
                 if let peer = removing { Button("등록 해제",role:.destructive) { Task { await model.unpair(peer); removing = nil } } }
             } message:{ Text("이 기기의 새 전송을 차단합니다. 다시 보내려면 수신자의 등록 승인이 필요합니다.") }

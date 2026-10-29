@@ -68,7 +68,6 @@ struct Transfer: Decodable, Identifiable {
     let error: String?
     var id: String { transfer_id }
     var title: String { kind == "files" ? (items.first?.name ?? "파일") + (items.count > 1 ? " 외 \(items.count - 1)개" : "") : (kind == "url" ? "URL" : "텍스트") }
-    var terminal: Bool { ["completed", "partial", "failed", "cancelled", "unknown"].contains(state) }
     var status: String {
         ["completed":"완료", "partial":"부분 완료", "failed":"실패", "cancelled":"취소됨", "unknown":"결과 확인 필요", "sending":"전송 중", "receiving":"수신 중", "verifying":"무결성 확인 중", "committing":"저장 중", "awaiting_registration":"상대 기기의 등록 승인 대기", "cancel_requested":"취소 확인 중"][state] ?? state
     }

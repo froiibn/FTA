@@ -5,12 +5,14 @@ final class FTAFlowTests: XCTestCase {
     func testNativeTabsAndFilePicker() {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.tabBars.buttons["보내기"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.staticTexts["FTA"].exists && app.staticTexts["File Transfer Anything"].exists)
+        XCTAssertFalse(app.navigationBars["보내기"].exists)
         XCTAssertTrue(app.buttons["사진"].exists && app.buttons["파일"].exists)
         XCTAssertTrue(app.buttons["send-message"].exists)
         XCTAssertFalse(app.buttons["send-message"].isEnabled)
         capture("send-glass",app)
         app.tabBars.buttons["기록"].tap()
-        XCTAssertTrue(app.navigationBars["기록"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["history-heading"].waitForExistence(timeout:5))
         capture("history-glass",app)
         app.tabBars.buttons["설정"].tap()
         XCTAssertTrue(app.switches["신뢰하는 집 네트워크입니다"].waitForExistence(timeout:5))
@@ -51,6 +53,9 @@ final class FTAFlowTests: XCTestCase {
         app.buttons["사진"].tap()
         XCTAssertTrue(app.buttons["갤러리에서 선택"].waitForExistence(timeout:5))
         XCTAssertTrue(app.buttons["촬영"].exists)
+        let photo = app.buttons["사진"]
+        let menu = app.buttons["갤러리에서 선택"]
+        XCTAssertGreaterThanOrEqual(menu.frame.minY,photo.frame.maxY-4,"The photo menu belongs below the source button")
         capture("photo-source-choice",app)
         // Compact native confirmation popovers can omit the cancel row; dismiss the real picker instead.
         app.buttons["갤러리에서 선택"].tap()
@@ -67,6 +72,11 @@ final class FTAFlowTests: XCTestCase {
         XCTAssertFalse(app.buttons["send-message"].isEnabled)
         capture("message-four-line-limit",app)
         input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:38))
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        // The left padding is genuinely unoccupied; tapping it must dismiss rather than steal field focus.
+        app.scrollViews["send-scroll"].coordinate(withNormalizedOffset:CGVector(dx:0.02,dy:0.2)).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout:5))
+        capture("keyboard-dismissed",app)
     }
     func testPhotoLibraryUsesCombinedAttachmentDraft() throws {
         let app = XCUIApplication(); app.launch(); app.buttons["사진"].tap(); app.buttons["갤러리에서 선택"].tap()
@@ -79,6 +89,16 @@ final class FTAFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["send-attachments"].waitForExistence(timeout:15))
         XCTAssertFalse(app.alerts.firstMatch.exists)
         capture("combined-photo-draft",app)
+        let heading = app.staticTexts["File Transfer Anything"]
+        let headingTop = heading.frame.minY
+        let photoTop = app.buttons["사진"].frame.minY
+        app.scrollViews["send-scroll"].swipeUp()
+        let headingDelta = heading.frame.minY-headingTop
+        let contentDelta = app.buttons["사진"].frame.minY-photoTop
+        // Short pages may fit without scrolling. When content moves, branding must move by the same amount.
+        XCTAssertEqual(headingDelta,contentDelta,accuracy:3,"Branding must never become a fixed navigation strip")
+        print("Scroll verification: header delta=\(headingDelta), content delta=\(contentDelta)")
+        XCTAssertFalse(app.navigationBars["보내기"].exists)
         app.buttons["선택 해제"].tap()
         XCTAssertFalse(app.buttons["send-attachments"].exists)
     }
@@ -87,6 +107,15 @@ final class FTAFlowTests: XCTestCase {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.buttons["사진"].waitForExistence(timeout:5))
         capture("glass-system-send",app)
+        let heading = app.staticTexts["File Transfer Anything"]
+        if heading.frame.height > 25 {
+            // The separate real accessibility-size run guarantees content overflow, without fake data.
+            let top = heading.frame.minY
+            app.scrollViews["send-scroll"].swipeUp()
+            XCTAssertLessThan(heading.frame.minY,top-2,"The whole header must scroll at accessibility text sizes")
+            XCTAssertFalse(app.navigationBars["보내기"].exists)
+            capture("header-scrolled-with-content",app)
+        }
         app.tabBars.buttons["설정"].tap(); capture("glass-system-settings",app)
         app.tabBars.buttons["기록"].tap(); capture("glass-system-history",app)
     }

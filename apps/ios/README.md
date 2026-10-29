@@ -80,6 +80,13 @@ output/ios-content-checks
 
 신뢰한 허용 대역·선택한 연결·송수신 사용은 재실행과 재접속 후 복원한다. 이전 엔진에 기록된 단일 승인 대역만 현재 연결과 정확히 일치할 때 이관하며 기본 대역 목록이나 새 연결을 임의 승인하지 않는다. 보내기 화면은 가로 기기 아이콘·흰색 사진/파일 버튼·통합 첨부·최대 네 줄 메시지와 원형 전송 아이콘으로 구성한다. 라이트/다크 시스템 외관과 네이티브 반투명 소재를 사용한다.
 
-아이콘 재생성은 `xcrun swift apps/ios/scripts/render-icon.swift apps/desktop/src-tauri/icons/icon.png apps/ios/FTA/Assets.xcassets/AppIcon.appiconset/AppIcon.png`로 수행한다. 공통 데스크톱 원본의 투명 바깥 영역만 iOS 요구에 맞춰 흰색으로 채운다.
+아이콘 재생성은 `xcrun swift apps/ios/scripts/render-icon.swift apps/desktop/src-tauri/icons/icon.png apps/ios/FTA/Assets.xcassets/AppIcon.appiconset/AppIcon.png apps/ios/FTA/Assets.xcassets/AppMark.imageset/AppMark.png`로 수행한다. 공통 데스크톱 원본의 투명 바깥 영역만 iOS 요구에 맞춰 흰색으로 채운다.
 
 설정 저장 회귀는 `xcrun swiftc apps/ios/FTA/NetworkPreferences.swift apps/ios/Tests/NetworkPreferencesChecks.swift -o output/ios-network-checks` 후 해당 실행 파일로 검사한다. UI 검사는 재실행·백그라운드 복귀·송수신 중지 유지·갤러리 첨부·네 줄 메시지·시스템 외관을 실제 앱으로 검사한다. 검증 수치와 실기 설치 결과는 iOS 플랫폼 문서의 최신 검증 기록을 따른다.
+
+
+## 2026-10-30 스크롤·아이콘 전송 상태
+
+상단 브랜드와 메시지 입력창은 본문과 함께 스크롤한다. 사진 소스 popover는 사진 버튼 바로 아래에 연결하며 빈 영역 탭으로 키보드를 닫는다. 기기 아이콘을 소폭 확대하고 상태 점을 윤곽에 붙인다. 완료 문구 대신 실제 전송 진행률을 타일 테두리로 표시하고 최종 저장 응답 후 1.5초 체크를 표시한다. 결과 불명·부분 완료·실패는 성공 체크를 주지 않는다. 기록 화면은 흰색 글자가 읽히도록 어두운 소재 배경을 사용한다.
+
+전송 표시 경계 검사는 `xcrun swiftc apps/ios/FTA/TransferFeedback.swift apps/ios/Tests/TransferFeedbackChecks.swift -o output/ios-transfer-feedback-checks`로 빌드한 실행 파일을 사용한다. 저장 응답 전 성공 금지, 1.5초 경계, 이전 전송의 늦은 조회·타이머가 새 대상 표시를 지우지 않는 조건을 검사한다. iOS 0.1.2 빌드 4로 업데이트하며 PC 배포본과 자동 업데이트 기능은 변경하지 않는다.

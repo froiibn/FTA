@@ -15,3 +15,8 @@ context.draw(image,in:CGRect(x:0,y:0,width:side,height:side))
 let output = CGImageDestinationCreateWithURL(URL(fileURLWithPath:CommandLine.arguments[2]) as CFURL,"public.png" as CFString,1,nil)!
 CGImageDestinationAddImage(output,context.makeImage()!,nil)
 precondition(CGImageDestinationFinalize(output),"Could not write the iOS icon")
+
+// The scrolling brand header uses the same desktop source, retaining alpha for native material backgrounds.
+if CommandLine.arguments.count > 3 {
+    try Data(contentsOf:URL(fileURLWithPath:CommandLine.arguments[1])).write(to:URL(fileURLWithPath:CommandLine.arguments[3]),options:.atomic)
+}
