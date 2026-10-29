@@ -22,6 +22,16 @@ final class FTAFlowTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["둘러보기"].waitForExistence(timeout:5) || app.buttons["취소"].exists || app.buttons["Cancel"].exists)
         capture("file-picker",app)
     }
+    func testBottomComposerRemainsInPlaceWhileContentScrolls() {
+        let app = XCUIApplication(); app.launch()
+        let input = app.descendants(matching:.any).matching(identifier:"message-input").firstMatch
+        XCTAssertTrue(input.waitForExistence(timeout:5))
+        let originalY = input.frame.midY
+        app.scrollViews["send-scroll"].swipeUp()
+        XCTAssertEqual(input.frame.midY,originalY,accuracy:2,"The composer must retain its original bottom position")
+        app.scrollViews["send-scroll"].swipeDown()
+        capture("restored-bottom-composer-and-glass",app)
+    }
     func testTrustedLANAndReceivePreferenceSurviveRestart() throws {
         let app = XCUIApplication(); app.launch(); app.tabBars.buttons["설정"].tap()
         let trust = app.switches["신뢰하는 집 네트워크입니다"]

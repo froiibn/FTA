@@ -105,11 +105,6 @@ private struct TransferBorder: View {
         }.accessibilityLabel("전송 진행률").accessibilityValue(fraction.map { "\(Int($0*100))%" } ?? "진행률 확인 중")
     }
 }
-// Observe growth, not every keystroke: repeated scrollTo while deleting fights native caret scrolling.
-private struct ComposerHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
 struct SendView: View {
     @EnvironmentObject var model: AppModel
     @State private var picking = false
@@ -117,10 +112,8 @@ struct SendView: View {
     @State private var takingPhoto = false
     @State private var choosingPhotoSource = false
     @FocusState private var messageFocused: Bool
-    @State private var composerHeight: CGFloat = 0
     var body: some View {
         GeometryReader { geometry in
-        ScrollViewReader { scroll in
         ScrollView {
             VStack(alignment:.leading,spacing:24) {
                 // Branding is ordinary scroll content, so no collapsed navigation strip remains above it.
@@ -131,8 +124,7 @@ struct SendView: View {
                         Text("File Transfer Anything").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button { Task { await model.refreshDevices() } } label: { Image(systemName:"arrow.clockwise") }
-                        .disabled(!model.running).accessibilityLabel("기기 새로고침")
+                    refreshButton
                 }.accessibilityIdentifier("app-header")
                 HStack {
                     Label(model.serviceText,systemImage:model.running ? "dot.radiowaves.left.and.right" : "pause.circle")
@@ -213,8 +205,6 @@ struct SendView: View {
                         }.disabled(model.sending || model.importing)
                     }.padding(16).modifier(GlassSurface())
                 }
-                composer.id("message-composer")
-                    .background { GeometryReader { bounds in Color.clear.preference(key:ComposerHeightKey.self,value:bounds.size.height) } }
                 if model.sending {
                     Button("전송 취소",role:.destructive) { Task { await model.cancel() } }
                 }
@@ -225,22 +215,11 @@ struct SendView: View {
                 // Only unoccupied content receives this gesture; TextField and buttons retain native taps.
                 .background { Color.clear.contentShape(Rectangle()).onTapGesture { messageFocused = false } }
         }.accessibilityIdentifier("send-scroll").scrollDismissesKeyboard(.interactively).scrollIndicators(.hidden)
-        .onPreferenceChange(ComposerHeightKey.self) { height in
-            let grew = height > composerHeight + 0.5
-            composerHeight = height
-            if grew && messageFocused {
-                Task { @MainActor in
-                    await Task.yield()
-                    if messageFocused { scroll.scrollTo("message-composer",anchor:.bottom) }
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for:UIResponder.keyboardDidShowNotification)) { _ in
-            if messageFocused { scroll.scrollTo("message-composer",anchor:.bottom) }
-        }
         .refreshable { await model.refreshDevices() }
         }
-        }.background(GlassBackground())
+        // Restore the original bottom material composer. The system inset keeps it above the keyboard.
+        .safeAreaInset(edge:.bottom,spacing:0) { composer.padding(.horizontal,20).padding(.vertical,12) }
+        .background(GlassBackground())
         .toolbar(.hidden,for:.navigationBar)
         .sheet(isPresented:$pickingPhotos) {
             PhotoLibraryPicker { providers in
@@ -257,6 +236,20 @@ struct SendView: View {
         .fileImporter(isPresented:$picking,allowedContentTypes:[.item],allowsMultipleSelection:true) { result in
             switch result { case .success(let urls): Task { await model.importFiles(urls) }; case .failure(let error): model.error = error.localizedDescription }
         }
+    }
+    // The old toolbar supplied a native circular glass surface; retain it without restoring a fixed bar.
+    @ViewBuilder private var refreshButton: some View {
+        if #available(iOS 26.0, *) {
+            refreshAction.glassEffect(.regular.interactive(),in:Circle())
+        } else {
+            refreshAction.background(.ultraThinMaterial,in:Circle())
+                .overlay(Circle().stroke(.white.opacity(0.2),lineWidth:0.7))
+        }
+    }
+    private var refreshAction: some View {
+        Button { Task { await model.refreshDevices() } } label: {
+            Image(systemName:"arrow.clockwise").frame(width:44,height:44)
+        }.buttonStyle(.plain).disabled(!model.running).accessibilityLabel("기기 새로고침")
     }
     private var composer: some View {
         VStack(alignment:.leading,spacing:10) {
