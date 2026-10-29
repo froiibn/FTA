@@ -35,6 +35,8 @@ tasks.named("preBuild").configure { dependsOn(buildRust) }
 
 // Fail closed on stale notices: dependency changes require reviewing the exact Android target inventory.
 val checkNotices by tasks.registering(Exec::class) {
+    // The native build fetches the locked target sources before the offline license inventory reads them.
+    dependsOn(buildRust)
     workingDir(rootProject.projectDir)
     commandLine("python3", "scripts/generate-notices.py", "--check")
     environment("PATH", System.getenv("HOME") + "/.cargo/bin:" + System.getenv("PATH"))
