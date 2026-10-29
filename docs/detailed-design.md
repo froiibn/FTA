@@ -134,3 +134,13 @@ Windows는 현재 사용자 SID만 접근 가능한 named pipe, macOS·Linux는 
 - [화면과 조작 흐름](interaction-design.md)
 - [Windows](platforms/windows.md), [macOS](platforms/macos.md), [Linux](platforms/linux.md)
 - [검증 계획](verification-plan.md)
+
+## iOS 호스트 추가 (2026-10-29)
+
+사용자 지시로 iOS 화면은 별도 `apps/ios`의 SwiftUI 네이티브 앱으로 구현한다. 데스크톱의 TypeScript → Tauri → IPC 구조와 Linux·MCP 경로는 유지한다. 모바일 Tauri 재사용 검토안보다 이번 네이티브 지시가 우선한다.
+
+iOS는 SwiftUI → 제한된 C ABI → 앱 내 공통 Rust 엔진 구조다. OS Bonjour가 실제 일반·등록 리스너 포트를 광고하고 검색 결과를 주소 힌트로 제공한다. 신뢰·TLS·본문 전송·무결성·commit·DB·이벤트 커서는 공통 코드를 사용한다. 파일 바이트는 제어 JSON에 넣지 않는다. 네트워크 실행을 중지해도 기록을 열 수 있으며, 재시작 전 이전 제어 요청의 종료를 기다린다. iOS의 임시 저장은 Application Support로 분리하고 데스크톱의 `.fta-partials` 위치는 유지한다. [플랫폼 상세](platforms/ios.md).
+
+## 연결 가능한 대상 조회 보완 (2026-10-29)
+
+`devices.list`는 설정·CLI 관리용 등록 정보 조회를 유지하며 `available_only=true`를 지정하면 인증 probe에 성공한 등록 기기와 현재 TCP 접속 가능한 미등록 발견 후보만 반환한다. 미등록 TCP 확인은 발견 캐시의 생존 확인일 뿐 온라인 신뢰 판정이 아니며 등록 세션·본문·pin을 생성하지 않는다. mDNS goodbye가 유실돼도 접속 실패 후보는 표시하지 않는다. 기기 이름으로 신원을 합치지 않으며 기존 ID의 주소 이동은 pin과 ID 검증 후에만 갱신한다. iOS는 NWPath의 Wi-Fi/유선 LAN 유효성과 인터페이스 변화를 함께 확인하고, 연결 세대가 바뀌기 전 시작한 조회 응답은 폐기한다.

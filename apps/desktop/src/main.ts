@@ -288,9 +288,11 @@ function updateActions(): void {
 }
 
 // Only application-owned SVG paths enter the DOM; received names remain text nodes.
-function icon(name: "computer" | "file" | "text" | "link" | "delete"): SVGSVGElement {
+function icon(name: "computer" | "phone" | "file" | "text" | "link" | "delete"): SVGSVGElement {
   const paths = {
     computer: ["M3 4h18v12H3z", "M8 21h8m-4-5v5"],
+    // Mobile peers must not inherit the desktop glyph; OS metadata comes from the engine.
+    phone: ["M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z", "M10 5h4M11 19h2"],
     file: ["M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6"],
     text: ["M4 5h16M4 10h16M4 15h10M4 20h7"],
     link: ["M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"],
@@ -316,12 +318,12 @@ function stateLabel(state: string): string {
   return labels[state] ?? state;
 }
 
-// Horizontal targets show only a computer and its name; status stays available without extra visible labels.
+// Device targets distinguish computer/phone silhouettes and retain the shared status dot.
 function renderDevices(): void {
   if (!isMain) return;
   const list = element("devices");
   list.replaceChildren();
-  if (!devices.length) {
+  if (!networkReady || !devices.some((device) => !device.paired || device.online)) {
     const empty = document.createElement("div");
     empty.className = "empty-device";
     const title = document.createElement("strong");
@@ -329,7 +331,7 @@ function renderDevices(): void {
     empty.append(title);
     list.append(empty);
   }
-  for (const device of devices) {
+  for (const device of devices.filter((item) => networkReady && (!item.paired || item.online))) {
     const button = document.createElement("button");
     button.className = "device-tile";
     button.dataset.deviceId = device.device_id;
@@ -340,7 +342,7 @@ function renderDevices(): void {
     button.setAttribute("aria-label", `${device.display_name}, ${status}`);
     const deviceIcon = document.createElement("span");
     deviceIcon.className = "device-icon";
-    deviceIcon.append(icon("computer"));
+    deviceIcon.append(icon(["ios", "android"].includes(device.os.toLowerCase()) ? "phone" : "computer"));
     const dot = document.createElement("span");
     dot.className = "device-status";
     dot.dataset.state = !device.paired ? "unpaired" : device.online && networkReady ? "online" : "offline";
@@ -467,7 +469,8 @@ async function refresh(): Promise<void> {
   refreshing = true;
   try {
     const status = await rpc<JsonObject>("status");
-    devices = await rpc<Device[]>("devices.list");
+    // Offline registrations belong to settings, never to the send/drop target list.
+    devices = await rpc<Device[]>("devices.list", { available_only: isMain });
     connected = true;
     // Startup can outlast the initial IPC probe; remove its stale error only after a real successful response.
     if (element("notice").dataset.source === "connection") element("notice").hidden = true;

@@ -2,6 +2,18 @@
 
 대상: Windows 11 / AMD Ryzen 5 5600X(x86-64). 이 문서는 Windows PC에서 직접 빌드하는 절차다. Windows 네이티브 검사·설치 파일 생성·설치·첫 실행·트레이 유지와 종료·재실행, Mac 한 대와의 실제 LAN 양방향 파일·해시·동일 이름 보존을 확인했다. GUI 드롭과 나머지 OS 통합 검증은 별도다. [검증 기록](../../docs/implementation-status.md)을 따른다.
 
+## 0.1.2 후속 빌드
+
+Mac에서 Windows 설치 파일을 만들거나 Windows 검사 통과를 주장하지 않는다. 0.1.2 공개 후 Windows 담당자는 `v0.1.2` 태그의 동일 소스를 새 폴더에 받아 아래 로컬 빌드 스크립트를 실행한다. 기존 작업 폴더를 강제로 초기화하지 않는다.
+
+```powershell
+git clone --branch v0.1.2 --depth 1 https://github.com/froiibn/FTA.git FTA-0.1.2
+cd FTA-0.1.2
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\packaging\windows\build.ps1
+```
+
+성공 산출물은 0.1.2 릴리스에 추가하고 Mac 파일·해시를 덮어쓰지 않는다. `build-info-windows-0.1.2.json`, `SHA256SUMS-windows-0.1.2.txt` 등 플랫폼별 이름으로 게시한다. 전체 빌드·OS 동작 검증 범위는 아래 절차에 따라 기록한다.
+
 ## 1. 빌드 PC 준비
 
 설치 파일을 만드는 PC에만 다음 도구가 필요하다. 설치 파일로 앱을 사용하는 다른 Windows PC에는 개발 도구가 필요 없다.

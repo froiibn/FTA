@@ -73,6 +73,61 @@ impl Store {
         tx.commit()?;
         Ok(Self { db: Mutex::new(db) })
     }
+    /// iOS can relocate an app sandbox during installation. Rebase only its owned receive root,
+    /// never arbitrary historical destinations, and keep event/cursor identities unchanged.
+    pub fn relocate_receive_root(&self, previous: &Path, current: &Path) -> Result<()> {
+        if !previous.is_absolute() || !current.is_absolute() {
+            return Err(Error::new(
+                "INVALID_PATH",
+                "absolute receive roots required",
+            ));
+        }
+        let mut db = self.lock()?;
+        let tx = db.transaction()?;
+        let records = {
+            let mut query = tx.prepare("SELECT transfers.data FROM transfers JOIN transfer_roots ON transfers.id=transfer_roots.transfer_id WHERE transfer_roots.root=?1")?;
+            query
+                .query_map([previous.to_string_lossy().as_ref()], |row| {
+                    row.get::<_, String>(0)
+                })?
+                .map(|row| Ok(serde_json::from_str::<Transfer>(&row?)?))
+                .collect::<Result<Vec<_>>>()?
+        };
+        for mut transfer in records {
+            if transfer.direction != "receive" {
+                return Err(Error::new("CONFLICT", "sender cannot own a receive root"));
+            }
+            for item in &mut transfer.items {
+                if let Some(path) = &item.path {
+                    let relative = Path::new(path)
+                        .strip_prefix(previous)
+                        .map_err(|_| Error::new("INVALID_PATH", "item outside receive root"))?;
+                    if relative.components().count() != 1
+                        || !relative
+                            .components()
+                            .all(|part| matches!(part, std::path::Component::Normal(_)))
+                    {
+                        return Err(Error::new("INVALID_PATH", "invalid stored receive path"));
+                    }
+                    item.path = Some(current.join(relative).to_string_lossy().into());
+                }
+            }
+            save_transfer_row(&tx, &transfer)?;
+            tx.execute(
+                "UPDATE events SET summary=?1 WHERE transfer_id=?2",
+                params![
+                    transfer_summary(&transfer)?.to_string(),
+                    transfer.transfer_id
+                ],
+            )?;
+        }
+        tx.execute(
+            "UPDATE transfer_roots SET root=?1 WHERE root=?2",
+            params![current.to_string_lossy(), previous.to_string_lossy()],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, Connection>> {
         self.db
             .lock()
@@ -258,9 +313,8 @@ impl Store {
                 item.state = "failed".into();
                 item.error = Some(reason.into());
                 if let Some(root) = &root {
-                    let path = root
-                        .join(".fta-partials")
-                        .join(format!("{}-{index}.part", transfer.transfer_id));
+                    let path =
+                        partials_dir(root)?.join(format!("{}-{index}.part", transfer.transfer_id));
                     match fs::remove_file(path) {
                         Ok(()) => {}
                         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -388,9 +442,8 @@ impl Store {
                     && let (Some(path), Some(expected), Some(root)) =
                         (&item.path, &item.sha256, &root)
                 {
-                    let partial = root
-                        .join(".fta-partials")
-                        .join(format!("{}-{index}.part", transfer.transfer_id));
+                    let partial =
+                        partials_dir(root)?.join(format!("{}-{index}.part", transfer.transfer_id));
                     // Intent is written before link allocation. If a partial still exists,
                     // equal contents alone cannot prove an existing destination belongs to us.
                     let published = match fs::symlink_metadata(&partial) {
@@ -410,9 +463,8 @@ impl Store {
                     item.error = Some("INTERRUPTED".into());
                 }
                 if let Some(root) = &root {
-                    let partial = root
-                        .join(".fta-partials")
-                        .join(format!("{}-{index}.part", transfer.transfer_id));
+                    let partial =
+                        partials_dir(root)?.join(format!("{}-{index}.part", transfer.transfer_id));
                     match fs::remove_file(partial) {
                         Ok(()) => {}
                         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -439,8 +491,7 @@ impl Store {
         for transfer in terminal_records {
             let root = self.receive_root(&transfer.transfer_id)?;
             for index in 0..transfer.items.len() {
-                let partial = root
-                    .join(".fta-partials")
+                let partial = crate::storage::partials_dir(&root)?
                     .join(format!("{}-{index}.part", transfer.transfer_id));
                 match fs::remove_file(partial) {
                     Ok(()) => {}
@@ -601,6 +652,23 @@ pub fn safe_name(name: &str) -> String {
     }
     clean
 }
+/// iOS exposes Documents in Files, so incomplete bytes belong in private Application Support.
+/// Desktop layouts stay unchanged so existing recovery records retain their original meaning.
+pub fn partials_dir(root: &Path) -> Result<PathBuf> {
+    #[cfg(target_os = "ios")]
+    {
+        use sha2::Digest;
+        let base = fta_platform::ios::paths()?.state_dir.join("partials");
+        Ok(base.join(hex::encode(sha2::Sha256::digest(
+            root.as_os_str().as_encoded_bytes(),
+        ))))
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        Ok(root.join(".fta-partials"))
+    }
+}
+
 pub fn receiving_dir(root: &Path) -> Result<PathBuf> {
     if fs::symlink_metadata(root).is_ok_and(|m| m.file_type().is_symlink()) {
         return Err(Error::new(
@@ -610,7 +678,7 @@ pub fn receiving_dir(root: &Path) -> Result<PathBuf> {
     }
     fs::create_dir_all(root)?;
     let root = fs::canonicalize(root)?;
-    private_dir(&root.join(".fta-partials"))?;
+    private_dir(&crate::storage::partials_dir(&root)?)?;
     Ok(root)
 }
 /// Publish atomically without overwriting; no-replace rename supports filesystems without hard links.
@@ -868,5 +936,38 @@ mod tests {
             assert_eq!(fs::read(target).unwrap(), b"same");
             assert!(!partial.exists());
         }
+    }
+    // Relocation must preserve IDs/cursors and must not rewrite another configured destination.
+    #[test]
+    fn sandbox_relocation_rebases_only_owned_receiver_paths() {
+        let (temp, store) = store_fixture();
+        let root = temp.path().canonicalize().unwrap();
+        let old = root.join("old");
+        let new = root.join("new");
+        let mut record = receiver_record();
+        store.reserve_receive(&record, &old).unwrap();
+        record.items[0].path = Some(old.join("file.txt").to_string_lossy().into());
+        record.items[0].state = "completed".into();
+        record.state = "completed".into();
+        store.save_transfer(&record).unwrap();
+        let mut other = receiver_record();
+        other.transfer_id = uuid::Uuid::new_v4().to_string();
+        let other_root = root.join("other");
+        store.reserve_receive(&other, &other_root).unwrap();
+        let events = store.events_after(0, 100).unwrap();
+        store.relocate_receive_root(&old, &new).unwrap();
+        assert_eq!(store.receive_root(&record.transfer_id).unwrap(), new);
+        assert_eq!(
+            store.transfer(&record.transfer_id).unwrap().items[0]
+                .path
+                .as_deref(),
+            new.join("file.txt").to_str()
+        );
+        assert_eq!(
+            store.events_after(0, 100).unwrap()["next_cursor"],
+            events["next_cursor"]
+        );
+        assert_eq!(store.receive_root(&other.transfer_id).unwrap(), other_root);
+        assert_eq!(store.event_cursor("ios-notifications-v1").unwrap(), 0);
     }
 }

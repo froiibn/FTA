@@ -1,7 +1,7 @@
 [package]
 name = "fta-platform"
 # Keep local release executables aligned with the installer version.
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 publish = false
 
@@ -43,3 +43,7 @@ rustix = { version = "1", features = ["fs"] }
 tempfile = "3"
 # The relocation regression reads the shortcut target through IShellLinkW rather than parsing .lnk bytes.
 windows = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
+# iOS uses its own Keychain adapter rather than the generic on-disk identity branch.
+[target.'cfg(target_os = "ios")'.dependencies]
+security-framework = "3"

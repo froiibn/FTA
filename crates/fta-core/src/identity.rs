@@ -87,9 +87,15 @@ impl Identity {
                 )?;
                 key
             };
+            #[cfg(target_os = "ios")]
+            let key = fta_platform::ios::load_identity_key(
+                disk.keychain_account
+                    .as_deref()
+                    .ok_or_else(|| Error::new("IDENTITY_ERROR", "missing Keychain account"))?,
+            )?;
             #[cfg(windows)]
             let key = fta_platform::windows::unprotect_secret(&decode_disk_key(&disk)?)?;
-            #[cfg(not(any(windows, target_os = "macos")))]
+            #[cfg(not(any(windows, target_os = "macos", target_os = "ios")))]
             let key = decode_disk_key(&disk)?;
             let identity = Self { cert, key };
             // Parsing and matching cert/key now prevents a broken identity from looking online.
@@ -107,6 +113,17 @@ impl Identity {
                 keychain_account: Some(account),
             }
         };
+        // A mobile identity must never fall through to Linux's private plaintext file format.
+        #[cfg(target_os = "ios")]
+        let disk = {
+            let account = fingerprint(&identity.cert);
+            fta_platform::ios::store_identity_key(&account, &identity.key)?;
+            DiskIdentity {
+                cert: hex::encode(&identity.cert),
+                key: None,
+                keychain_account: Some(account),
+            }
+        };
         #[cfg(windows)]
         let disk = DiskIdentity {
             cert: hex::encode(&identity.cert),
@@ -115,7 +132,7 @@ impl Identity {
             )?)),
             keychain_account: None,
         };
-        #[cfg(not(any(windows, target_os = "macos")))]
+        #[cfg(not(any(windows, target_os = "macos", target_os = "ios")))]
         let disk = DiskIdentity {
             cert: hex::encode(&identity.cert),
             key: Some(hex::encode(&identity.key)),
@@ -158,6 +175,7 @@ impl Identity {
     }
 }
 // Linux stores this field only in a mode-0600 file; Windows stores a DPAPI ciphertext.
+#[cfg(not(target_os = "ios"))]
 fn decode_disk_key(disk: &DiskIdentity) -> Result<Vec<u8>> {
     let key = disk
         .key

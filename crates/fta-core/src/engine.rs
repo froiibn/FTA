@@ -234,16 +234,34 @@ impl Engine {
                 let mut devices = self.registered_devices().await?;
                 let known: std::collections::HashSet<_> =
                     devices.iter().map(|d| d.device_id.clone()).collect();
-                let found = self
+                let found: Vec<_> = self
                     .discovered
                     .lock()
-                    .map_err(|_| Error::new("INTERNAL", "discovery lock poisoned"))?;
-                devices.extend(
-                    found
-                        .values()
-                        .filter(|d| !known.contains(&d.device_id))
-                        .cloned(),
-                );
+                    .map_err(|_| Error::new("INTERNAL", "discovery lock poisoned"))?
+                    .values()
+                    .filter(|d| !known.contains(&d.device_id))
+                    .cloned()
+                    .collect();
+                // Discovery goodbyes can be lost when Wi-Fi vanishes. Test reachability without
+                // opening a registration session, trusting a key, or submitting any payload.
+                let available = stream::iter(found)
+                    .map(|device| async move {
+                        crate::network::discovered_reachable(self, &device)
+                            .await
+                            .then_some(device)
+                    })
+                    .buffered(STATUS_PROBE_CONCURRENCY)
+                    .collect::<Vec<_>>()
+                    .await;
+                devices.extend(available.into_iter().flatten());
+                // Management/CLI retain saved registrations; the send surface requests only live targets.
+                if p.get("available_only").and_then(Value::as_bool) == Some(true) {
+                    if self.network_available() {
+                        devices.retain(|device| !device.paired || device.online);
+                    } else {
+                        devices.clear();
+                    }
+                }
                 Ok(serde_json::to_value(devices)?)
             }
             "devices.probe" => {
