@@ -93,9 +93,21 @@ impl Identity {
                     .as_deref()
                     .ok_or_else(|| Error::new("IDENTITY_ERROR", "missing Keychain account"))?,
             )?;
+            // Android must unwrap the existing identity; a lost wrapping key never silently rotates trust.
+            #[cfg(target_os = "android")]
+            let key = fta_platform::android::load_identity_key(
+                disk.keychain_account
+                    .as_deref()
+                    .ok_or_else(|| Error::new("IDENTITY_ERROR", "missing Android vault account"))?,
+            )?;
             #[cfg(windows)]
             let key = fta_platform::windows::unprotect_secret(&decode_disk_key(&disk)?)?;
-            #[cfg(not(any(windows, target_os = "macos", target_os = "ios")))]
+            #[cfg(not(any(
+                windows,
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "android"
+            )))]
             let key = decode_disk_key(&disk)?;
             let identity = Self { cert, key };
             // Parsing and matching cert/key now prevents a broken identity from looking online.
@@ -124,6 +136,17 @@ impl Identity {
                 keychain_account: Some(account),
             }
         };
+        // Android persists only a certificate/account here; its Keystore-encrypted DER lives in no-backup storage.
+        #[cfg(target_os = "android")]
+        let disk = {
+            let account = fingerprint(&identity.cert);
+            fta_platform::android::store_identity_key(&account, &identity.key)?;
+            DiskIdentity {
+                cert: hex::encode(&identity.cert),
+                key: None,
+                keychain_account: Some(account),
+            }
+        };
         #[cfg(windows)]
         let disk = DiskIdentity {
             cert: hex::encode(&identity.cert),
@@ -132,7 +155,7 @@ impl Identity {
             )?)),
             keychain_account: None,
         };
-        #[cfg(not(any(windows, target_os = "macos", target_os = "ios")))]
+        #[cfg(not(any(windows, target_os = "macos", target_os = "ios", target_os = "android")))]
         let disk = DiskIdentity {
             cert: hex::encode(&identity.cert),
             key: Some(hex::encode(&identity.key)),
@@ -175,7 +198,7 @@ impl Identity {
     }
 }
 // Linux stores this field only in a mode-0600 file; Windows stores a DPAPI ciphertext.
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn decode_disk_key(disk: &DiskIdentity) -> Result<Vec<u8>> {
     let key = disk
         .key

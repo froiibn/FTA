@@ -19,14 +19,14 @@ use tokio::io::AsyncWriteExt;
 // First-send approval reuses the isolated registration transport, never the file receiver.
 pub mod approval;
 
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const SERVICE_TYPE: &str = "_fta._tcp.local.";
 const MAX_META: usize = 256 * 1024;
 const CHUNK_SIZE: usize = 64 * 1024;
 const MAX_CONNECTIONS: usize = 32;
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const MAX_DISCOVERED_DEVICES: usize = 1000;
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const PAIR_SERVICE_TYPE: &str = "_fta-pair._tcp.local.";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 const REVOCATION_POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -275,7 +275,7 @@ fn cached_pairing_target(e: &Engine, target: &str) -> Result<Option<String>> {
 }
 
 // Refresh only registration discovery; never guess the ordinary transfer port or replay /pair/hello.
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 async fn resolve_pairing_target(e: &Engine, target: &str) -> Result<String> {
     if target.parse::<SocketAddr>().is_ok() {
         return Ok(target.into());
@@ -1395,7 +1395,7 @@ impl Drop for PairAdvertisement {
         }
     }
 }
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn discovery_daemon(config: &Config) -> Result<mdns_sd::ServiceDaemon> {
     let daemon = mdns_sd::ServiceDaemon::new().map_err(net_error)?;
     daemon
@@ -1406,7 +1406,7 @@ fn discovery_daemon(config: &Config) -> Result<mdns_sd::ServiceDaemon> {
         .map_err(net_error)?;
     Ok(daemon)
 }
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn service_info(config: &Config, service_type: &str, port: u16) -> Result<mdns_sd::ServiceInfo> {
     let host = format!("fta-{}.local.", config.device_id);
     let properties = [
@@ -1425,7 +1425,7 @@ fn service_info(config: &Config, service_type: &str, port: u16) -> Result<mdns_s
     )
     .map_err(net_error)
 }
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn advertise_pairing(e: &Engine, session: &PairSession) -> Result<Option<mdns_sd::ServiceDaemon>> {
     let config = e.config()?;
     if !config.discovery_enabled || config.listen_addr.ip().is_loopback() {
@@ -1442,7 +1442,7 @@ fn advertise_pairing(e: &Engine, session: &PairSession) -> Result<Option<mdns_sd
     Ok(Some(daemon))
 }
 /// Only address hints are accepted from discovery; authentication always happens on the TLS socket.
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn apply_discovery_event(
     e: &Engine,
     config: &Config,
@@ -1510,7 +1510,7 @@ fn apply_discovery_event(
     Ok(())
 }
 /// Browse temporary registration endpoints separately from ordinary transfer listeners.
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub fn start_discovery(e: Arc<Engine>) -> Result<Option<mdns_sd::ServiceDaemon>> {
     let config = e.config()?;
     e.ensure_network()?;
@@ -1824,18 +1824,18 @@ mod discovery_tests {
     }
 }
 
-// The iOS host publishes actual bound ports with NetService and feeds resolved LAN hints back.
-#[cfg(target_os = "ios")]
+// Native mobile hosts publish actual ports through Bonjour/Android NSD and feed only untrusted LAN hints back.
+#[cfg(any(target_os = "ios", target_os = "android"))]
 fn advertise_pairing(_: &Engine, _: &PairSession) -> Result<Option<mdns_sd::ServiceDaemon>> {
     Ok(None)
 }
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "android"))]
 pub fn start_discovery(_: Arc<Engine>) -> Result<Option<mdns_sd::ServiceDaemon>> {
     Ok(None)
 }
 
-// Native Bonjour may resolve after the send tap; wait only within the existing online budget.
-#[cfg(target_os = "ios")]
+// Native service discovery may resolve after the send tap; wait only within the existing online budget.
+#[cfg(any(target_os = "ios", target_os = "android"))]
 async fn resolve_pairing_target(e: &Engine, target: &str) -> Result<String> {
     if target.parse::<SocketAddr>().is_ok() {
         return Ok(target.into());

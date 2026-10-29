@@ -58,3 +58,7 @@
 ## 모바일 확장 분석 보완 (2026-10-29)
 
 사용자 요청으로 모바일끼리와 기존 OS 사이 송수신을 목표에 포함한다. iOS 초안은 네이티브 SwiftUI와 공통 Rust를 사용한다. 앱 전면 수신을 기본으로 하며 iOS의 절전·백그라운드 제한 때문에 등록 상태와 실제 수신 가능 상태를 분리한다. 외부 문서 공급자의 URL은 일반 경로로 간주하지 않고 사용자 선택 권한 하에 로컬 사본을 준비한다. [iOS 경계와 후속 범위](platforms/ios.md).
+
+## Android 구현 분석 보완 (2026-10-30)
+
+사용자 지시에 따라 Android 초안을 별도 폴더에서 구현한다. 기존 모바일 C ABI와 공통 Rust의 등록·TLS·파일 저장/기록을 재사용하고, Android 기본 Java 컨트롤·NSD·SAF/Photo Picker·Keystore만 OS 계층에서 추가한다. Tauri/TypeScript 화면 재사용 대신 OS 기본 입력/권한/문서 공급자 경로를 선택했으며 데스크톱 스택은 유지한다. Android 17 LAN 권한, no-backup 키 래핑, 수신 파일 공급자와 전면 수신의 실제 경계는 [Android 설계](platforms/android.md)를 따른다.

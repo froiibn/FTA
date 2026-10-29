@@ -73,15 +73,18 @@ pub fn open_file(path: &Path, allowed_roots: Option<&[PathBuf]>) -> Result<File>
     }
     Ok(file)
 }
-// The OS-owned container is the iOS trust anchor; opening system ancestors is sandbox-denied.
-#[cfg(target_os = "ios")]
+// Native mobile containers are trust anchors; sandbox policy can deny opening their system ancestors.
+#[cfg(any(target_os = "ios", target_os = "android"))]
 fn open_root_nofollow(root: &Path) -> Result<cap_std::fs::Dir> {
+    #[cfg(target_os = "ios")]
     let (anchor, handle) = fta_platform::ios::source_anchor()?;
+    #[cfg(target_os = "android")]
+    let (anchor, handle) = fta_platform::android::source_anchor()?;
     open_root_from_anchor(root, &anchor, handle)
 }
 
 /// Open each physical root component relative to the previous handle, never following a replacement link.
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn open_root_nofollow(root: &Path) -> Result<cap_std::fs::Dir> {
     let mut anchor = PathBuf::new();
     let mut names = Vec::new();
@@ -114,8 +117,8 @@ fn open_root_nofollow(root: &Path) -> Result<cap_std::fs::Dir> {
     }
     Ok(cap_std::fs::Dir::from_std_file(handle))
 }
-// Only the starting handle differs on iOS. Every grant component below it retains the same link checks.
-#[cfg(any(target_os = "ios", all(test, unix)))]
+// Only the starting handle differs on mobile. Every grant component below it retains the same link checks.
+#[cfg(any(target_os = "ios", target_os = "android", all(test, unix)))]
 fn open_root_from_anchor(root: &Path, anchor: &Path, mut handle: File) -> Result<cap_std::fs::Dir> {
     let relative = root.strip_prefix(anchor).map_err(|_| {
         Error::new(

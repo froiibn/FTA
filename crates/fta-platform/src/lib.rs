@@ -56,3 +56,9 @@ pub fn publish_noreplace(
 pub mod ios;
 #[cfg(target_os = "ios")]
 pub use ios::paths;
+
+// Android paths and key protection are supplied by its native host rather than desktop environment defaults.
+#[cfg(target_os = "android")]
+pub mod android;
+#[cfg(target_os = "android")]
+pub use android::paths;

@@ -1,0 +1,23 @@
+[package]
+name = "fta-android"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+# Reuse the already-tested mobile engine host; Android supplies different OS adapters, never a second protocol.
+fta-ios = { path = "../../ios/bridge" }
+fta-platform = { path = "../../../crates/fta-platform" }
+serde_json = "1"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+# Reuse existing engine/runtime crates for a real emulator-to-Mac TLS verification fixture.
+fta-core = { path = "../../../crates/fta-core" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "net"] }

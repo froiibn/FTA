@@ -1,0 +1,12 @@
+<resources>
+    <!-- Framework controls keep Android accessibility/input behavior; FTA's existing white/green palette stays explicit. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#34C759</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#102032</item>
+        <item name="android:colorControlNormal">#FFFFFF</item>
+    </style>
+</resources>

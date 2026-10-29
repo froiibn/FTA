@@ -1,0 +1,5 @@
+/* Keep the JNI surface explicit and discard unrelated archive code; no Rust internals need runtime symbol lookup. */
+{
+    global: JNI_OnLoad; Java_app_fta_android_NativeBridge_nativeCall; Java_app_fta_android_NativeBridge_nativeConfigure;
+    local: *;
+};
