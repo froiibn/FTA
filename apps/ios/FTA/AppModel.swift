@@ -42,6 +42,8 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     @Published var activeID: String?
     @Published var deciding = false
     @Published var notificationStatus = "확인 중"
+    private let preferences = NetworkPreferences()
+    private var serviceBlocked = false
     private let bonjour = Bonjour()
     private let notifications = NotificationRouter()
     private let monitor = NWPathMonitor()
@@ -53,25 +55,19 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     private let consumer = "ios-notifications-v1"
 
     init() {
-        selectedLAN = lans.first?.id ?? ""
+        receiveEnabled = preferences.receiveEnabled
+        restoreConnections(lans)
         UNUserNotificationCenter.current().delegate = notifications
         notifications.open = { [weak self] id in Task { @MainActor in self?.tab = 1; await self?.openRecord(id) } }
         bonjour.failure = { [weak self] text in
-            self?.error = text; self?.confirmed = false; self?.updateLifecycle()
+            self?.error = text; self?.serviceBlocked = true; self?.updateLifecycle()
         }
         monitor.pathUpdateHandler = { [weak self] path in
             let usableLAN = path.status == .satisfied && (path.usesInterfaceType(.wifi) || path.usesInterfaceType(.wiredEthernet))
             Task { @MainActor in
                 guard let self else { return }
-                self.lans = usableLAN ? LAN.available() : []
-                if let active = self.activeLAN, !usableLAN || !self.lans.contains(active) {
-                    // Invalidate before awaiting Rust shutdown, so a stale probe cannot restore Wi-Fi targets.
-                    self.deviceEpoch += 1
-                    self.selectedPeer = nil
-                    self.confirmed = false
-                    self.notice = "네트워크가 변경되어 송수신을 중지했습니다. 사용할 집 네트워크를 다시 확인하세요."
-                    self.updateLifecycle()
-                }
+                self.restoreConnections(usableLAN ? LAN.available() : [])
+                self.updateLifecycle()
             }
         }
         monitor.start(queue: DispatchQueue(label: "fta.ios.network"))
@@ -88,27 +84,82 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         }
     }
     // Preserve offline trust records for settings, but never offer them as send targets.
-    var targets: [Peer] { running && confirmed ? peers.filter { !$0.paired || $0.online } : [] }
+    var targets: [Peer] { foreground && running && confirmed && receiveEnabled && !serviceBlocked && activeLAN == lan ? peers.filter { !$0.paired || $0.online } : [] }
     var selected: Peer? { targets.first { $0.id == selectedPeer } }
     var canSend: Bool { running && !sending && !importing && selected?.selectable == true }
     var lan: LAN? { lans.first { $0.id == selectedLAN } }
     var serviceText: String { starting ? "수신 준비 중" : (running ? "이 화면이 열려 있는 동안 수신 가능" : "송수신 중지됨") }
 
+    // Restore durable consent without revoking it on path changes; migrate only a recorded legacy approval.
+    private func restoreConnections(_ available: [LAN]) {
+        // The old engine config is evidence of a prior explicit start, not inferred LAN-wide consent.
+        if let data = try? Data(contentsOf:Sandbox.state.appendingPathComponent("config.json")),
+           let config = try? JSONSerialization.jsonObject(with:data) as? [String:Any],
+           let networks = config["allowed_networks"] as? [String] {
+            for connection in available {
+                preferences.adoptLegacyNetworks(networks,interface:connection.name,network:connection.network)
+            }
+        }
+        let old = lan
+        let chosen = available.first { $0.id == selectedLAN }
+            ?? available.first { $0.trustScope == preferences.selectedScope }
+            ?? available.first { preferences.trusts($0.trustScope) }
+            ?? available.first
+        lans = available
+        selectedLAN = chosen?.id ?? ""
+        confirmed = chosen.map { preferences.trusts($0.trustScope) } ?? false
+        if old != chosen {
+            deviceEpoch += 1; selectedPeer = nil; serviceBlocked = false
+        }
+    }
+    func selectLAN(_ id: String) {
+        selectedLAN = id
+        if let lan { preferences.selectedScope = lan.trustScope }
+        confirmed = lan.map { preferences.trusts($0.trustScope) } ?? false
+        deviceEpoch += 1; selectedPeer = nil; serviceBlocked = false
+        updateLifecycle()
+    }
+    func setNetworkTrusted(_ trusted: Bool) {
+        guard let lan else { return }
+        preferences.setTrusted(trusted,scope:lan.trustScope)
+        preferences.selectedScope = lan.trustScope
+        confirmed = trusted; serviceBlocked = false; updateLifecycle()
+    }
+    func setReceiveEnabled(_ enabled: Bool) {
+        receiveEnabled = enabled; preferences.receiveEnabled = enabled
+        serviceBlocked = false; updateLifecycle()
+    }
+    // NWPath gates stale interface addresses so cellular/VPN paths never restore LAN trust.
+    private var usableConnections: [LAN] {
+        let path = monitor.currentPath
+        return path.status == .satisfied && (path.usesInterfaceType(.wifi) || path.usesInterfaceType(.wiredEthernet)) ? LAN.available() : []
+    }
+    func setForeground(_ active: Bool) {
+        foreground = active
+        // Suspension pauses the listener, while returning restores previously approved LANs.
+        if active { serviceBlocked = false; restoreConnections(usableConnections) }
+        updateLifecycle()
+    }
     func updateLifecycle() {
         let previous = lifecycle
         lifecycle = Task { [weak self] in
             await previous?.value
             guard let self else { return }
-            if self.foreground && self.confirmed && self.receiveEnabled { await self.startIfNeeded() }
+            if self.running && self.activeLAN != self.lan { await self.stop() }
+            if self.foreground && self.confirmed && self.receiveEnabled && !self.serviceBlocked { await self.startIfNeeded() }
             else { await self.stop() }
         }
     }
     private func startIfNeeded() async {
-        guard !running, let lan else { return }
+        guard !running, let lan, usableConnections.contains(lan) else { return }
         starting = true; defer { starting = false }
         do {
             try Sandbox.prepare()
             let data = try await Engine.call("host.start", ["state_dir":Sandbox.state.path,"receive_dir":Sandbox.received.path,"display_name":name,"listen_addr":"\(lan.address):0","allowed_networks":[lan.network]]) as? [String:Any] ?? [:]
+            // A path/scene change can arrive while Rust binds; never advertise a stale listener.
+            guard foreground, confirmed, receiveEnabled, !serviceBlocked, self.lan == lan, usableConnections.contains(lan) else {
+                _ = try await Engine.call("host.stop"); return
+            }
             activeLAN = lan; running = true
             bonjour.start(); bonjour.advertise(data, name: name)
             polling = Task { [weak self] in
@@ -155,8 +206,8 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         } catch { self.error = error.localizedDescription }
     }
     func refreshActivity() async {
-        if let activeLAN, !LAN.available().contains(activeLAN) {
-            confirmed = false; notice = "집 네트워크가 변경되어 송수신을 중지했습니다."; updateLifecycle(); return
+        if let activeLAN, !usableConnections.contains(activeLAN) {
+            restoreConnections(usableConnections); updateLifecycle(); return
         }
         guard running else { await refreshLocalHistory(); return }
         do {
@@ -195,13 +246,13 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         do { _ = try await Engine.call(accept ? "registration.accept" : "registration.reject",["session_id":request.id]); await refreshActivity() }
         catch { self.error = error.localizedDescription }
     }
-    func sendFiles() async { await send(kind:"files", extras:["paths":files.map(\.path)]) }
-    func sendPhotos() async { await send(kind:"files", extras:["paths":photos.map(\.path)], photoTransfer:true) }
+    // One attachment composer sends all selected sources through the same streaming engine.
+    func sendAttachments() async { await send(kind:"files", extras:["paths":(photos + files).map(\.path)]) }
     // The composer has no mode switch: classify only to preserve link actions on the receiver.
     func sendMessage() async { await send(kind:MessageContent.kind(for:message),extras:["body":message]) }
-    private func send(kind: String, extras: [String:Any], photoTransfer: Bool = false) async {
+    private func send(kind: String, extras: [String:Any]) async {
         guard canSend, let peer = selected else { return }
-        guard kind == "files" ? !(photoTransfer ? photos : files).isEmpty : !message.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { return }
+        guard kind == "files" ? !(photos + files).isEmpty : !message.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { return }
         sending = true; let id = UUID().uuidString.lowercased(); activeID = id; progress = nil
         defer { sending = false; activeID = nil }
         var params = extras; params["kind"] = kind; params["to"] = peer.id; params["transfer_id"] = id
@@ -209,7 +260,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
             let result = try await Engine.decode(Transfer.self,"transfers.send_discovered",params)
             progress = result; notice = result.status
             if result.state == "completed" {
-                if kind == "files" { if photoTransfer { clearPhotos() } else { clearFiles() } } else { message = "" }
+                if kind == "files" { clearPhotos(); clearFiles() } else { message = "" }
             }
             await refreshActivity()
         } catch { self.error = error.localizedDescription; await refreshActivity() }
@@ -224,13 +275,14 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         importing = true; defer { importing = false }
         do {
             // Coordinate reads under the provider's security scope; copy on a worker before releasing grants.
+            let photoCount = photos.count
             let copied = try await Task.detached(priority:.userInitiated) {
                 try Sandbox.prepare()
                 let directory = Sandbox.outgoing.appendingPathComponent(UUID().uuidString, isDirectory:true)
                 try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
                 var copied: [URL] = []
                 do {
-                    guard !urls.isEmpty, urls.count <= 100 else { throw EngineFailure(code:"TOO_LARGE",message:"파일은 한 번에 100개까지 선택하세요") }
+                    guard !urls.isEmpty, urls.count + photoCount <= PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:"사진과 파일은 합쳐서 100개까지 선택하세요") }
                     for url in urls {
                         let scoped = url.startAccessingSecurityScopedResource()
                         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -255,13 +307,13 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
             clearFiles(); files = copied
         } catch { self.error = error.localizedDescription }
     }
-    // Gallery and Files have independent drafts; successful transmission clears only its own selection.
+    // Picker cancellation keeps both drafts; only a completed combined transfer clears them.
     func importPhotos(_ providers: [NSItemProvider]) async {
         guard !sending, !importing, !providers.isEmpty else { return }
         importing = true; defer { importing = false }
         var directory: URL?
         do {
-            guard providers.count <= PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:"사진은 한 번에 100개까지 선택하세요") }
+            guard providers.count + files.count <= PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:"사진과 파일은 합쳐서 100개까지 선택하세요") }
             let session = try PhotoStaging.session(); directory = session
             var selected: [URL] = []
             for provider in providers { selected.append(try await PhotoStaging.copy(provider,into:session)) }
@@ -275,6 +327,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         guard !sending, !importing else { return }
         importing = true; defer { importing = false }
         do {
+            guard files.count < PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:"사진과 파일은 합쳐서 100개까지 선택하세요") }
             // JPEG encoding and disk I/O must not freeze the native camera dismissal.
             let photo = try await Task.detached(priority:.userInitiated) {
                 let directory = try PhotoStaging.session()

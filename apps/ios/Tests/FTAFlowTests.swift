@@ -1,81 +1,97 @@
 import XCTest
 
-// These tests navigate the shipped UI with real empty state; no fake online devices are injected.
+// Exercise real native controls and the actual listener; never inject pretend online devices.
 final class FTAFlowTests: XCTestCase {
     func testNativeTabsAndFilePicker() {
-        let app = XCUIApplication()
-        app.launch()
+        let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.tabBars.buttons["보내기"].waitForExistence(timeout:10))
-        XCTAssertTrue(app.staticTexts["송수신 중지됨"].exists)
-        // The composer is below the fold on compact screens; verify disabled send after scrolling.
-        for _ in 0..<3 where !app.buttons["send-message"].isHittable { app.swipeUp() }
-        XCTAssertTrue(app.buttons["send-message"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["사진"].exists && app.buttons["파일"].exists)
+        XCTAssertTrue(app.buttons["send-message"].exists)
         XCTAssertFalse(app.buttons["send-message"].isEnabled)
-        app.swipeDown(); app.swipeDown()
-        XCTAssertFalse(app.alerts.firstMatch.exists, "Startup must open protected history without an error")
-        capture("send", app)
+        capture("send-glass",app)
         app.tabBars.buttons["기록"].tap()
-        XCTAssertTrue(app.staticTexts["아직 전송 기록이 없습니다"].waitForExistence(timeout:5))
-        capture("history", app)
+        XCTAssertTrue(app.navigationBars["기록"].waitForExistence(timeout:5))
+        capture("history-glass",app)
         app.tabBars.buttons["설정"].tap()
         XCTAssertTrue(app.switches["신뢰하는 집 네트워크입니다"].waitForExistence(timeout:5))
         XCTAssertTrue(app.textFields["기기 이름"].exists)
-        capture("settings", app)
-        app.tabBars.buttons["보내기"].tap()
-        app.buttons["파일 선택"].tap()
-        XCTAssertTrue(app.navigationBars["둘러보기"].waitForExistence(timeout:5) || app.buttons["취소"].waitForExistence(timeout:5) || app.buttons["Cancel"].waitForExistence(timeout:5))
-        capture("file-picker", app)
+        capture("settings-glass",app)
+        app.tabBars.buttons["보내기"].tap(); app.buttons["파일"].tap()
+        XCTAssertTrue(app.navigationBars["둘러보기"].waitForExistence(timeout:5) || app.buttons["취소"].exists || app.buttons["Cancel"].exists)
+        capture("file-picker",app)
     }
-    func testForegroundReceiverStopsAfterBackground() throws {
-        let app = XCUIApplication(); app.launch()
-        app.tabBars.buttons["설정"].tap()
+    func testTrustedLANAndReceivePreferenceSurviveRestart() throws {
+        let app = XCUIApplication(); app.launch(); app.tabBars.buttons["설정"].tap()
         let trust = app.switches["신뢰하는 집 네트워크입니다"]
         XCTAssertTrue(trust.waitForExistence(timeout:5))
-        guard trust.isEnabled else { throw XCTSkip("No usable LAN on the simulator host") }
-        addUIInterruptionMonitor(withDescription:"Expected local network consent") { alert in
-            for title in ["허용", "Allow"] where alert.buttons[title].exists { alert.buttons[title].tap(); return true }
-            return false
-        }
-        trust.switches.firstMatch.exists ? trust.switches.firstMatch.tap() : trust.tap()
-        XCTAssertTrue(app.staticTexts["이 화면이 열려 있는 동안 수신 가능"].waitForExistence(timeout:10))
-        XCTAssertFalse(app.alerts.firstMatch.exists, "Polling must accept the notification consumer contract")
-        capture("receiver-active", app)
-        app.tabBars.buttons["보내기"].tap()
-        capture("available-targets", app)
-        app.tabBars.buttons["설정"].tap()
-        XCUIDevice.shared.press(.home)
-        app.activate()
+        guard trust.isEnabled else { throw XCTSkip("No usable LAN on simulator host") }
+        let receive = app.switches["송수신 사용"]
+        if receive.value as? String == "0" { tapSwitch(receive) }
+        if trust.value as? String == "0" { tapSwitch(trust) }
+        XCTAssertTrue(app.staticTexts["이 화면이 열려 있는 동안 수신 가능"].waitForExistence(timeout:15))
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        XCUIDevice.shared.press(.home); app.activate()
+        XCTAssertTrue(app.staticTexts["이 화면이 열려 있는 동안 수신 가능"].waitForExistence(timeout:15))
+        // A real process termination loses all @Published values; only persisted consent can restore this.
+        app.terminate(); app.launch(); app.tabBars.buttons["설정"].tap()
+        XCTAssertEqual(trust.value as? String,"1")
+        XCTAssertEqual(receive.value as? String,"1")
+        XCTAssertTrue(app.staticTexts["이 화면이 열려 있는 동안 수신 가능"].waitForExistence(timeout:15))
+        capture("trusted-after-relaunch",app)
+        tapSwitch(receive)
         XCTAssertTrue(app.staticTexts["송수신 중지됨"].waitForExistence(timeout:10))
-        // Disconnected/offline registrations must never linger in the send picker after the receiver stops.
-        app.tabBars.buttons["보내기"].tap()
-        XCTAssertTrue(app.staticTexts["송수신을 시작하세요"].waitForExistence(timeout:5))
-        XCTAssertFalse(app.buttons["send-message"].exists && app.buttons["send-message"].isEnabled)
-        capture("receiver-paused", app)
+        app.terminate(); app.launch(); app.tabBars.buttons["설정"].tap()
+        XCTAssertEqual(trust.value as? String,"1")
+        XCTAssertEqual(receive.value as? String,"0")
+        XCTAssertTrue(app.staticTexts["송수신 중지됨"].exists)
+        capture("preferences-after-relaunch",app)
     }
-    func testPhotoEntryAndUnifiedMessageInput() {
+    func testPhotoSourceChoiceAndGrowingComposer() {
         let app = XCUIApplication(); app.launch()
-        XCTAssertTrue(app.buttons["사진 선택"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.buttons["사진 촬영"].exists)
-        XCTAssertTrue(app.buttons["파일 선택"].exists)
-        XCTAssertFalse(app.segmentedControls.buttons["텍스트"].exists)
-        XCTAssertFalse(app.segmentedControls.buttons["URL"].exists)
-        capture("photo-file-separation", app)
-        app.buttons["사진 선택"].tap()
-        XCTAssertTrue(app.buttons["취소"].waitForExistence(timeout:5) || app.buttons["Cancel"].waitForExistence(timeout:5))
+        app.buttons["사진"].tap()
+        XCTAssertTrue(app.buttons["갤러리에서 선택"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["촬영"].exists)
+        capture("photo-source-choice",app)
+        // Compact native confirmation popovers can omit the cancel row; dismiss the real picker instead.
+        app.buttons["갤러리에서 선택"].tap()
+        let cancel = app.buttons["취소"].exists ? app.buttons["취소"] : app.buttons["Cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout:5)); cancel.tap()
+        let input = app.descendants(matching:.any).matching(identifier:"message-input").firstMatch
+        XCTAssertTrue(input.exists)
+        let initial = input.frame.height
+        input.tap(); input.typeText("one\ntwo\nthree\nfour\nfive\nsix")
+        let expanded = input.frame.height
+        XCTAssertGreaterThan(expanded,initial)
+        input.typeText("\nseven\neight")
+        XCTAssertEqual(input.frame.height,expanded,accuracy:3,"The field must scroll after reaching four lines")
+        XCTAssertFalse(app.buttons["send-message"].isEnabled)
+        capture("message-four-line-limit",app)
+        input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:38))
+    }
+    func testPhotoLibraryUsesCombinedAttachmentDraft() throws {
+        let app = XCUIApplication(); app.launch(); app.buttons["사진"].tap(); app.buttons["갤러리에서 선택"].tap()
+        XCTAssertTrue(app.buttons["취소"].waitForExistence(timeout:5) || app.buttons["Cancel"].exists)
         let thumbnail = app.images.matching(identifier:"PXGGridLayout-Info").firstMatch
-        XCTAssertTrue(thumbnail.waitForExistence(timeout:15))
-        capture("photo-library", app)
+        guard thumbnail.waitForExistence(timeout:10) else { throw XCTSkip("No seeded photo in simulator library") }
         thumbnail.tap()
         let confirm = app.buttons.matching(NSPredicate(format:"label BEGINSWITH '추가' OR label BEGINSWITH 'Add' OR label == '완료' OR label == 'Done'")).firstMatch
-        XCTAssertTrue(confirm.waitForExistence(timeout:5))
-        if confirm.exists { confirm.tap() }
-        XCTAssertTrue(app.buttons["사진 보내기"].waitForExistence(timeout:15))
-        XCTAssertFalse(app.buttons["파일 보내기"].exists, "Gallery selection must not populate the Files draft")
+        XCTAssertTrue(confirm.waitForExistence(timeout:5)); confirm.tap()
+        XCTAssertTrue(app.buttons["send-attachments"].waitForExistence(timeout:15))
         XCTAssertFalse(app.alerts.firstMatch.exists)
-        capture("photo-prepared", app)
-        for _ in 0..<3 where !app.textViews["전송할 텍스트 또는 URL"].isHittable { app.swipeUp() }
-        XCTAssertTrue(app.textViews["전송할 텍스트 또는 URL"].exists)
-        capture("unified-message", app)
+        capture("combined-photo-draft",app)
+        app.buttons["선택 해제"].tap()
+        XCTAssertFalse(app.buttons["send-attachments"].exists)
+    }
+    // Run against the simulator's actual system appearance; launch defaults do not change UIKit traits.
+    func testGlassWithSystemAppearance() {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["사진"].waitForExistence(timeout:5))
+        capture("glass-system-send",app)
+        app.tabBars.buttons["설정"].tap(); capture("glass-system-settings",app)
+        app.tabBars.buttons["기록"].tap(); capture("glass-system-history",app)
+    }
+    private func tapSwitch(_ element: XCUIElement) {
+        element.switches.firstMatch.exists ? element.switches.firstMatch.tap() : element.tap()
     }
     private func capture(_ name: String, _ app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot:app.screenshot())

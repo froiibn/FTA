@@ -6,6 +6,8 @@ struct LAN: Identifiable, Equatable {
     let name: String
     let address: String
     let network: String
+    // DHCP renewals change the listener address without revoking subnet consent.
+    var trustScope: String { NetworkPreferences.scope(interface:name,network:network) }
     var id: String { "\(name):\(address):\(network)" }
     static func available() -> [LAN] {
         var head: UnsafeMutablePointer<ifaddrs>?

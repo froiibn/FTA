@@ -1,16 +1,17 @@
-import AppKit
-// Reuse the desktop transfer arrows, with an opaque edge-to-edge canvas for iOS's own icon mask.
+import CoreGraphics
+import ImageIO
+import Foundation
+
+// Reuse the desktop's actual pixels; a standalone bitmap context avoids AppKit's absent display context.
+// iOS icons must be opaque, so only the desktop's transparent outer canvas is flattened onto white.
 let side = 1024
-let image = NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:side,pixelsHigh:side,bitsPerSample:8,samplesPerPixel:3,hasAlpha:false,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:0,bitsPerPixel:0)!
-NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep:image)
-NSColor(calibratedRed:36/255,green:70/255,blue:107/255,alpha:1).setFill()
-NSBezierPath(rect:NSRect(x:0,y:0,width:side,height:side)).fill()
-NSColor.white.setStroke()
-let path = NSBezierPath(); path.lineWidth = 58; path.lineCapStyle = .round; path.lineJoinStyle = .round
-func move(_ x:Double,_ y:Double) { path.move(to:NSPoint(x:x,y:1024-y)) }
-func line(_ x:Double,_ y:Double) { path.line(to:NSPoint(x:x,y:1024-y)) }
-move(264,352); line(760,352); move(632,224); line(760,352); line(632,480)
-move(760,672); line(264,672); move(392,544); line(264,672); line(392,800)
-path.stroke(); NSGraphicsContext.restoreGraphicsState()
-try image.representation(using:.png,properties:[:])!.write(to:URL(fileURLWithPath:CommandLine.arguments[1]))
+let source = CGImageSourceCreateWithURL(URL(fileURLWithPath:CommandLine.arguments[1]) as CFURL,nil)!
+let image = CGImageSourceCreateImageAtIndex(source,0,nil)!
+let context = CGContext(data:nil,width:side,height:side,bitsPerComponent:8,bytesPerRow:side*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.noneSkipLast.rawValue)!
+context.setFillColor(CGColor(gray:1,alpha:1))
+context.fill(CGRect(x:0,y:0,width:side,height:side))
+context.interpolationQuality = .high
+context.draw(image,in:CGRect(x:0,y:0,width:side,height:side))
+let output = CGImageDestinationCreateWithURL(URL(fileURLWithPath:CommandLine.arguments[2]) as CFURL,"public.png" as CFString,1,nil)!
+CGImageDestinationAddImage(output,context.makeImage()!,nil)
+precondition(CGImageDestinationFinalize(output),"Could not write the iOS icon")

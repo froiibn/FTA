@@ -75,3 +75,11 @@ output/ios-content-checks
 ```
 
 구현·검증 결과와 남은 실기기 항목은 [iOS 설계](../../docs/platforms/ios.md)를 따른다.
+
+## 2026-10-30 모바일 수정
+
+신뢰한 허용 대역·선택한 연결·송수신 사용은 재실행과 재접속 후 복원한다. 이전 엔진에 기록된 단일 승인 대역만 현재 연결과 정확히 일치할 때 이관하며 기본 대역 목록이나 새 연결을 임의 승인하지 않는다. 보내기 화면은 가로 기기 아이콘·흰색 사진/파일 버튼·통합 첨부·최대 네 줄 메시지와 원형 전송 아이콘으로 구성한다. 라이트/다크 시스템 외관과 네이티브 반투명 소재를 사용한다.
+
+아이콘 재생성은 `xcrun swift apps/ios/scripts/render-icon.swift apps/desktop/src-tauri/icons/icon.png apps/ios/FTA/Assets.xcassets/AppIcon.appiconset/AppIcon.png`로 수행한다. 공통 데스크톱 원본의 투명 바깥 영역만 iOS 요구에 맞춰 흰색으로 채운다.
+
+설정 저장 회귀는 `xcrun swiftc apps/ios/FTA/NetworkPreferences.swift apps/ios/Tests/NetworkPreferencesChecks.swift -o output/ios-network-checks` 후 해당 실행 파일로 검사한다. UI 검사는 재실행·백그라운드 복귀·송수신 중지 유지·갤러리 첨부·네 줄 메시지·시스템 외관을 실제 앱으로 검사한다. 검증 수치와 실기 설치 결과는 iOS 플랫폼 문서의 최신 검증 기록을 따른다.
