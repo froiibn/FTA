@@ -21,13 +21,13 @@ FTA는 **File Transfer Anything**의 약자다.
 
 | 플랫폼 | 제공 파일 | 설치·사용 안내 |
 |---|---|---|
-| macOS · Apple Silicon | [0.1.2 사전 릴리스 DMG · Developer ID 서명](https://github.com/froiibn/FTA/releases/download/v0.1.2/FTA_0.1.2_aarch64.dmg) | [앱 설치·메뉴 막대·빌드](packaging/macos/README.md) |
+| macOS · Apple Silicon | [서명·공증 DMG · v0.1.2](https://github.com/froiibn/FTA/releases/download/v0.1.2/FTA_0.1.2_aarch64.dmg) | [앱 설치·메뉴 막대·빌드](packaging/macos/README.md) |
 | Windows · x64 | [설치 프로그램 · v0.1.1](https://github.com/froiibn/FTA/releases/download/v0.1.1/FTA_0.1.1_x64-setup.exe) | [앱 설치·트레이·빌드](packaging/windows/README.md) |
 | Linux | 소스에서 CLI·엔진 빌드 | [서버 설치·systemd 서비스](packaging/linux/README.md) |
 
 macOS는 DMG에서 `FTA.app`을 Applications로 옮겨 설치하고, Windows는 설치 마법사에서 설치 폴더를 선택한다. 설정·등록 정보는 사용자별 데이터 폴더에, 수신 파일은 사용자가 지정한 수신 폴더에 저장한다.
 
-0.1.2는 Mac에서 로컬 검증·빌드한 사전 릴리스이며 모바일 아이콘과 온라인 전송 목록 수정을 포함한다. 새 Mac 파일은 Developer ID 서명 대상이며 공증은 미수행이다. 기존 [공증 완료 Mac 0.1.1](https://github.com/froiibn/FTA/releases/tag/v0.1.1)도 유지한다. Windows 설치 파일은 현재 0.1.1이며 0.1.2는 Windows에서 별도 빌드·검증 후 추가한다. 두 버전은 최초 전송 시 수신자 등록 확인을 지원한다. 이전 v0.1.0 릴리스의 수동 등록 방식과 구분하며, 최초 전송 승인 기능은 양쪽 기기에 지원 버전이 필요하다.
+0.1.2는 Mac에서 로컬 검증·빌드한 릴리스이며 모바일 아이콘과 온라인 전송 목록 수정을 포함한다. Mac 배포본은 Developer ID 서명·Apple 공증을 적용하며 실제 결과와 해시는 릴리스의 빌드 정보에서 확인한다. 기존 [Mac 0.1.1](https://github.com/froiibn/FTA/releases/tag/v0.1.1)도 유지한다. Windows 설치 파일은 현재 0.1.1이며 0.1.2는 Windows에서 별도 빌드·검증 후 추가한다. 두 버전은 최초 전송 시 수신자 등록 확인을 지원한다. 이전 v0.1.0 릴리스의 수동 등록 방식과 구분하며, 최초 전송 승인 기능은 양쪽 기기에 지원 버전이 필요하다.
 
 ## 처음 사용하기
 
