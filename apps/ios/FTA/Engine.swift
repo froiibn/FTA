@@ -92,6 +92,8 @@ struct Cursor: Decodable { let sequence: UInt64 }
 
 // Foundation derives sandbox locations so restored installations never retain an old absolute path.
 enum Sandbox {
+    // Foundation identifies the OS-owned container; Rust must not open its inaccessible system parents.
+    static var container: URL { URL(fileURLWithPath:NSHomeDirectory(),isDirectory:true).resolvingSymlinksInPath() }
     static var state: URL { FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("FTA", isDirectory: true).resolvingSymlinksInPath() }
     static var received: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("받은 파일", isDirectory: true).resolvingSymlinksInPath() }
     static var outgoing: URL { state.appendingPathComponent("Outgoing", isDirectory: true) }

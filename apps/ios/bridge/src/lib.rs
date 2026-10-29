@@ -84,6 +84,28 @@ fn stop(h: &mut Host) -> Result<Value> {
     }
     Ok(json!({"stopped":true}))
 }
+// Swift supplies OS-derived paths; no sender request may relocate the pinned sandbox boundary.
+#[cfg(target_os = "ios")]
+fn configure_ios_sandbox(params: &Value, paths: &AppPaths) -> Result<()> {
+    let root = std::fs::canonicalize(PathBuf::from(field(params, "container_dir")?))?;
+    if !root.is_absolute()
+        || !std::fs::canonicalize(&paths.state_dir)?.starts_with(&root)
+        || !std::fs::canonicalize(&paths.default_receive_dir)?.starts_with(&root)
+    {
+        return Err(Error::new(
+            "INVALID_PATH",
+            "paths must belong to the app container",
+        ));
+    }
+    fta_platform::ios::configure_container_root(root)?;
+    fta_platform::ios::configure_paths(fta_platform::PlatformPaths {
+        config_dir: paths.config_dir.clone(),
+        state_dir: paths.state_dir.clone(),
+        runtime_dir: paths.runtime_dir.clone(),
+        receive_dir: paths.default_receive_dir.clone(),
+    })?;
+    Ok(())
+}
 fn start(v: &Value) -> Result<Value> {
     let mut h = host()
         .lock()
@@ -110,6 +132,11 @@ fn start(v: &Value) -> Result<Value> {
     if !state.is_absolute() || !receive.is_absolute() {
         return Err(Error::new("INVALID_PATH", "absolute sandbox required"));
     }
+    // Normalize Foundation aliases once; later grants must remain the captured physical spelling.
+    #[cfg(target_os = "ios")]
+    let state = std::fs::canonicalize(state)?;
+    #[cfg(target_os = "ios")]
+    let receive = std::fs::canonicalize(receive)?;
     let paths = AppPaths {
         config_dir: state.clone(),
         runtime_dir: state.join("run"),
@@ -117,12 +144,7 @@ fn start(v: &Value) -> Result<Value> {
         default_receive_dir: receive,
     };
     #[cfg(target_os = "ios")]
-    fta_platform::ios::configure_paths(fta_platform::PlatformPaths {
-        config_dir: paths.config_dir.clone(),
-        state_dir: paths.state_dir.clone(),
-        runtime_dir: paths.runtime_dir.clone(),
-        receive_dir: paths.default_receive_dir.clone(),
-    })?;
+    configure_ios_sandbox(v, &paths)?;
     let mut config = Config::load_or_create(&paths)?;
     config.display_name = field(v, "display_name")?;
     config.receive_dir = paths.default_receive_dir.clone();
@@ -176,6 +198,11 @@ fn invoke(v: Value) -> Result<Value> {
             if !state.is_absolute() || !receive.is_absolute() {
                 return Err(Error::new("INVALID_PATH", "absolute sandbox required"));
             }
+            // Match the physical paths used by host.start even if Foundation returned an OS alias.
+            #[cfg(target_os = "ios")]
+            let state = std::fs::canonicalize(state)?;
+            #[cfg(target_os = "ios")]
+            let receive = std::fs::canonicalize(receive)?;
             let paths = AppPaths {
                 config_dir: state.clone(),
                 runtime_dir: state.join("run"),
@@ -183,12 +210,7 @@ fn invoke(v: Value) -> Result<Value> {
                 default_receive_dir: receive,
             };
             #[cfg(target_os = "ios")]
-            fta_platform::ios::configure_paths(fta_platform::PlatformPaths {
-                config_dir: paths.config_dir.clone(),
-                state_dir: paths.state_dir.clone(),
-                runtime_dir: paths.runtime_dir.clone(),
-                receive_dir: paths.default_receive_dir.clone(),
-            })?;
+            configure_ios_sandbox(&params, &paths)?;
             let e = open_engine(paths)?;
             e.suspend_network()?;
             h.engine = Some(e);
@@ -221,9 +243,19 @@ fn invoke(v: Value) -> Result<Value> {
     };
     // Selected input copies are the only file grants; a path typo must never send identity/state files.
     if method == "transfers.send_discovered" && params["kind"] == "files" {
-        params["allowed_roots"] = json!([std::fs::canonicalize(
-            engine.paths.state_dir.join("Outgoing")
-        )?]);
+        let outgoing = engine.paths.state_dir.join("Outgoing");
+        // Never canonicalize a replaced selection root into a broader grant (for example, identity state).
+        let metadata = std::fs::symlink_metadata(&outgoing)?;
+        if !metadata.is_dir()
+            || metadata.file_type().is_symlink()
+            || std::fs::canonicalize(&outgoing)? != outgoing
+        {
+            return Err(Error::new(
+                "PATH_DENIED",
+                "selected input directory changed or is not physical",
+            ));
+        }
+        params["allowed_roots"] = json!([outgoing]);
     }
     match method.as_str() {
         "host.advertisement" => {
@@ -420,6 +452,45 @@ mod tests {
             sender.store.transfer(&result.transfer_id).unwrap().state,
             "completed"
         );
+        let photo_slot = outgoing.join("photo-session/photo-slot");
+        std::fs::create_dir_all(&photo_slot).unwrap();
+        let photo = photo_slot.join("선택한 사진.jpg");
+        std::fs::write(&photo, b"native image fixture").unwrap();
+        let sent_photo: Transfer = serde_json::from_value(
+            command(
+                "transfers.send_discovered",
+                json!({"to":target,"kind":"files","paths":[photo]}),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(sent_photo.state, "completed");
+        let saved_photo = peer.store.transfer(&sent_photo.transfer_id).unwrap();
+        assert_eq!(
+            std::fs::read(saved_photo.items[0].path.as_ref().unwrap()).unwrap(),
+            b"native image fixture"
+        );
+        #[cfg(unix)]
+        {
+            // A staged-looking path must not let a replaced selection directory read private state.
+            std::os::unix::fs::symlink(&state, outgoing.join("replaced-slot")).unwrap();
+            let denied = command("transfers.send_discovered", json!({"to":target,"kind":"files","paths":[outgoing.join("replaced-slot/private-key-test")]})).unwrap_err();
+            assert_eq!(denied.code, "PATH_DENIED");
+        }
+        #[cfg(unix)]
+        {
+            let original = state.join("original-selection-root");
+            std::fs::rename(&outgoing, &original).unwrap();
+            std::os::unix::fs::symlink(&state, &outgoing).unwrap();
+            let denied = command(
+                "transfers.send_discovered",
+                json!({"to":target,"kind":"files","paths":[state.join("private-key-test")]}),
+            )
+            .unwrap_err();
+            std::fs::remove_file(&outgoing).unwrap();
+            std::fs::rename(original, &outgoing).unwrap();
+            assert_eq!(denied.code, "PATH_DENIED");
+        }
         assert_eq!(
             command("events.cursor", json!({"consumer":"ios-notifications-v1"})).unwrap()["sequence"],
             0

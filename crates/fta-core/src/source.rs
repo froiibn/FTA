@@ -73,7 +73,15 @@ pub fn open_file(path: &Path, allowed_roots: Option<&[PathBuf]>) -> Result<File>
     }
     Ok(file)
 }
+// The OS-owned container is the iOS trust anchor; opening system ancestors is sandbox-denied.
+#[cfg(target_os = "ios")]
+fn open_root_nofollow(root: &Path) -> Result<cap_std::fs::Dir> {
+    let (anchor, handle) = fta_platform::ios::source_anchor()?;
+    open_root_from_anchor(root, &anchor, handle)
+}
+
 /// Open each physical root component relative to the previous handle, never following a replacement link.
+#[cfg(not(target_os = "ios"))]
 fn open_root_nofollow(root: &Path) -> Result<cap_std::fs::Dir> {
     let mut anchor = PathBuf::new();
     let mut names = Vec::new();
@@ -106,9 +114,91 @@ fn open_root_nofollow(root: &Path) -> Result<cap_std::fs::Dir> {
     }
     Ok(cap_std::fs::Dir::from_std_file(handle))
 }
+// Only the starting handle differs on iOS. Every grant component below it retains the same link checks.
+#[cfg(any(target_os = "ios", all(test, unix)))]
+fn open_root_from_anchor(root: &Path, anchor: &Path, mut handle: File) -> Result<cap_std::fs::Dir> {
+    let relative = root.strip_prefix(anchor).map_err(|_| {
+        Error::new(
+            "PATH_DENIED",
+            "allowed directory is outside the filesystem anchor",
+        )
+    })?;
+    for component in relative.components() {
+        let std::path::Component::Normal(name) = component else {
+            return Err(Error::new(
+                "PATH_DENIED",
+                "invalid relative allowed directory",
+            ));
+        };
+        handle = cap_primitives::fs::open_dir_nofollow(&handle, Path::new(name)).map_err(|_| {
+            Error::new(
+                "PATH_DENIED",
+                "allowed directory contains a replaced link or inaccessible component",
+            )
+        })?;
+    }
+    Ok(cap_std::fs::Dir::from_std_file(handle))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    #[test]
+    fn pinned_sandbox_anchor_does_not_open_inaccessible_parents() {
+        use std::{io::Read, os::unix::fs::PermissionsExt};
+        let temp = tempfile::tempdir().unwrap();
+        let parent = temp
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("system-owned-parent");
+        let container = parent.join("container");
+        let allowed = container.join("Library/Application Support/FTA/Outgoing");
+        std::fs::create_dir_all(&allowed).unwrap();
+        std::fs::write(allowed.join("photo.jpg"), b"selected photo bytes").unwrap();
+        let anchor = File::open(&container).unwrap();
+        let original_permissions = std::fs::metadata(&parent).unwrap().permissions();
+        // Search remains permitted, like iOS sandbox lookup, but reading the ancestor is denied.
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o111)).unwrap();
+        let ancestor_is_inaccessible = std::fs::read_dir(&parent).is_err();
+        let old_walk = open_root_nofollow(&allowed);
+        let opened = open_root_from_anchor(&allowed, &container, anchor).and_then(|dir| {
+            let mut data = Vec::new();
+            dir.open("photo.jpg")?.read_to_end(&mut data)?;
+            Ok(data)
+        });
+        // Restore before assertions so even a regression cannot strand an unreadable temporary tree.
+        std::fs::set_permissions(&parent, original_permissions).unwrap();
+        // Linux can use O_PATH search handles; Darwin is the platform whose old read-open reproduces this denial.
+        if ancestor_is_inaccessible && cfg!(target_os = "macos") {
+            assert!(
+                old_walk.is_err(),
+                "the old absolute ancestor walk must reproduce the denial"
+            );
+        }
+        assert_eq!(opened.unwrap(), b"selected photo bytes");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pinned_sandbox_anchor_still_rejects_replaced_links_and_outside_roots() {
+        let temp = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let container = temp.path().canonicalize().unwrap();
+        let other = outside.path().canonicalize().unwrap();
+        std::fs::create_dir(other.join("child")).unwrap();
+        std::os::unix::fs::symlink(&other, container.join("changed")).unwrap();
+        for denied in [container.join("changed/child"), other] {
+            assert_eq!(
+                open_root_from_anchor(&denied, &container, File::open(&container).unwrap())
+                    .unwrap_err()
+                    .code,
+                "PATH_DENIED"
+            );
+        }
+    }
+
     #[test]
     fn allowed_roots_reject_escape_and_empty_grants() {
         let d = tempfile::tempdir().unwrap();

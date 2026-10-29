@@ -77,7 +77,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
                 try Sandbox.prepare()
                 try? FileManager.default.removeItem(at:Sandbox.outgoing)
                 try Sandbox.prepare()
-                _ = try await Engine.call("host.prepare",["state_dir":Sandbox.state.path,"receive_dir":Sandbox.received.path])
+                _ = try await Engine.call("host.prepare",["container_dir":Sandbox.container.path,"state_dir":Sandbox.state.path,"receive_dir":Sandbox.received.path])
                 await refreshLocalHistory()
             } catch { self.error = error.localizedDescription }
             await refreshNotificationStatus()
@@ -155,7 +155,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         starting = true; defer { starting = false }
         do {
             try Sandbox.prepare()
-            let data = try await Engine.call("host.start", ["state_dir":Sandbox.state.path,"receive_dir":Sandbox.received.path,"display_name":name,"listen_addr":"\(lan.address):0","allowed_networks":[lan.network]]) as? [String:Any] ?? [:]
+            let data = try await Engine.call("host.start", ["container_dir":Sandbox.container.path,"state_dir":Sandbox.state.path,"receive_dir":Sandbox.received.path,"display_name":name,"listen_addr":"\(lan.address):0","allowed_networks":[lan.network]]) as? [String:Any] ?? [:]
             // A path/scene change can arrive while Rust binds; never advertise a stale listener.
             guard foreground, confirmed, receiveEnabled, !serviceBlocked, self.lan == lan, usableConnections.contains(lan) else {
                 _ = try await Engine.call("host.stop"); return
