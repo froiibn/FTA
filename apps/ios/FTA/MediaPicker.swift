@@ -1,3 +1,4 @@
+// Localize visible copy while preserving identifiers, user data, and existing storage folder names.
 import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers
@@ -62,22 +63,22 @@ enum PhotoStaging {
     }
     static func copy(_ provider: NSItemProvider, into directory: URL) async throws -> URL {
         guard let identifier = provider.registeredTypeIdentifiers.first(where: { UTType($0)?.conforms(to: .image) == true }) else {
-            throw EngineFailure(code:"INVALID_MEDIA", message:"선택한 사진을 파일로 읽을 수 없습니다")
+            throw EngineFailure(code:"INVALID_MEDIA", message:String(localized:"선택한 사진을 파일로 읽을 수 없습니다"))
         }
         // Capture immutable metadata rather than the non-Sendable provider in its background callback.
-        let suggestedName = provider.suggestedName ?? "사진"
+        let suggestedName = provider.suggestedName ?? String(localized:"사진")
         return try await withCheckedThrowingContinuation { continuation in
             provider.loadFileRepresentation(forTypeIdentifier: identifier) { source, error in
                 do {
                     if let error { throw error }
-                    guard let source else { throw EngineFailure(code:"NOT_FOUND", message:"사진 원본을 준비하지 못했습니다") }
+                    guard let source else { throw EngineFailure(code:"NOT_FOUND", message:String(localized:"사진 원본을 준비하지 못했습니다")) }
                     let values = try source.resourceValues(forKeys:[.isRegularFileKey, .isSymbolicLinkKey])
-                    guard values.isRegularFile == true, values.isSymbolicLink != true else { throw EngineFailure(code:"INVALID_MEDIA",message:"일반 사진 파일만 보낼 수 있습니다") }
+                    guard values.isRegularFile == true, values.isSymbolicLink != true else { throw EngineFailure(code:"INVALID_MEDIA",message:String(localized:"일반 사진 파일만 보낼 수 있습니다")) }
                     let slot = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
                     try FileManager.default.createDirectory(at:slot,withIntermediateDirectories:true)
                     let suggested = suggestedName as NSString
                     var name = suggested.lastPathComponent
-                    if name.isEmpty || name == "." || name == ".." { name = "사진" }
+                    if name.isEmpty || name == "." || name == ".." { name = String(localized:"사진") }
                     if (name as NSString).pathExtension.isEmpty {
                         name += "." + (UTType(identifier)?.preferredFilenameExtension ?? source.pathExtension)
                     }
@@ -89,10 +90,10 @@ enum PhotoStaging {
         }
     }
     static func capture(_ image: UIImage, into directory: URL) throws -> URL {
-        guard let data = image.jpegData(compressionQuality:captureJPEGQuality) else { throw EngineFailure(code:"INVALID_MEDIA",message:"촬영한 사진을 준비하지 못했습니다") }
+        guard let data = image.jpegData(compressionQuality:captureJPEGQuality) else { throw EngineFailure(code:"INVALID_MEDIA",message:String(localized:"촬영한 사진을 준비하지 못했습니다")) }
         let slot = directory.appendingPathComponent(UUID().uuidString,isDirectory:true)
         try FileManager.default.createDirectory(at:slot,withIntermediateDirectories:true)
-        let destination = slot.appendingPathComponent("촬영한 사진.jpg")
+        let destination = slot.appendingPathComponent(String(localized:"촬영한 사진.jpg"))
         try data.write(to:destination,options:[.atomic,.completeFileProtection])
         return destination
     }

@@ -1,0 +1,3 @@
+// Generated from reviewed translations; edit apps/ios/Localization instead.
+"NSCameraUsageDescription" = "Usa la fotocamera per scattare una foto e inviarla al dispositivo FTA scelto.";
+"NSLocalNetworkUsageDescription" = "Trova dispositivi FTA nella stessa rete locale e scambia file, testo e URL.";

@@ -2,8 +2,74 @@ import XCTest
 
 // Exercise real native controls and the actual listener; never inject pretend online devices.
 final class FTAFlowTests: XCTestCase {
+    // Capture the real app in each supported language; no invented peers or transfer receipts.
+    func testStoreLocalizedScreenshots() throws {
+        let path = try XCTUnwrap(Bundle(for:Self.self).url(forResource:"LocaleExpectations",withExtension:"json"))
+        let expectations = try JSONDecoder().decode([String:[String:String]].self,from:Data(contentsOf:path))
+        let locales = ["ko","en","ja","zh-Hans","zh-Hant","de","fr","es","pt-BR","it","hu"]
+        for locale in locales {
+            let strings = try XCTUnwrap(expectations[locale == "hu" ? "en" : locale])
+            let app = makeApp(language:locale); app.launch()
+            XCTAssertTrue(storeTab(app,label:strings["보내기"]!).waitForExistence(timeout:10))
+            storeTab(app,label:strings["설정"]!).tap()
+            let receiving = app.switches[strings["송수신 사용"]!]
+            XCTAssertTrue(receiving.waitForExistence(timeout:5))
+            // Pause the simulator's real listener so public captures contain no personal LAN peer names.
+            if receiving.value as? String == "1" { tapSwitch(receiving) }
+            storeTab(app,label:strings["보내기"]!).tap()
+            capture("store-\(locale)-send",app)
+            app.buttons[strings["사진"]!].tap()
+            capture("store-\(locale)-photos",app)
+            // Dismiss the actual photo source popover without selecting or sending any content.
+            app.staticTexts["File Transfer Anything"].tap()
+            storeTab(app,label:strings["기록"]!).tap()
+            capture("store-\(locale)-history",app)
+            app.terminate()
+        }
+    }
+    // Foreign labels must remain operable at real accessibility sizes, without changing the layout.
+    func testLocalizedLargeTextControls() throws {
+        let path = try XCTUnwrap(Bundle(for:Self.self).url(forResource:"LocaleExpectations",withExtension:"json"))
+        let expectations = try JSONDecoder().decode([String:[String:String]].self,from:Data(contentsOf:path))
+        for locale in ["ko","en","ja","zh-Hans","zh-Hant","de","fr","es","pt-BR","it"] {
+            let strings = try XCTUnwrap(expectations[locale])
+            let app = makeApp(language:locale); app.launch()
+            XCTAssertTrue(storeTab(app,label:strings["보내기"]!).waitForExistence(timeout:10))
+            let photos = app.buttons[strings["사진"]!], files = app.buttons[strings["파일"]!]
+            for _ in 0..<5 { if photos.isHittable && files.isHittable { break }; app.scrollViews["send-scroll"].swipeUp() }
+            XCTAssertTrue(photos.isHittable && files.isHittable,"Media controls must remain reachable in \(locale)")
+            capture("accessibility-\(locale)-send",app)
+            photos.tap()
+            XCTAssertTrue(app.buttons[strings["갤러리에서 선택"]!].waitForExistence(timeout:5))
+            XCTAssertTrue(app.buttons[strings["촬영"]!].isHittable)
+            capture("accessibility-\(locale)-photos",app)
+            app.terminate()
+        }
+    }
+    // Reviewers must be able to read the shipped policy/notices without a server or LAN peer.
+    func testBundledPrivacyAndDependencyNotices() {
+        let app = makeApp(); app.launch(); app.tabBars.buttons["설정"].tap()
+        let policy = app.buttons["개인정보 처리방침"]
+        for _ in 0..<8 { if policy.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(policy.isHittable); policy.tap()
+        // TextKit exposes selectable paragraphs as separate accessibility elements on current iOS.
+        let policyParagraph = app.descendants(matching:.any).matching(NSPredicate(format:"label CONTAINS %@","최초 전송은 수신자가 한 번")).firstMatch
+        XCTAssertTrue(policyParagraph.waitForExistence(timeout:5))
+        capture("bundled-privacy-policy",app)
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        let notices = app.buttons["오픈소스 고지"]
+        XCTAssertTrue(notices.isHittable); notices.tap()
+        // Bundle validation checks the full notice bytes; avoid serializing its entire long accessibility tree.
+        XCTAssertTrue(app.navigationBars["오픈소스 고지"].waitForExistence(timeout:5))
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout:5)); search.tap(); search.typeText("ring")
+        let ring = app.buttons["license-ring-0.17.14"]
+        XCTAssertTrue(ring.waitForExistence(timeout:5)); ring.tap()
+        XCTAssertTrue(app.navigationBars["ring"].waitForExistence(timeout:5))
+        capture("bundled-third-party-notices",app)
+    }
     func testNativeTabsAndFilePicker() {
-        let app = XCUIApplication(); app.launch()
+        let app = makeApp(); app.launch()
         XCTAssertTrue(app.tabBars.buttons["보내기"].waitForExistence(timeout:10))
         XCTAssertTrue(app.staticTexts["FTA"].exists && app.staticTexts["File Transfer Anything"].exists)
         XCTAssertFalse(app.navigationBars["보내기"].exists)
@@ -23,7 +89,7 @@ final class FTAFlowTests: XCTestCase {
         capture("file-picker",app)
     }
     func testBottomComposerRemainsInPlaceWhileContentScrolls() {
-        let app = XCUIApplication(); app.launch()
+        let app = makeApp(); app.launch()
         let input = app.descendants(matching:.any).matching(identifier:"message-input").firstMatch
         XCTAssertTrue(input.waitForExistence(timeout:5))
         let originalY = input.frame.midY
@@ -33,7 +99,7 @@ final class FTAFlowTests: XCTestCase {
         capture("restored-bottom-composer-and-glass",app)
     }
     func testTrustedLANAndReceivePreferenceSurviveRestart() throws {
-        let app = XCUIApplication(); app.launch(); app.tabBars.buttons["설정"].tap()
+        let app = makeApp(); app.launch(); app.tabBars.buttons["설정"].tap()
         let trust = app.switches["신뢰하는 집 네트워크입니다"]
         XCTAssertTrue(trust.waitForExistence(timeout:5))
         guard trust.isEnabled else { throw XCTSkip("No usable LAN on simulator host") }
@@ -59,7 +125,7 @@ final class FTAFlowTests: XCTestCase {
         capture("preferences-after-relaunch",app)
     }
     func testPhotoSourceChoiceAndGrowingComposer() {
-        let app = XCUIApplication(); app.launch()
+        let app = makeApp(); app.launch()
         app.buttons["사진"].tap()
         XCTAssertTrue(app.buttons["갤러리에서 선택"].waitForExistence(timeout:5))
         XCTAssertTrue(app.buttons["촬영"].exists)
@@ -89,7 +155,7 @@ final class FTAFlowTests: XCTestCase {
         capture("keyboard-dismissed",app)
     }
     func testPhotoLibraryUsesCombinedAttachmentDraft() throws {
-        let app = XCUIApplication(); app.launch(); app.buttons["사진"].tap(); app.buttons["갤러리에서 선택"].tap()
+        let app = makeApp(); app.launch(); app.buttons["사진"].tap(); app.buttons["갤러리에서 선택"].tap()
         XCTAssertTrue(app.buttons["취소"].waitForExistence(timeout:5) || app.buttons["Cancel"].exists)
         let thumbnail = app.images.matching(identifier:"PXGGridLayout-Info").firstMatch
         guard thumbnail.waitForExistence(timeout:10) else { throw XCTSkip("No seeded photo in simulator library") }
@@ -114,7 +180,7 @@ final class FTAFlowTests: XCTestCase {
     }
     // Run against the simulator's actual system appearance; launch defaults do not change UIKit traits.
     func testGlassWithSystemAppearance() {
-        let app = XCUIApplication(); app.launch()
+        let app = makeApp(); app.launch()
         XCTAssertTrue(app.buttons["사진"].waitForExistence(timeout:5))
         capture("glass-system-send",app)
         let heading = app.staticTexts["File Transfer Anything"]
@@ -128,6 +194,18 @@ final class FTAFlowTests: XCTestCase {
         }
         app.tabBars.buttons["설정"].tap(); capture("glass-system-settings",app)
         app.tabBars.buttons["기록"].tap(); capture("glass-system-history",app)
+    }
+    // iPad's native floating tab bar exposes cells rather than TabBar descendants on current iPadOS.
+    private func storeTab(_ app: XCUIApplication, label: String) -> XCUIElement {
+        let phone = app.tabBars.buttons[label]
+        if phone.exists { return phone }
+        return app.descendants(matching:.any).matching(NSPredicate(format:"label == %@",label)).firstMatch
+    }
+    // Baseline control tests retain Korean explicitly; global capture checks pass a real app language.
+    private func makeApp(language: String = "ko") -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments += ["-AppleLanguages", "(\(language))", "-AppleLocale", language == "ko" ? "ko_KR" : language]
+        return app
     }
     private func tapSwitch(_ element: XCUIElement) {
         element.switches.firstMatch.exists ? element.switches.firstMatch.tap() : element.tap()

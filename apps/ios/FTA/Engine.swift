@@ -1,3 +1,4 @@
+// Localize visible copy while preserving identifiers, user data, and existing storage folder names.
 import Foundation
 
 // C strings have explicit ownership; neither Swift nor JSON ever carries file bytes.
@@ -16,13 +17,13 @@ enum Engine {
                     let data = try JSONSerialization.data(withJSONObject: ["method": method, "params": params])
                     let request = String(decoding: data, as: UTF8.self)
                     let response: Data = try request.withCString { input in
-                        guard let output = fta_ios_call(input) else { throw EngineFailure(code: "INTERNAL", message: "엔진 응답이 없습니다") }
+                        guard let output = fta_ios_call(input) else { throw EngineFailure(code: "INTERNAL", message: String(localized:"엔진 응답이 없습니다")) }
                         defer { fta_ios_free(output) }
                         return Data(bytes: output, count: strlen(output))
                     }
                     let envelope = try JSONSerialization.jsonObject(with: response) as? [String: Any] ?? [:]
                     if let error = envelope["error"] as? [String: String] {
-                        throw EngineFailure(code: error["code"] ?? "INTERNAL", message: error["message"] ?? "작업 실패")
+                        throw EngineFailure(code: error["code"] ?? "INTERNAL", message: error["message"] ?? String(localized:"작업 실패"))
                     }
                     continuation.resume(returning: envelope["result"] ?? NSNull())
                 } catch { continuation.resume(throwing: error) }
@@ -44,7 +45,7 @@ struct Peer: Decodable, Identifiable {
     var id: String { device_id }
     var mobile: Bool { ["ios", "android"].contains(os.lowercased()) }
     var selectable: Bool { !paired || online }
-    var status: String { paired ? (online ? "온라인" : "오프라인") : "발견됨 · 최초 등록 필요" }
+    var status: String { paired ? (online ? String(localized:"온라인") : String(localized:"오프라인")) : String(localized:"발견됨 · 최초 등록 필요") }
 }
 struct TransferItem: Decodable, Identifiable {
     let name: String
@@ -67,9 +68,9 @@ struct Transfer: Decodable, Identifiable {
     let items: [TransferItem]
     let error: String?
     var id: String { transfer_id }
-    var title: String { kind == "files" ? (items.first?.name ?? "파일") + (items.count > 1 ? " 외 \(items.count - 1)개" : "") : (kind == "url" ? "URL" : "텍스트") }
+    var title: String { kind == "files" ? (items.first?.name ?? String(localized:"파일")) + (items.count > 1 ? String(localized:" 외 \(items.count - 1)개") : "") : (kind == "url" ? "URL" : String(localized:"텍스트")) }
     var status: String {
-        ["completed":"완료", "partial":"부분 완료", "failed":"실패", "cancelled":"취소됨", "unknown":"결과 확인 필요", "sending":"전송 중", "receiving":"수신 중", "verifying":"무결성 확인 중", "committing":"저장 중", "awaiting_registration":"상대 기기의 등록 승인 대기", "cancel_requested":"취소 확인 중"][state] ?? state
+        ["completed":String(localized:"완료"), "partial":String(localized:"부분 완료"), "failed":String(localized:"실패"), "cancelled":String(localized:"취소됨"), "unknown":String(localized:"결과 확인 필요"), "sending":String(localized:"전송 중"), "receiving":String(localized:"수신 중"), "verifying":String(localized:"무결성 확인 중"), "committing":String(localized:"저장 중"), "awaiting_registration":String(localized:"상대 기기의 등록 승인 대기"), "cancel_requested":String(localized:"취소 확인 중")][state] ?? state
     }
     var fraction: Double {
         let total = items.reduce(0.0) { $0 + (Double($1.size) ?? 0) }

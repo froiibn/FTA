@@ -1,3 +1,4 @@
+// Localize visible copy while preserving identifiers, user data, and existing storage folder names.
 import SwiftUI
 import UserNotifications
 import Network
@@ -41,7 +42,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     @Published var detail: Transfer?
     @Published var activeID: String?
     @Published var deciding = false
-    @Published var notificationStatus = "확인 중"
+    @Published var notificationStatus = String(localized:"확인 중")
     private let preferences = NetworkPreferences()
     private var serviceBlocked = false
     private let bonjour = Bonjour()
@@ -88,7 +89,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     var selected: Peer? { targets.first { $0.id == selectedPeer } }
     var canSend: Bool { running && !sending && !importing && selected?.selectable == true }
     var lan: LAN? { lans.first { $0.id == selectedLAN } }
-    var serviceText: String { starting ? "수신 준비 중" : (running ? "이 화면이 열려 있는 동안 수신 가능" : "송수신 중지됨") }
+    var serviceText: String { starting ? String(localized:"수신 준비 중") : (running ? String(localized:"이 화면이 열려 있는 동안 수신 가능") : String(localized:"송수신 중지됨")) }
 
     // Restore durable consent without revoking it on path changes; migrate only a recorded legacy approval.
     private func restoreConnections(_ available: [LAN]) {
@@ -184,7 +185,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         requests = []; activeLAN = nil
         do { _ = try await Engine.call("host.stop") } catch { self.error = error.localizedDescription }
         // A forced suspension can lose commit replies; sender results remain in durable history.
-        if sending { notice = "앱이 백그라운드로 이동해 전송이 중단될 수 있습니다. 복귀 후 기록에서 결과를 확인하세요." }
+        if sending { notice = String(localized:"앱이 백그라운드로 이동해 전송이 중단될 수 있습니다. 복귀 후 기록에서 결과를 확인하세요.") }
     }
     func refreshDevices() async {
         guard running, confirmed else { return }
@@ -234,7 +235,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         for event in page.events {
             if event.record.direction == "receive", [.authorized,.provisional,.ephemeral].contains(settings.authorizationStatus) {
                 let content = UNMutableNotificationContent()
-                content.title = event.record.state == "completed" ? "FTA 수신 완료" : "FTA 수신 결과"
+                content.title = event.record.state == "completed" ? String(localized:"FTA 수신 완료") : String(localized:"FTA 수신 결과")
                 content.body = "\(event.record.title) · \(event.record.status)"
                 content.sound = .default
                 content.userInfo = ["transfer_id":event.transfer_id]
@@ -299,7 +300,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
                 try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
                 var copied: [URL] = []
                 do {
-                    guard !urls.isEmpty, urls.count + photoCount <= PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:"사진과 파일은 합쳐서 100개까지 선택하세요") }
+                    guard !urls.isEmpty, urls.count + photoCount <= PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:String(localized:"사진과 파일은 합쳐서 100개까지 선택하세요")) }
                     for url in urls {
                         let scoped = url.startAccessingSecurityScopedResource()
                         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -311,7 +312,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
                         NSFileCoordinator().coordinate(readingItemAt:url,options:[],error:&coordinatorError) { source in
                             do {
                                 let values = try source.resourceValues(forKeys:[.isRegularFileKey,.isSymbolicLinkKey])
-                                guard values.isRegularFile == true, values.isSymbolicLink != true else { throw EngineFailure(code:"INVALID_PATH",message:"일반 파일만 보낼 수 있습니다") }
+                                guard values.isRegularFile == true, values.isSymbolicLink != true else { throw EngineFailure(code:"INVALID_PATH",message:String(localized:"일반 파일만 보낼 수 있습니다")) }
                                 try FileManager.default.copyItem(at:source,to:destination)
                             } catch { copyError = error }
                         }
@@ -330,7 +331,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         importing = true; defer { importing = false }
         var directory: URL?
         do {
-            guard providers.count + files.count <= PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:"사진과 파일은 합쳐서 100개까지 선택하세요") }
+            guard providers.count + files.count <= PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:String(localized:"사진과 파일은 합쳐서 100개까지 선택하세요")) }
             let session = try PhotoStaging.session(); directory = session
             var selected: [URL] = []
             for provider in providers { selected.append(try await PhotoStaging.copy(provider,into:session)) }
@@ -344,7 +345,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         guard !sending, !importing else { return }
         importing = true; defer { importing = false }
         do {
-            guard files.count < PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:"사진과 파일은 합쳐서 100개까지 선택하세요") }
+            guard files.count < PhotoStaging.maximumSelection else { throw EngineFailure(code:"TOO_LARGE",message:String(localized:"사진과 파일은 합쳐서 100개까지 선택하세요")) }
             // JPEG encoding and disk I/O must not freeze the native camera dismissal.
             let photo = try await Task.detached(priority:.userInitiated) {
                 let directory = try PhotoStaging.session()
@@ -383,12 +384,12 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     }
     func saveName() async {
         do {
-            guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty, name.utf8.count <= 128 else { throw EngineFailure(code:"INVALID_REQUEST",message:"이름을 1~128바이트로 입력하세요") }
+            guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty, name.utf8.count <= 128 else { throw EngineFailure(code:"INVALID_REQUEST",message:String(localized:"이름을 1~128바이트로 입력하세요")) }
             if running { _ = try await Engine.call("settings.update",["values":["display_name":name]]) }
             UserDefaults.standard.set(name,forKey:"deviceName")
             // Republish with new TXT metadata instead of leaving a stale discovery name.
             if running { bonjour.start(); await refreshActivity() }
-            notice = "기기 이름을 저장했습니다"
+            notice = String(localized:"기기 이름을 저장했습니다")
         } catch { self.error = error.localizedDescription }
     }
     func requestNotifications() async {
@@ -397,6 +398,6 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     }
     func refreshNotificationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
-        notificationStatus = [.authorized,.provisional,.ephemeral].contains(settings.authorizationStatus) ? "허용됨" : (settings.authorizationStatus == .notDetermined ? "설정 전" : "차단됨")
+        notificationStatus = [.authorized,.provisional,.ephemeral].contains(settings.authorizationStatus) ? String(localized:"허용됨") : (settings.authorizationStatus == .notDetermined ? String(localized:"설정 전") : String(localized:"차단됨"))
     }
 }

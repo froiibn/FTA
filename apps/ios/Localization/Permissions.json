@@ -1,0 +1,12 @@
+{
+  "ko": {"NSCameraUsageDescription":"촬영한 사진을 선택한 FTA 기기로 보내기 위해 카메라를 사용합니다.","NSLocalNetworkUsageDescription":"같은 LAN의 FTA 기기를 찾고 파일·텍스트·URL을 주고받습니다."},
+  "en": {"NSCameraUsageDescription":"Use the camera to take a photo and send it to the FTA device you select.","NSLocalNetworkUsageDescription":"Find FTA devices on the same local network and exchange files, text and URLs."},
+  "ja": {"NSCameraUsageDescription":"写真を撮影し、選択したFTA機器へ送信するためにカメラを使用します。","NSLocalNetworkUsageDescription":"同じLANのFTA機器を探し、ファイル・テキスト・URLを送受信します。"},
+  "zh-Hans": {"NSCameraUsageDescription":"使用相机拍照并发送到您选择的 FTA 设备。","NSLocalNetworkUsageDescription":"查找同一局域网中的 FTA 设备并收发文件、文本和 URL。"},
+  "zh-Hant": {"NSCameraUsageDescription":"使用相機拍照並傳送到您選取的 FTA 裝置。","NSLocalNetworkUsageDescription":"尋找同一區域網路的 FTA 裝置，並傳送與接收檔案、文字及 URL。"},
+  "de": {"NSCameraUsageDescription":"Die Kamera wird verwendet, um ein Foto aufzunehmen und an das ausgewählte FTA-Gerät zu senden.","NSLocalNetworkUsageDescription":"FTA-Geräte im selben lokalen Netzwerk finden und Dateien, Text sowie URLs austauschen."},
+  "fr": {"NSCameraUsageDescription":"Utilise la caméra pour prendre une photo et l’envoyer à l’appareil FTA choisi.","NSLocalNetworkUsageDescription":"Recherche les appareils FTA sur le même réseau local et échange des fichiers, textes et URL."},
+  "es": {"NSCameraUsageDescription":"Usa la cámara para hacer una foto y enviarla al dispositivo FTA que elijas.","NSLocalNetworkUsageDescription":"Busca dispositivos FTA en la misma red local e intercambia archivos, texto y URL."},
+  "pt-BR": {"NSCameraUsageDescription":"Usa a câmera para tirar uma foto e enviá-la ao dispositivo FTA escolhido.","NSLocalNetworkUsageDescription":"Encontra dispositivos FTA na mesma rede local e troca arquivos, texto e URLs."},
+  "it": {"NSCameraUsageDescription":"Usa la fotocamera per scattare una foto e inviarla al dispositivo FTA scelto.","NSLocalNetworkUsageDescription":"Trova dispositivi FTA nella stessa rete locale e scambia file, testo e URL."}
+}

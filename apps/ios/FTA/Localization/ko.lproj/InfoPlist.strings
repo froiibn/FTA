@@ -1,0 +1,3 @@
+// Generated from reviewed translations; edit apps/ios/Localization instead.
+"NSCameraUsageDescription" = "촬영한 사진을 선택한 FTA 기기로 보내기 위해 카메라를 사용합니다.";
+"NSLocalNetworkUsageDescription" = "같은 LAN의 FTA 기기를 찾고 파일·텍스트·URL을 주고받습니다.";

@@ -1,0 +1,172 @@
+{
+  "ko": {
+    "appleLocale": "ko",
+    "subtitle": "같은 LAN에서 사진·파일·메시지",
+    "promotionalText": "사진, 파일, 텍스트와 URL을 같은 LAN의 내 기기로. 처음 한 번 등록 승인 후 온라인 기기에 직접 전송합니다.",
+    "keywords": "파일전송,사진전송,LAN,WiFi,텍스트,URL,맥,윈도우,리눅스",
+    "description": "FTA(File Transfer Anything)는 같은 LAN의 내 기기 사이에서 사진·파일·텍스트·URL을 직접 주고받는 앱입니다.\n\n• 사진 보관함에서 선택하거나 카메라로 촬영한 사진\n• 파일 앱에서 선택한 파일\n• 한 입력창에서 텍스트와 URL\n• 최초 수신자 등록 승인 후 등록된 온라인 기기로 전송\n• 파일 앱에서 수신 파일 확인·이동·공유\n• 기기 내부 전송 기록과 사용자 선택에 따른 링크 열기\n• FTA를 실행한 iOS·macOS·Windows·Linux 기기 연결\n\n양쪽 기기에 FTA가 필요하며 같은 사설 IPv4 LAN에서 클라우드 중계 없이 직접 연결합니다. iOS에서는 앱을 열어둔 동안 송수신하며 백그라운드·화면 잠금·Wi-Fi 단절 시 중지합니다. 외부 네트워크 전송과 오프라인 대기열은 지원하지 않습니다. 파일·URL을 자동 실행하지 않습니다.",
+    "headlines": [
+      "내 파일을,\n가까운 내 기기로",
+      "사진과 파일,\n원하는 방식으로",
+      "전송 결과를\n기기에 보관"
+    ],
+    "captions": [
+      "같은 LAN에서 직접 전송",
+      "갤러리·촬영·파일 앱",
+      "파일·텍스트·URL 기록"
+    ]
+  },
+  "en": {
+    "appleLocale": "en-US",
+    "subtitle": "Photos, files and text via LAN",
+    "promotionalText": "Send photos, files, text and URLs directly to your devices on the same LAN. Approve registration once, then send to registered devices while online.",
+    "keywords": "file,transfer,photo,LAN,WiFi,text,URL,Mac,Windows,Linux,share",
+    "description": "FTA (File Transfer Anything) sends photos, files, text and URLs directly between your devices on the same LAN.\n\n• Choose photos from the system picker or take a photo\n• Select files in the Files app\n• Send text and URLs from one composer\n• Approve device registration once, then send to registered online devices\n• View, move and share received files in Files\n• Keep transfer results on your device and open links only when you choose\n• Connect with FTA on iOS, macOS, Windows and Linux\n\nBoth devices need FTA and the same private IPv4 LAN. Transfers are direct, without a cloud relay. On iOS, sending and receiving work while the app is open and stop in the background, when locked or when Wi-Fi disconnects. Remote-network transfers and offline queues are not supported. Files and URLs never open automatically.",
+    "headlines": [
+      "Your files.\nYour nearby devices.",
+      "Photos and files,\nyour way.",
+      "Transfer results,\nkept on your device."
+    ],
+    "captions": [
+      "Directly across your LAN",
+      "Photos · Camera · Files",
+      "Files · Text · URLs"
+    ]
+  },
+  "ja": {
+    "appleLocale": "ja",
+    "subtitle": "同じLANで写真・ファイル・テキスト",
+    "promotionalText": "写真、ファイル、テキスト、URLを同じLANの自分の機器へ直接転送。最初の登録承認後は、登録済みでオンラインの機器へ送信できます。",
+    "keywords": "ファイル,転送,写真,LAN,WiFi,テキスト,URL,Mac,Windows,Linux,共有",
+    "description": "FTA（File Transfer Anything）は、同じLANの自分の機器間で写真・ファイル・テキスト・URLを直接送受信するアプリです。\n\n• システム写真選択器または撮影した写真\n• ファイルアプリで選択したファイル\n• ひとつの入力欄でテキストとURL\n• 初回の受信側登録承認後、登録済みのオンライン機器へ送信\n• ファイルアプリで受信ファイルの確認・移動・共有\n• 機器内の転送履歴と、ユーザーが選ぶリンク表示\n• iOS・macOS・Windows・LinuxのFTAと接続\n\n両方の機器にFTAが必要です。同じプライベートIPv4 LAN上で、クラウド中継なしに直接接続します。iOSはアプリを開いている間に送受信し、バックグラウンド・画面ロック・Wi-Fi切断時に停止します。外部ネットワーク転送やオフライン待機列は非対応です。ファイル・URLは自動で開きません。",
+    "headlines": [
+      "自分のファイルを、\n近くの自分の機器へ",
+      "写真もファイルも、\n好きな方法で",
+      "転送結果は\n機器内に保存"
+    ],
+    "captions": [
+      "同じLANで直接転送",
+      "写真・撮影・ファイル",
+      "ファイル・テキスト・URLの履歴"
+    ]
+  },
+  "zh-Hans": {
+    "appleLocale": "zh-Hans",
+    "subtitle": "在局域网传输照片、文件和文本",
+    "promotionalText": "将照片、文件、文本和 URL 直接发送到同一局域网中的自有设备。首次批准注册后，即可向已注册且在线的设备发送。",
+    "keywords": "文件,传输,照片,局域网,LAN,WiFi,文本,URL,Mac,Windows,Linux,共享",
+    "description": "FTA（File Transfer Anything）可在同一局域网的自有设备之间直接收发照片、文件、文本和 URL。\n\n• 从系统照片选择器中选择照片，或拍摄照片\n• 选择文件应用中的文件\n• 在同一输入框发送文本和 URL\n• 接收方首次批准注册后，向已注册的在线设备发送\n• 在文件应用中查看、移动和共享接收的文件\n• 在设备上保存传输记录，仅在主动选择时打开链接\n• 连接 iOS、macOS、Windows 和 Linux 上的 FTA\n\n两端都需要 FTA，并连接同一私有 IPv4 局域网。无需云端中继。iOS 仅在应用打开时收发，进入后台、锁屏或 Wi-Fi 断开时停止。不支持外部网络传输和离线队列。文件和 URL 不会自动打开。",
+    "headlines": [
+      "自己的文件，\n传给身边的设备",
+      "照片和文件，\n按你喜欢的方式",
+      "传输结果，\n保存在设备上"
+    ],
+    "captions": [
+      "同一局域网直接传输",
+      "照片 · 拍摄 · 文件",
+      "文件 · 文本 · URL 记录"
+    ]
+  },
+  "zh-Hant": {
+    "appleLocale": "zh-Hant",
+    "subtitle": "在區域網路傳輸照片、檔案與文字",
+    "promotionalText": "將照片、檔案、文字及 URL 直接傳送到同一區域網路中的自有裝置。首次核准註冊後，即可傳送到已註冊且上線的裝置。",
+    "keywords": "檔案,傳輸,照片,區域網路,LAN,WiFi,文字,URL,Mac,Windows,Linux,分享",
+    "description": "FTA（File Transfer Anything）可在同一區域網路的自有裝置間直接傳送與接收照片、檔案、文字及 URL。\n\n• 從系統照片選擇器選取照片，或拍攝照片\n• 選取檔案 App 中的檔案\n• 在同一輸入欄傳送文字與 URL\n• 接收方首次核准註冊後，傳送到已註冊的上線裝置\n• 在檔案 App 檢視、移動及分享接收的檔案\n• 在裝置上保留傳輸記錄，僅在主動選擇時開啟連結\n• 連接 iOS、macOS、Windows 及 Linux 上的 FTA\n\n兩端都需要 FTA，並連接同一私有 IPv4 區域網路，無須雲端中繼。iOS 僅在 App 開啟時傳送與接收，進入背景、鎖定螢幕或 Wi-Fi 中斷時停止。不支援外部網路傳輸及離線佇列。檔案與 URL 不會自動開啟。",
+    "headlines": [
+      "自己的檔案，\n傳給身邊的裝置",
+      "照片與檔案，\n用你喜歡的方式",
+      "傳輸結果，\n保留在裝置上"
+    ],
+    "captions": [
+      "同一區域網路直接傳輸",
+      "照片 · 拍攝 · 檔案",
+      "檔案 · 文字 · URL 記錄"
+    ]
+  },
+  "de": {
+    "appleLocale": "de-DE",
+    "subtitle": "Fotos, Dateien und Text im LAN",
+    "promotionalText": "Fotos, Dateien, Text und URLs direkt an Ihre Geräte im selben LAN senden. Einmal registrieren und anschließend an registrierte Online-Geräte übertragen.",
+    "keywords": "Datei,Transfer,Foto,LAN,WLAN,Text,URL,Mac,Windows,Linux,teilen",
+    "description": "FTA (File Transfer Anything) überträgt Fotos, Dateien, Text und URLs direkt zwischen Ihren Geräten im selben LAN.\n\n• Fotos im Systemdialog auswählen oder aufnehmen\n• Dateien aus der Dateien-App auswählen\n• Text und URLs in einem Eingabefeld senden\n• Einmalige Registrierungsfreigabe durch den Empfänger, danach Übertragung an registrierte Online-Geräte\n• Empfangene Dateien in Dateien ansehen, verschieben und teilen\n• Übertragungsergebnisse lokal speichern und Links nur auf eigenen Wunsch öffnen\n• Verbindung mit FTA auf iOS, macOS, Windows und Linux\n\nBeide Geräte benötigen FTA und dasselbe private IPv4-LAN. Die Übertragung erfolgt ohne Cloud-Relay. Unter iOS funktioniert sie bei geöffneter App und stoppt im Hintergrund, bei Sperre oder WLAN-Trennung. Externe Netzwerke und Offline-Warteschlangen werden nicht unterstützt. Dateien und URLs öffnen sich nie automatisch.",
+    "headlines": [
+      "Ihre Dateien.\nIhre Geräte in der Nähe.",
+      "Fotos und Dateien,\nauf Ihre Weise.",
+      "Übertragungsergebnisse\nbleiben auf Ihrem Gerät."
+    ],
+    "captions": [
+      "Direkt über Ihr LAN",
+      "Fotos · Kamera · Dateien",
+      "Dateien · Text · URLs"
+    ]
+  },
+  "fr": {
+    "appleLocale": "fr-FR",
+    "subtitle": "Photos, fichiers et texte LAN",
+    "promotionalText": "Envoyez photos, fichiers, textes et URL à vos appareils sur le même LAN. Approuvez l’enregistrement une fois, puis envoyez aux appareils enregistrés en ligne.",
+    "keywords": "fichier,transfert,photo,LAN,WiFi,texte,URL,Mac,Windows,Linux,partage",
+    "description": "FTA (File Transfer Anything) échange directement photos, fichiers, textes et URL entre vos appareils sur le même réseau local.\n\n• Choisir des photos dans le sélecteur système ou en prendre une\n• Sélectionner des fichiers dans l’app Fichiers\n• Envoyer textes et URL depuis un seul champ\n• Faire approuver l’enregistrement une fois par le destinataire, puis envoyer aux appareils enregistrés en ligne\n• Consulter, déplacer et partager les fichiers reçus dans Fichiers\n• Conserver les résultats sur l’appareil et ouvrir les liens uniquement à votre demande\n• Se connecter à FTA sur iOS, macOS, Windows et Linux\n\nFTA est nécessaire sur les deux appareils, sur le même LAN IPv4 privé, sans relais cloud. Sur iOS, les transferts fonctionnent quand l’app est ouverte et s’arrêtent en arrière-plan, au verrouillage ou à la déconnexion Wi-Fi. Les réseaux distants et files hors ligne ne sont pas pris en charge. Aucun fichier ni URL ne s’ouvre automatiquement.",
+    "headlines": [
+      "Vos fichiers.\nVos appareils à proximité.",
+      "Photos et fichiers,\nà votre façon.",
+      "Les résultats restent\nsur votre appareil."
+    ],
+    "captions": [
+      "Directement sur votre LAN",
+      "Photos · Caméra · Fichiers",
+      "Fichiers · Textes · URL"
+    ]
+  },
+  "es": {
+    "appleLocale": "es-ES",
+    "subtitle": "Fotos, archivos y texto en LAN",
+    "promotionalText": "Envía fotos, archivos, texto y URL a tus dispositivos en la misma LAN. Aprueba el registro una vez y envía a los dispositivos registrados cuando estén en línea.",
+    "keywords": "archivo,transferir,foto,LAN,WiFi,texto,URL,Mac,Windows,Linux,compartir",
+    "description": "FTA (File Transfer Anything) envía fotos, archivos, texto y URL directamente entre tus dispositivos en la misma LAN.\n\n• Elige fotos con el selector del sistema o haz una foto\n• Selecciona archivos en la app Archivos\n• Envía texto y URL desde un solo campo\n• El destinatario aprueba el registro una vez; después envía a dispositivos registrados en línea\n• Consulta, mueve y comparte los archivos recibidos en Archivos\n• Guarda los resultados en el dispositivo y abre enlaces solo cuando lo elijas\n• Conecta FTA en iOS, macOS, Windows y Linux\n\nAmbos dispositivos necesitan FTA y la misma LAN IPv4 privada, sin intermediario en la nube. En iOS funciona con la app abierta y se detiene en segundo plano, al bloquear o al desconectar el Wi-Fi. No admite redes externas ni colas sin conexión. Los archivos y las URL nunca se abren automáticamente.",
+    "headlines": [
+      "Tus archivos.\nTus dispositivos cercanos.",
+      "Fotos y archivos,\na tu manera.",
+      "Los resultados quedan\nen tu dispositivo."
+    ],
+    "captions": [
+      "Directamente por tu LAN",
+      "Fotos · Cámara · Archivos",
+      "Archivos · Texto · URL"
+    ]
+  },
+  "pt-BR": {
+    "appleLocale": "pt-BR",
+    "subtitle": "Fotos, arquivos e texto na LAN",
+    "promotionalText": "Envie fotos, arquivos, texto e URLs aos seus dispositivos na mesma LAN. Aprove o registro uma vez e envie aos dispositivos registrados quando estiverem online.",
+    "keywords": "arquivo,transferir,foto,LAN,WiFi,texto,URL,Mac,Windows,Linux,compartilhar",
+    "description": "O FTA (File Transfer Anything) envia fotos, arquivos, texto e URLs diretamente entre seus dispositivos na mesma LAN.\n\n• Escolha fotos no seletor do sistema ou tire uma foto\n• Selecione arquivos no app Arquivos\n• Envie texto e URLs em um único campo\n• O destinatário aprova o registro uma vez; depois envie a dispositivos registrados online\n• Veja, mova e compartilhe os arquivos recebidos em Arquivos\n• Guarde os resultados no dispositivo e abra links só quando escolher\n• Conecte o FTA no iOS, macOS, Windows e Linux\n\nOs dois dispositivos precisam do FTA e da mesma LAN IPv4 privada, sem retransmissão pela nuvem. No iOS, funciona com o app aberto e para em segundo plano, ao bloquear ou desconectar o Wi-Fi. Não oferece redes externas nem filas offline. Arquivos e URLs nunca são abertos automaticamente.",
+    "headlines": [
+      "Seus arquivos.\nSeus dispositivos por perto.",
+      "Fotos e arquivos,\ndo seu jeito.",
+      "Os resultados ficam\nno seu dispositivo."
+    ],
+    "captions": [
+      "Direto pela sua LAN",
+      "Fotos · Câmera · Arquivos",
+      "Arquivos · Texto · URLs"
+    ]
+  },
+  "it": {
+    "appleLocale": "it",
+    "subtitle": "Foto, file e testo via LAN",
+    "promotionalText": "Invia foto, file, testo e URL ai tuoi dispositivi nella stessa LAN. Approva la registrazione una volta, poi invia ai dispositivi registrati quando sono in linea.",
+    "keywords": "file,trasferimento,foto,LAN,WiFi,testo,URL,Mac,Windows,Linux,condividi",
+    "description": "FTA (File Transfer Anything) invia foto, file, testo e URL direttamente tra i tuoi dispositivi nella stessa LAN.\n\n• Scegli foto dal selettore di sistema o scatta una foto\n• Seleziona documenti nell’app File\n• Invia testo e URL da un unico campo\n• Il destinatario approva la registrazione una volta; poi invia ai dispositivi registrati in linea\n• Visualizza, sposta e condividi i file ricevuti in File\n• Conserva i risultati sul dispositivo e apri link solo quando scegli\n• Collega FTA su iOS, macOS, Windows e Linux\n\nEntrambi i dispositivi richiedono FTA e la stessa LAN IPv4 privata, senza relay cloud. Su iOS funziona con l’app aperta e si interrompe in background, al blocco o alla disconnessione Wi-Fi. Non supporta reti esterne o code offline. File e URL non si aprono mai automaticamente.",
+    "headlines": [
+      "I tuoi file.\nI tuoi dispositivi vicini.",
+      "Foto e file,\na modo tuo.",
+      "I risultati restano\nsul tuo dispositivo."
+    ],
+    "captions": [
+      "Direttamente sulla tua LAN",
+      "Foto · Fotocamera · File",
+      "File · Testo · URL"
+    ]
+  }
+}

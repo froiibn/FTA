@@ -1,0 +1,3 @@
+// Generated from reviewed translations; edit apps/ios/Localization instead.
+"NSCameraUsageDescription" = "写真を撮影し、選択したFTA機器へ送信するためにカメラを使用します。";
+"NSLocalNetworkUsageDescription" = "同じLANのFTA機器を探し、ファイル・テキスト・URLを送受信します。";

@@ -1,0 +1,3 @@
+// Generated from reviewed translations; edit apps/ios/Localization instead.
+"NSCameraUsageDescription" = "使用相機拍照並傳送到您選取的 FTA 裝置。";
+"NSLocalNetworkUsageDescription" = "尋找同一區域網路的 FTA 裝置，並傳送與接收檔案、文字及 URL。";

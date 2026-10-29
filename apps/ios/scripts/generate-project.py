@@ -26,7 +26,20 @@ files.append(signing)
 asset=obj('assets','isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = FTA/Assets.xcassets; sourceTree = "<group>";')
 files.append(asset)
 assetbuild=obj('assetbuild',f'isa = PBXBuildFile; fileRef = {asset};')
-resources=obj('resources',f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({assetbuild}); runOnlyForDeploymentPostprocessing = 0;')
+# Legal/privacy files must survive project regeneration and be present in the shipped app bundle.
+resourcebuilds=[assetbuild]
+for resource in ['FTA/PrivacyInfo.xcprivacy','FTA/Legal/PrivacyPolicy.txt','FTA/Legal/PrivacyPolicy-en.txt','FTA/Legal/ThirdPartyNotices.txt','FTA/Legal/ThirdPartyNotices.json']:
+ ref=obj(resource,f'isa = PBXFileReference; lastKnownFileType = text; path = {q(resource)}; sourceTree = "<group>";')
+ files.append(ref); resourcebuilds.append(obj('build'+resource,f'isa = PBXBuildFile; fileRef = {ref};'))
+# Use native variant groups so Foundation/UIKit resolve per-app language and permission descriptions.
+locales=['en','ko','ja','zh-Hans','zh-Hant','de','fr','es','pt-BR','it']
+for table in ['Localizable.strings','InfoPlist.strings']:
+ localized=[]
+ for locale in locales:
+  localized.append(obj(locale+table,f'isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = {q(locale)}; path = {q("FTA/Localization/"+locale+".lproj/"+table)}; sourceTree = "<group>";'))
+ variant=obj(table,f'isa = PBXVariantGroup; children = {array(localized)}; name = {q(table)}; sourceTree = "<group>";')
+ files.append(variant); resourcebuilds.append(obj('build'+table,f'isa = PBXBuildFile; fileRef = {variant};'))
+resources=obj('resources',f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = {array(resourcebuilds)}; runOnlyForDeploymentPostprocessing = 0;')
 product=obj('app','isa = PBXFileReference; explicitFileType = wrapper.application; path = FTA.app; sourceTree = BUILT_PRODUCTS_DIR;')
 products=obj('products',f'isa = PBXGroup; children = ({product}); name = Products; sourceTree = "<group>";')
 group=obj('group',f'isa = PBXGroup; children = {array(files+[products])}; sourceTree = "<group>";')
@@ -37,7 +50,7 @@ base={'ARCHS':'arm64','IPHONEOS_DEPLOYMENT_TARGET':'17.0','SDKROOT':'iphoneos','
 def configs(name,base):
  refs=[]
  for mode in ['Debug','Release']:
-  settings=dict(base); settings.update(previous.get('objects',{}).get(ident(name+mode),{}).get('buildSettings',{})); settings['SWIFT_OPTIMIZATION_LEVEL']='-Onone' if mode=='Debug' else '-O'; settings['DEBUG_INFORMATION_FORMAT']='dwarf'
+  settings=dict(base); settings.update(previous.get('objects',{}).get(ident(name+mode),{}).get('buildSettings',{})); settings['SWIFT_OPTIMIZATION_LEVEL']='-Onone' if mode=='Debug' else '-O'; settings['DEBUG_INFORMATION_FORMAT']='dwarf-with-dsym' if mode=='Release' else 'dwarf'
   refs.append(obj(name+mode,f'isa = XCBuildConfiguration; baseConfigurationReference = {signing}; buildSettings = {{'+''.join(f'{q(k)} = {build_value(v)};' for k,v in settings.items())+'}; name = '+mode+';'))
  return obj(name+'configs',f'isa = XCConfigurationList; buildConfigurations = {array(refs)}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;')
 target=obj('target',f'isa = PBXNativeTarget; buildConfigurationList = {configs("app",base)}; buildPhases = {array([rust,sources,frameworks,resources])}; buildRules = (); dependencies = (); name = FTA; productName = FTA; productReference = {product}; productType = "com.apple.product-type.application";')
@@ -47,13 +60,17 @@ testbuild=obj('testbuild',f'isa = PBXBuildFile; fileRef = {testfile};')
 testproduct=obj('testproduct','isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = FTAFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR;')
 objects[products]=objects[products].replace(f'({product})',f'({product},{testproduct})')
 objects[group]=objects[group].replace(array(files+[products]),array(files+[testfile,products]))
+# Capture tests read reviewed labels and do not require a third-party localization test framework.
+expectations=obj('localeExpectations','isa = PBXFileReference; lastKnownFileType = text.json; path = Tests/LocaleExpectations.json; sourceTree = "<group>";')
+expectationsbuild=obj('localeExpectationsBuild',f'isa = PBXBuildFile; fileRef = {expectations};')
+testresources=obj('testresources',f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({expectationsbuild}); runOnlyForDeploymentPostprocessing = 0;')
 testsource=obj('testsource',f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({testbuild}); runOnlyForDeploymentPostprocessing = 0;')
 proxy=obj('proxy',f'isa = PBXContainerItemProxy; containerPortal = {ident("project")}; proxyType = 1; remoteGlobalIDString = {target}; remoteInfo = FTA;')
 dependency=obj('dependency',f'isa = PBXTargetDependency; target = {target}; targetProxy = {proxy};')
 testbase={k:v for k,v in base.items() if k not in ['LIBRARY_SEARCH_PATHS','OTHER_LDFLAGS','INFOPLIST_FILE','PRODUCT_NAME','PRODUCT_BUNDLE_IDENTIFIER','GENERATE_INFOPLIST_FILE']}
 testbase.update({'PRODUCT_NAME':'FTAFlowTests','PRODUCT_BUNDLE_IDENTIFIER':'app.fta.ios.flowtests','GENERATE_INFOPLIST_FILE':'YES','TEST_TARGET_NAME':'FTA'})
-testtarget=obj('testtarget',f'isa = PBXNativeTarget; buildConfigurationList = {configs("tests",testbase)}; buildPhases = ({testsource}); buildRules = (); dependencies = ({dependency}); name = FTAFlowTests; productName = FTAFlowTests; productReference = {testproduct}; productType = "com.apple.product-type.bundle.ui-testing";')
-project=obj('project',f'isa = PBXProject; attributes = {{LastUpgradeCheck = 2700; }}; buildConfigurationList = {configs("project",{})}; compatibilityVersion = "Xcode 14.0"; developmentRegion = ko; hasScannedForEncodings = 0; knownRegions = (ko,en,Base); mainGroup = {group}; productRefGroup = {products}; projectDirPath = ""; projectRoot = ""; targets = ({target},{testtarget});')
+testtarget=obj('testtarget',f'isa = PBXNativeTarget; buildConfigurationList = {configs("tests",testbase)}; buildPhases = ({testsource},{testresources}); buildRules = (); dependencies = ({dependency}); name = FTAFlowTests; productName = FTAFlowTests; productReference = {testproduct}; productType = "com.apple.product-type.bundle.ui-testing";')
+project=obj('project',f'isa = PBXProject; attributes = {{LastUpgradeCheck = 2700; }}; buildConfigurationList = {configs("project",{})}; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (ko,en,Base); mainGroup = {group}; productRefGroup = {products}; projectDirPath = ""; projectRoot = ""; targets = ({target},{testtarget});')
 out=root/'FTA.xcodeproj';out.mkdir(exist_ok=True)
 (out/'project.pbxproj').write_text('// !$*UTF8*$!\n{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {\n'+''.join(f'{key} = {{ {value} }};\n' for key,value in objects.items())+f'}}; rootObject = {project}; }}\n')
 schemes=out/'xcshareddata/xcschemes';schemes.mkdir(parents=True,exist_ok=True)

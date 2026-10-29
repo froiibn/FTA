@@ -1,3 +1,4 @@
+// Localize visible copy while preserving identifiers, user data, and existing storage folder names.
 import Foundation
 import Network
 import Darwin
@@ -105,9 +106,9 @@ final class Bonjour: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
         }
     }
     func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: NSNumber]) {
-        failure?("기기를 검색할 수 없습니다. 설정에서 FTA의 로컬 네트워크 권한과 Wi-Fi 연결을 확인하세요.")
+        failure?(String(localized:"기기를 검색할 수 없습니다. 설정에서 FTA의 로컬 네트워크 권한과 Wi-Fi 연결을 확인하세요."))
     }
     func netService(_ sender: NetService, didNotPublish errorDict: [String: NSNumber]) {
-        failure?("수신 서비스를 알리지 못했습니다. 로컬 네트워크 권한을 확인하세요.")
+        failure?(String(localized:"수신 서비스를 알리지 못했습니다. 로컬 네트워크 권한을 확인하세요."))
     }
 }

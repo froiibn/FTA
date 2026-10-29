@@ -30,10 +30,17 @@ http-body-util = "0.1"
 bytes = "1"
 futures-util = "0.3"
 tokio-util = { version = "0.7", features = ["io", "rt"] }
-rusqlite = { version = "0.37", features = ["bundled"] }
 ipnet = { version = "2", features = ["serde"] }
 mdns-sd = "0.15"
 fta-platform = { path = "../fta-platform" }
+
+# iOS stores its database in the local app container and uses Apple's maintained SQLite.
+# Other targets retain bundled SQLite; their file locking and deployed database behavior stay unchanged.
+[target.'cfg(target_os = "ios")'.dependencies]
+rusqlite = "0.37"
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+rusqlite = { version = "0.37", features = ["bundled"] }
 
 # The native busy code distinguishes local pipe contention from missing-service/access failures.
 [target.'cfg(windows)'.dependencies]
