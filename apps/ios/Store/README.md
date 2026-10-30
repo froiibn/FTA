@@ -38,7 +38,8 @@ output/render-store-images
 - 완성본: `output/ios-store-assets/promotional/{phone,ipad}/<locale>/`.
 - iPhone 1320×2868, iPad 2064×2752, 로케일별 각 3개로 총 60개. 실제 화면 위에 제품 문구/여백/프레임만 합성한다. 앱 UI와 전송 상태는 다시 그리지 않는다.
 - iPhone 대형 자산을 올리면 App Store가 동일 언어의 필수 중형 자산에 자동 적용하는 것을 확인했다.
-- 현재 한국어 및 나머지 8개 비영어 로케일에 설명·부제·지원 링크·정책 URL과 기기별 3개 이미지를 저장했다. 영어(미국)는 `FTA` 이름 충돌로 저장이 거부됐다. 이후 사용자가 전 스토어 제목을 `FTA - File Transfer Anything`(28자)으로 승인했다. 재개 시 App Store Connect 세션이 만료되어 실제 이름 가용성/저장은 재로그인 후 진행해야 하며, 영어 리소스/문구/이미지는 준비됐다.
+- 사용자 승인 제목 `FTA - File Transfer Anything`(28자)을 10개 로케일 모두 저장하고 재접속 후 실제 값을 확인했다. 영어 이름 충돌은 해소됐다. 앱 안의 FTA 표시명·아이콘·bundle ID/SKU는 변경하지 않았다.
+- 10개 로케일의 설명·부제·지원 링크·정책 URL과 iPhone/iPad 각 3개, 총 60개 이미지를 저장했다. 영어의 마지막 6개 업로드 후 처리 완료와 실제 파일명을 확인했고 기존 54개는 보존했다. 영어 설명·키워드·프로모션 문구는 재접속 후 원본과 일치함을 확인했다.
 - 무료 가격/사용 가능 지역은 175개 국가·지역으로 준비했다. 앱이 출시된 상태는 아니다. 미검증 iOS-on-Mac/Vision Pro 호환 배포는 켜지 않는다.
 
 ## 검증 기록과 남은 항목
@@ -50,17 +51,16 @@ output/render-store-images
 - 실제 iOS 시뮬레이터의 SQLite 3.54.0: TLS 1 MiB 송수신·동명 파일 비덮어쓰기·DB 재열기/WAL·최종 저장 중단 복구·무결성 검사 통과.
 - 최종 Release archive, Swift/Rust dSYM, 엄격한 로컬 서명/번들 검증 성공. 개발 서명 archive를 App Store 배포 export와 혼동하지 않는다.
 
-사전 배포 export는 Apple Distribution 서명과 개발 디버깅 권한 없음까지 확인했다. 이후 다국어 최종 archive의 export에서 Xcode 계정 자격증명 누락(`missing Xcode-Username / No Accounts`)이 발생했다. 소유자가 Xcode Accounts에서 재인증한 뒤 최종 distribution export·검증·업로드 및 Apple 처리 완료 확인을 이어가야 한다. 사전 export의 오래된 IPA를 업로드하지 않는다.
+Xcode 계정 자격증명 누락은 소유자의 재인증으로 해소됐다. 최신 `runtime-notices` archive를 Apple Distribution/App Store 프로파일로 export하고 `validate-release.py --require-distribution`으로 검증했다. 로컬 검증 IPA는 `output/ios-app-store-export-final9/FTA.ipa`이며 SHA-256은 `e92f0657b4fa8ae63f7fed71a78de990fb1c6910d5a3c430ddc141e0181aa32a`다. 동일 최종 archive의 App Store Connect 업로드와 서버 처리는 성공했고 0.1.2(9)가 TestFlight/버전의 빌드 추가 화면에 나타났다. 현재 상태는 **수출 규정 관련 문서 누락**이다. 버전 0.1.2에 빌드 9를 연결·저장한 뒤 재접속하여 유지됨을 확인했다. 테스트/심사 준비 완료를 의미하지 않는다. 사전 IPA를 업로드하지 않았다.
 
 실제 제출 전 잔여 항목:
 
-1. App Store Connect 재로그인 후 승인된 `FTA - File Transfer Anything` 제목의 전 로케일 저장/가용성 확인, 영어 설명·정책 URL·6개 이미지 저장 확인.
-2. Xcode 계정 재인증, 최종 distribution export/검증/빌드 업로드·처리 완료·선택.
-3. 저작권 소유자 확인. 다른 앱의 저작권 문구를 이 앱 소유권으로 추정하지 않는다.
-4. App Privacy의 ‘데이터 수집 없음’ 초안은 실제 코드와 Apple의 수집 정의에 기반해 저장했다. 최종 게시의 법적 준수·정보 갱신 동의는 소유자의 확인/승인이 필요하다.
-5. 콘텐츠 권한 진술과 암호화 수출 규정. Rustls/ring의 표준 TLS 암호화가 OS 밖에서 구현되므로 `ITSAppUsesNonExemptEncryption=false`를 임의 추가하지 않는다. 면제 여부/프랑스 등 문서 요건은 소유자가 판정해야 한다.
-6. 중국 본토 ICP 등록 적용 여부 등 국가별 추가 요구가 실제 배포에 해당하는지 소유자가 확인한다. 번호나 권리를 만들어 입력하지 않는다.
-7. 최종 build 9의 실기 전송/권한·수명주기, 가장 오래된 지원 OS, Windows/Linux 상호 운용의 최종 재검증. 이전 build 8의 실기 사용 성공과 새 빌드의 실기 검증은 다르다.
+1. 업로드된 0.1.2(9)의 수출 규정 문서 차단 해소 후 연결된 빌드의 테스트 가능 상태 확인. 실제 문서 마법사는 OS 외부 표준 암호화 + 프랑스 배포에 **프랑스 암호화 신고 승인서 사본**을 요구한다. 서류 없이 저장하거나 면제·프랑스 제외를 추측하지 않았다.
+2. 저작권 소유자 확인. 다른 앱의 저작권 문구를 이 앱 소유권으로 추정하지 않는다.
+3. App Privacy의 ‘데이터 수집 없음’ 초안은 실제 코드와 Apple의 수집 정의에 기반해 저장했다. 최종 게시의 법적 준수·정보 갱신 동의는 소유자의 확인/승인이 필요하다.
+4. 콘텐츠 권한 진술과 암호화 수출 규정. Rustls/ring의 표준 TLS 암호화가 OS 밖에서 구현되므로 `ITSAppUsesNonExemptEncryption=false`를 임의 추가하지 않는다. 면제 여부/프랑스 등 문서 요건은 소유자가 판정해야 한다.
+5. 중국 본토 ICP 등록 적용 여부 등 국가별 추가 요구가 실제 배포에 해당하는지 소유자가 확인한다. 번호나 권리를 만들어 입력하지 않는다.
+6. 최종 build 9의 실기 전송/권한·수명주기, 가장 오래된 지원 OS, Windows/Linux 상호 운용의 최종 재검증. 이전 build 8의 실기 사용 성공과 새 빌드의 실기 검증은 다르다.
 
 연령 설문은 Apple의 정의에 따라 직접 메시지 있음, 공개 UGC/소셜 피드·내장 자유 웹브라우저·광고 없음으로 저장했다. 앱이 자체 제공하는 성인/의료/도박 등 콘텐츠는 없다. Apple 계산값은 일반 4+, 한국 전체, 브라질 A12, 베트남 00+다. 어린이 전용이나 임의 상향으로 지정하지 않았다.
 
