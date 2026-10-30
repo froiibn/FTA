@@ -24,22 +24,28 @@ import java.util.concurrent.*;
 public final class MainActivity extends Activity {
     static final int WHITE=Color.WHITE;
     private static final int PICK_PHOTOS=101,PICK_FILES=102,CAPTURE=103,LAN_PERMISSION=104,NOTIFICATIONS=105,OPEN_RECEIVED=106;
-    private static final int MAX_ATTACHMENTS=100, POLL_MS=750, EVENT_PAGE_SIZE=1;
+    private static final int MAX_ATTACHMENTS=100;
     private static final long COMPLETION_MS=1500, BLINK_CYCLE_MS=600;
     // Lifecycle controls are serialized globally, so recreation cannot stop a newer listener from an old worker.
-    private static final ExecutorService CONTROL=Executors.newSingleThreadExecutor();
+    private static final ExecutorService CONTROL=TransferService.CONTROL;
     private static final ExecutorService WORK=Executors.newFixedThreadPool(3);
     private final Handler main=new Handler(Looper.getMainLooper());
     private SharedPreferences preferences;
-    private LanDiscovery discovery;
-    private ConnectivityManager connectivity;
-    private ConnectivityManager.NetworkCallback networkCallback;
+    private TransferService session;
+    private boolean bound,prepared,stateReceiverRegistered;
+    private final BroadcastReceiver stateReceiver=new BroadcastReceiver(){public void onReceive(Context context,Intent intent){updateLifecycle();}};
+    private final String clientToken=UUID.randomUUID().toString();
+    private final ServiceConnection connection=new ServiceConnection(){
+        public void onServiceConnected(ComponentName name,IBinder binder){if(!visible||destroyed)return;session=((TransferService.LocalBinder)binder).service();session.attach(clientToken);updateLifecycle();}
+        public void onServiceDisconnected(ComponentName name){session=null;running=false;ready=false;if(visible)render();}
+    };
     private volatile boolean visible,ready,destroyed;
-    private volatile long generation;
-    private String desired="",selected="",preferredPeer="",activeId,activePeer,messageDraft="",cameraToken;
-    private boolean running,starting,sending,importing,polling;
-    private long pollingGeneration=-1;
+    private String selected="",preferredPeer="",activeId,activePeer,messageDraft="",cameraToken,lastOutcomeSeen;
+    private boolean running,sending,importing;
     private double fraction=Double.NaN;
+    private boolean displayedReceive=true;
+    // Only a visible Activity renders snapshots; the Service retains no view listener across Home or recreation.
+    private final Runnable viewTick=new Runnable(){public void run(){if(!visible||destroyed)return;updateLifecycle();main.postDelayed(this,750);}};
     private JSONArray peers=new JSONArray(),history=new JSONArray(),registrations=new JSONArray();
     private final ArrayList<File> attachments=new ArrayList<>();
     private final HashMap<String,Receipt> completed=new HashMap<>();
@@ -58,7 +64,7 @@ public final class MainActivity extends Activity {
     private String lastError,pendingReceipt,renderedPeers,renderedHistory,renderedAttachments;
     private List<Uri> deferredUris;
     private Runnable deferredCleanup;
-    private static final class Receipt {final String id;final long until;Receipt(String id){this.id=id;until=SystemClock.elapsedRealtime()+COMPLETION_MS;}}
+    private static final class Receipt {final String id;final long until;Receipt(String id,long deadline){this.id=id;until=deadline;}}
 
     @Override public void onCreate(Bundle state){super.onCreate(state);
         // Theme attributes keep all Android controls and custom status drawing consistent with system light/night mode.
@@ -66,68 +72,35 @@ public final class MainActivity extends Activity {
         // Green remains semantic progress/success; theme-specific contrast keeps the ring and check legible in both modes.
         boolean night=(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;transferGreen=night?0xFF81C995:0xFF188038;completionInk=night?Color.BLACK:WHITE;
         preferences=getSharedPreferences("fta",MODE_PRIVATE);messageDraft=preferences.getString("messageDraft","");cameraToken=preferences.getString("cameraToken",null);
-        connectivity=getSystemService(ConnectivityManager.class);discovery=new LanDiscovery(this,CONTROL);discovery.failure=text->fail(new IOException(text));
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         createRoot();showTab(state==null?0:state.getInt("selectedTab",0));
-        networkCallback=new ConnectivityManager.NetworkCallback(){
-            @Override public void onAvailable(Network n){main.post(()->updateLifecycle());}
-            @Override public void onLost(Network n){main.post(()->updateLifecycle());}
-            @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){main.post(()->updateLifecycle());}
-            @Override public void onLinkPropertiesChanged(Network n,LinkProperties l){main.post(()->updateLifecycle());}
-        };
-        connectivity.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN).build(),networkCallback);
-        CONTROL.execute(()->{try{NativeBridge.initialize(getApplicationContext());main.post(()->{if(destroyed)return;ready=true;restoreAttachments();pruneStaging();updateLifecycle();render();if(pendingReceipt!=null){String receipt=pendingReceipt;pendingReceipt=null;openReceipt(receipt);}if(deferredUris!=null){List<Uri> uris=deferredUris;Runnable cleanup=deferredCleanup;deferredUris=null;deferredCleanup=null;importUris(uris,cleanup);}});}catch(Exception e){fail(e);}});
         // Cold-start notification navigation waits for actual engine readiness rather than an arbitrary delay.
         pendingReceipt=getIntent().getStringExtra("transfer_id");
     }
-    @Override protected void onStart(){super.onStart();visible=true;updateLifecycle();}
-    // Permission settings can change outside FTA; refresh the displayed values when the screen returns.
+    // Pre-33 receivers use a signature permission because the non-exported flag is unavailable on those OS versions.
+    @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag")
+    @Override protected void onStart(){super.onStart();visible=true;if(Build.VERSION.SDK_INT>=33)registerReceiver(stateReceiver,new IntentFilter(TransferService.STATE_CHANGED),Context.RECEIVER_NOT_EXPORTED);else registerReceiver(stateReceiver,new IntentFilter(TransferService.STATE_CHANGED),TransferService.STATE_PERMISSION,null);stateReceiverRegistered=true;bound=bindService(new Intent(this,TransferService.class),connection,BIND_AUTO_CREATE);main.post(viewTick);}
     @Override protected void onResume(){super.onResume();if(tab==2&&body!=null)showTab(2);}
-    @Override protected void onStop(){visible=false;persistDraft();updateLifecycle();super.onStop();}
-    @Override protected void onDestroy(){destroyed=true;visible=false;generation++;discovery.stop();main.removeCallbacksAndMessages(null);try{connectivity.unregisterNetworkCallback(networkCallback);}catch(Exception ignored){}super.onDestroy();}
+    @Override protected void onStop(){visible=false;persistDraft();main.removeCallbacks(viewTick);if(stateReceiverRegistered){unregisterReceiver(stateReceiver);stateReceiverRegistered=false;}if(session!=null)session.detach(clientToken);session=null;if(bound){unbindService(connection);bound=false;}super.onStop();}
+    @Override protected void onDestroy(){destroyed=true;main.removeCallbacksAndMessages(null);super.onDestroy();}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);String id=intent.getStringExtra("transfer_id");if(id!=null)openReceipt(id);}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==LAN_PERMISSION){updateLifecycle();showTab(tab);} }
 
     private boolean permitted(){return Build.VERSION.SDK_INT<37||checkSelfPermission("android.permission.ACCESS_LOCAL_NETWORK")==PackageManager.PERMISSION_GRANTED;}
     private boolean trusted(LanDiscovery.Lan lan){return lan!=null&&preferences.getStringSet("trustedScopes",Collections.emptySet()).contains(lan.scope);}
     private String name(){return preferences.getString("deviceName",Build.MODEL);}
-    // Visibility and current LAN govern sockets; saved consent survives suspension and DHCP renewals.
+    // Binding exposes state only. Starting/stopping sockets and send workers belongs exclusively to the Service.
     private void updateLifecycle(){
-        if(!ready||destroyed)return;
-        LanDiscovery.Lan lan=LanDiscovery.current(this);
-        boolean allowed=visible&&preferences.getBoolean("receiveEnabled",true)&&trusted(lan)&&permitted();
-        String next=allowed?lan.identity():"";
-        if(next.equals(desired)&&(!allowed||running||starting)){renderStatus();return;}
-        desired=next;final long version=++generation;
-        running=false;starting=allowed;peers=new JSONArray();selected="";discovery.stop();render();
-        CONTROL.execute(()->{try{
-            NativeBridge.call("host.stop");connectivity.bindProcessToNetwork(null);
-            if(!allowed||version!=generation)return;
-            if(!connectivity.bindProcessToNetwork(lan.network))throw new IOException("선택한 LAN을 사용할 수 없습니다");
-            JSONObject params=NativeBridge.paths().put("display_name",name()).put("listen_addr",lan.address+":0").put("allowed_networks",new JSONArray().put(lan.cidr));
-            JSONObject advert=(JSONObject)NativeBridge.call("host.start",params);
-            main.post(()->{if(version!=generation||!visible||destroyed)return;starting=false;running=true;discovery.start(lan);discovery.advertise(advert,name());render();poll();});
-        }catch(Exception e){main.post(()->{if(version==generation){starting=false;desired="";fail(e);}});}});
-        if(!allowed)loadHistory();
+        if(destroyed||!visible||session==null)return;session.fromUi();ready=session.ready;running=session.running;sending=session.sending;activeId=session.activeId;activePeer=session.activePeer;fraction=session.fraction;peers=session.peers;history=session.history;registrations=session.registrations;
+        completed.entrySet().removeIf(entry->!session.completed.containsKey(entry.getKey()));for(Map.Entry<String,TransferService.Completion> entry:session.completed.entrySet()){Receipt previous=completed.get(entry.getKey());if(previous==null||!previous.id.equals(entry.getValue().id))completed.put(entry.getKey(),new Receipt(entry.getValue().id,entry.getValue().until));}
+        if(ready&&!prepared){prepared=true;restoreAttachments();pruneStaging();if(pendingReceipt!=null){String receipt=pendingReceipt;pendingReceipt=null;openReceipt(receipt);}if(deferredUris!=null){List<Uri> uris=deferredUris;Runnable cleanup=deferredCleanup;deferredUris=null;deferredCleanup=null;importUris(uris,cleanup);}}
+        applyOutcome();
+        if(session.lastError!=null){String error=session.lastError;session.lastError=null;fail(new IOException(error));}
+        boolean receive=preferences.getBoolean("receiveEnabled",true);if(tab==2&&receive!=displayedReceive)showTab(2);displayedReceive=receive;render();presentRegistration();
     }
-    // Generation/transfer IDs reject delayed results after a path change or a newer send.
-    private void poll(){
-        if(!visible||!running||destroyed||(polling&&pollingGeneration==generation))return;
-        polling=true;final long version=generation;pollingGeneration=version;final String transfer=activeId;
-        WORK.execute(()->{try{
-            JSONArray devices=(JSONArray)NativeBridge.call("devices.list",new JSONObject().put("available_only",true));
-            JSONArray records=(JSONArray)NativeBridge.call("inbox.list",new JSONObject().put("limit",100));
-            JSONArray requests=(JSONArray)NativeBridge.call("registration.requests");
-            JSONObject advert=(JSONObject)NativeBridge.call("host.advertisement");
-            JSONObject progress=null;
-            if(transfer!=null)try{progress=(JSONObject)NativeBridge.call("transfers.get",new JSONObject().put("transfer_id",transfer));}catch(Exception ignored){}
-            deliverNotifications();final JSONObject measured=progress;
-            main.post(()->{if(pollingGeneration==version)polling=false;if(version!=generation||!running||destroyed)return;peers=devices;history=records;registrations=requests;
-                if(transfer!=null&&transfer.equals(activeId)&&measured!=null)fraction=fileFraction(measured);
-                discovery.advertise(advert,name());render();presentRegistration();main.postDelayed(this::poll,POLL_MS);});
-        }catch(Exception e){main.post(()->{if(pollingGeneration==version)polling=false;if(version==generation&&running){fail(e);main.postDelayed(this::poll,POLL_MS*2);}});}});
-    }
-    private void loadHistory(){if(!ready)return;WORK.execute(()->{try{JSONArray records=(JSONArray)NativeBridge.call("inbox.list",new JSONObject().put("limit",100));main.post(()->{if(destroyed)return;history=records;if(tab==1)renderHistory();});}catch(Exception ignored){}});}
+    private void applyOutcome(){if(session==null)return;if(session.lastOutcome!=null&&!session.lastOutcome.equals(lastOutcomeSeen)){lastOutcomeSeen=session.lastOutcome;if("completed".equals(session.lastOutcomeState)){if(session.lastOutcomeFiles){attachments.clear();restoreAttachments();}else if(messageDraft.equals(session.lastOutcomeBody)){messageDraft=preferences.getString("messageDraft","");if(message!=null)message.setText(messageDraft);}}}}
+    private void poll(){updateLifecycle();}
+    private void loadHistory(){if(session!=null)session.refreshHistory();}
     static double fileFraction(JSONObject transfer){if(!"files".equals(transfer.optString("kind")))return Double.NaN;JSONArray items=transfer.optJSONArray("items");double total=0,sent=0;if(items!=null)for(int i=0;i<items.length();i++){JSONObject item=items.optJSONObject(i);if(item!=null){total+=item.optDouble("size",0);sent+=item.optDouble("bytes_transferred",0);}}return total>0?Math.min(1,Math.max(0,sent/total)):Double.NaN;}
     private void presentRegistration(){if(!visible||isFinishing())return;for(int i=0;i<registrations.length();i++){JSONObject request=registrations.optJSONObject(i);if(request==null)continue;String id=request.optString("session_id");if(!shownRequests.add(id))continue;
         new AlertDialog.Builder(this).setTitle("기기 등록 요청").setMessage(request.optString("display_name")+"\n"+request.optString("os")+" · "+request.optString("kind")+" · "+request.optInt("item_count")+"개\n등록하면 이후 온라인 상태에서 바로 받을 수 있습니다.")
@@ -178,7 +151,7 @@ public final class MainActivity extends Activity {
         LinearLayout composer=new LinearLayout(this);composer.setOrientation(LinearLayout.VERTICAL);composer.setBackgroundColor(surface);composer.addView(divider());
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.BOTTOM);row.setPadding(dp(16),dp(8),dp(8),dp(8));
         message=new EditText(this);message.setText(messageDraft);message.setHint("텍스트 또는 URL");message.setTextSize(16);message.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);message.setMinLines(1);message.setMaxLines(4);message.setVerticalScrollBarEnabled(true);message.setMinHeight(dp(48));message.setPadding(dp(12),dp(10),dp(12),dp(10));message.setBackground(inputSurface());
-        message.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){}public void onTextChanged(CharSequence s,int st,int before,int count){messageDraft=s.toString();renderActions();}public void afterTextChanged(Editable e){}});
+        message.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){}public void onTextChanged(CharSequence s,int st,int before,int count){messageDraft=s.toString();preferences.edit().putString("messageDraft",messageDraft).apply();renderActions();}public void afterTextChanged(Editable e){}});
         row.addView(message,new LinearLayout.LayoutParams(0,-2,1));sendButton=new ImageButton(this);sendButton.setImageResource(R.drawable.ic_send);sendButton.setImageTintList(android.content.res.ColorStateList.valueOf(actionInk()));sendButton.setPadding(dp(12),dp(12),dp(12),dp(12));sendButton.setContentDescription("메시지 보내기");sendButton.setBackground(actionSurface(accent));sendButton.setOnClickListener(v->send(false));LinearLayout.LayoutParams sendParams=new LinearLayout.LayoutParams(dp(48),dp(48));sendParams.setMarginStart(dp(8));row.addView(sendButton,sendParams);composer.addView(row);body.addView(composer,new LinearLayout.LayoutParams(-1,-2));
     }
     private void buildHistory(){renderedHistory=null;LinearLayout content=column();historyRows=new LinearLayout(this);historyRows.setOrientation(LinearLayout.VERTICAL);group(content).addView(historyRows);body.addView(scroll(content),new LinearLayout.LayoutParams(-1,-1));loadHistory();}
@@ -188,7 +161,7 @@ public final class MainActivity extends Activity {
         LanDiscovery.Lan lan=LanDiscovery.current(this);
         Switch trust=new Switch(this);trust.setText("신뢰하는 집 네트워크입니다");trust.setTextSize(16);trust.setMinHeight(dp(48));trust.setChecked(trusted(lan));trust.setEnabled(lan!=null);trust.setOnCheckedChangeListener((b,on)->{Set<String> scopes=new HashSet<>(preferences.getStringSet("trustedScopes",Collections.emptySet()));if(lan!=null){if(on)scopes.add(lan.scope);else scopes.remove(lan.scope);}preferences.edit().putStringSet("trustedScopes",scopes).apply();if(on&&!permitted())requestPermissions(new String[]{"android.permission.ACCESS_LOCAL_NETWORK"},LAN_PERMISSION);updateLifecycle();});
         switchRow(networkGroup,trust,lan==null?"Wi-Fi 또는 유선 LAN에 연결하세요":lan.interfaceName+" · "+lan.cidr);networkGroup.addView(divider());
-        Switch receive=new Switch(this);receive.setText("송수신 사용");receive.setTextSize(16);receive.setMinHeight(dp(48));receive.setChecked(preferences.getBoolean("receiveEnabled",true));receive.setOnCheckedChangeListener((b,on)->{preferences.edit().putBoolean("receiveEnabled",on).apply();updateLifecycle();});switchRow(networkGroup,receive,"화면이 열려 있는 동안 수신합니다. 앱을 벗어나도 신뢰 설정은 유지됩니다.");
+        Switch receive=new Switch(this);receive.setText("송수신 사용");receive.setTextSize(16);receive.setMinHeight(dp(48));receive.setChecked(preferences.getBoolean("receiveEnabled",true));receive.setOnCheckedChangeListener((b,on)->{preferences.edit().putBoolean("receiveEnabled",on).apply();updateLifecycle();});switchRow(networkGroup,receive,"지속 알림이 실행되는 동안 백그라운드에서도 송수신합니다. 기기 절전이나 시스템 중지로 연결이 제한될 수 있습니다.");
         c.addView(section("기기"));LinearLayout deviceGroup=group(c);
         deviceGroup.addView(settingsRow("기기 이름",name(),R.drawable.ic_info,this::editDeviceName));deviceGroup.addView(divider());deviceGroup.addView(settingsRow("등록된 기기 관리","온라인 상태와 관계없이 등록을 해제할 수 있습니다",R.drawable.ic_network,this::manageDevices));
         c.addView(section("파일 및 권한"));LinearLayout files=group(c);files.addView(settingsRow("받은 파일 열기","Android 파일 앱에서 확인",R.drawable.ic_file,()->{try{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE).putExtra(DocumentsContract.EXTRA_INITIAL_URI,DocumentsContract.buildRootUri("app.fta.android.documents","received"));startActivityForResult(intent,OPEN_RECEIVED);}catch(Exception e){fail(e);}}));files.addView(divider());
@@ -198,7 +171,7 @@ public final class MainActivity extends Activity {
     }
     // Settings-style rows expose the current value and edit in a native dialog instead of an always-open form.
     private void editDeviceName(){
-        EditText editor=new EditText(this);editor.setText(name());editor.setHint("기기 이름");editor.setSingleLine(true);editor.setContentDescription("기기 이름");LinearLayout box=new LinearLayout(this);box.setPadding(dp(24),dp(8),dp(24),0);box.addView(editor,new LinearLayout.LayoutParams(-1,-2));AlertDialog dialog=new AlertDialog.Builder(this).setTitle("기기 이름").setView(box).setNegativeButton("취소",null).setPositiveButton("저장",null).create();dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String value=editor.getText().toString().trim();if(value.isEmpty()||value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>128){editor.setError("기기 이름은 1~128바이트여야 합니다");return;}preferences.edit().putString("deviceName",value).apply();desired="restart";updateLifecycle();dialog.dismiss();showTab(2);}));dialog.show();
+        EditText editor=new EditText(this);editor.setText(name());editor.setHint("기기 이름");editor.setSingleLine(true);editor.setContentDescription("기기 이름");LinearLayout box=new LinearLayout(this);box.setPadding(dp(24),dp(8),dp(24),0);box.addView(editor,new LinearLayout.LayoutParams(-1,-2));AlertDialog dialog=new AlertDialog.Builder(this).setTitle("기기 이름").setView(box).setNegativeButton("취소",null).setPositiveButton("저장",null).create();dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String value=editor.getText().toString().trim();if(value.isEmpty()||value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>128){editor.setError("기기 이름은 1~128바이트여야 합니다");return;}preferences.edit().putString("deviceName",value).apply();updateLifecycle();dialog.dismiss();showTab(2);}));dialog.show();
     }
     private void switchRow(LinearLayout group,Switch control,String summary){LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.VERTICAL);row.setPadding(dp(16),dp(8),dp(16),dp(16));row.addView(control,new LinearLayout.LayoutParams(-1,-2));TextView detail=label(summary,14);detail.setTextColor(textSecondary);detail.setPadding(0,dp(4),dp(48),0);row.addView(detail);group.addView(row);}
     private View settingsRow(String title,String summary,int icon,Runnable action){
@@ -212,7 +185,7 @@ public final class MainActivity extends Activity {
     private android.graphics.drawable.Drawable inputSurface(){StateListDrawable states=new StateListDrawable();for(boolean focus:new boolean[]{true,false}){GradientDrawable fill=new GradientDrawable();fill.setColor(background);fill.setCornerRadius(dp(12));fill.setStroke(dp(focus?2:1),focus?accent:withAlpha(textSecondary,0.55f));states.addState(focus?new int[]{android.R.attr.state_focused}:new int[]{},fill);}return states;}
     private int actionInk(){return (getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES?0xFF102032:Color.WHITE;}
     private void render(){if(destroyed)return;renderStatus();if(tab==0){renderPeers();renderActions();renderAttachments();}else if(tab==1)renderHistory();}
-    private void renderStatus(){if(status==null)return;LanDiscovery.Lan lan=LanDiscovery.current(this);status.setText(!ready?"엔진 준비 중":running?"이 화면이 열려 있는 동안 수신 가능":lan==null?"LAN 연결 없음":!trusted(lan)?"설정에서 집 네트워크를 확인하세요":!permitted()?"로컬 네트워크 권한을 허용하세요":!preferences.getBoolean("receiveEnabled",true)?"송수신 중지됨":"송수신 준비 중");}
+    private void renderStatus(){if(status!=null)status.setText(session==null?"송수신 서비스 연결 중":session.status());}
     private void renderPeers(){if(deviceRow==null)return;
         // Stable rows preserve native accessibility focus; polling identical engine data must not recreate controls.
         String snapshot=peers.toString()+"|"+selected+"|"+activeId+"|"+fraction+"|"+completed.toString();if(snapshot.equals(renderedPeers))return;renderedPeers=snapshot;
@@ -248,7 +221,7 @@ public final class MainActivity extends Activity {
         main.post(()->{if(destroyed){deleteTree(session);return;}attachments.addAll(copied);importing=false;persistDraft();render();});
     }catch(Exception e){deleteTree(session);main.post(()->{importing=false;render();});fail(e);}finally{if(cleanup!=null)main.post(cleanup);}});}
     private void restoreAttachments(){try{JSONArray saved=new JSONArray(preferences.getString("attachments","[]"));for(int i=0;i<saved.length();i++){File f=new File(saved.getString(i));if(f.isFile()&&f.getCanonicalPath().equals(f.getAbsolutePath())&&f.getCanonicalPath().startsWith(NativeBridge.outgoing.getCanonicalPath()+File.separator))attachments.add(f);}}catch(Exception ignored){} }
-    private void persistDraft(){JSONArray paths=new JSONArray();for(File file:attachments)paths.put(file.getAbsolutePath());preferences.edit().putString("messageDraft",messageDraft).putString("attachments",paths.toString()).apply();}
+    private void persistDraft(){applyOutcome();JSONArray paths=new JSONArray();for(File file:attachments)paths.put(file.getAbsolutePath());preferences.edit().putString("messageDraft",messageDraft).putString("attachments",paths.toString()).apply();}
     private void clearAttachments(){for(File f:attachments){File parent=f.getParentFile();if(parent!=null&&parent.getParentFile()!=null&&parent.getParentFile().getParentFile()!=null&&parent.getParentFile().getParentFile().equals(NativeBridge.outgoing))deleteTree(parent.getParentFile());}attachments.clear();persistDraft();}
     // A killed import may leave private copies; preserve live drafts/camera results and remove only unreferenced staging.
     private void pruneStaging(){File[] sessions=NativeBridge.outgoing.listFiles();if(sessions==null)return;
@@ -257,13 +230,8 @@ public final class MainActivity extends Activity {
         }
     }
     private static void deleteTree(File root){try{if(!root.getCanonicalPath().equals(root.getAbsolutePath())){root.delete();return;}}catch(IOException denied){return;}File[] children=root.listFiles();if(children!=null)for(File f:children)deleteTree(f);root.delete();}
-    // Capture this attempt's draft. A stored receipt clears only unchanged text, preserving edits made while waiting.
-    private void send(boolean files){if(!running||sending||importing||selected.isEmpty()||(files?attachments.isEmpty():messageDraft.trim().isEmpty()))return;
-        final String id=UUID.randomUUID().toString(),peer=selected,bodyText=messageDraft;final ArrayList<File> paths=new ArrayList<>(attachments);activeId=id;activePeer=peer;completed.remove(peer);fraction=Double.NaN;sending=true;render();
-        WORK.execute(()->{try{JSONObject params=new JSONObject().put("transfer_id",id).put("to",peer).put("kind",files?"files":messageKind(bodyText));if(files){JSONArray array=new JSONArray();for(File f:paths)array.put(f.getCanonicalPath());params.put("paths",array);}else params.put("body",bodyText);
-            JSONObject result=(JSONObject)NativeBridge.call("transfers.send_discovered",params);main.post(()->{if(!id.equals(activeId))return;String state=result.optString("state");if("completed".equals(state)){Receipt receipt=new Receipt(id);completed.put(peer,receipt);main.postDelayed(()->{Receipt current=completed.get(peer);if(current!=null&&current.id.equals(id)){completed.remove(peer);renderPeers();}},COMPLETION_MS);if(files)clearAttachments();else if(messageDraft.equals(bodyText)){messageDraft="";if(message!=null)message.setText("");}}else fail(new IOException(result.isNull("error")?stateText(state):result.optString("error")));finishSend(id);});
-        }catch(Exception e){main.post(()->finishSend(id));fail(e);}});
-    }
+    // Persist selection before handing an immutable attempt to the Service; closing this screen no longer owns the transfer.
+    private void send(boolean files){if(session==null||!running||sending||importing||selected.isEmpty()||(files?attachments.isEmpty():messageDraft.trim().isEmpty()))return;persistDraft();if(session.send(selected,messageDraft,new ArrayList<>(attachments),files))updateLifecycle();}
     static String messageKind(String body){String trimmed=body.trim();if(trimmed.isEmpty()||trimmed.matches("(?s).*\\s.*"))return "text";try{URI uri=new URI(trimmed);String scheme=uri.getScheme();return ("http".equalsIgnoreCase(scheme)||"https".equalsIgnoreCase(scheme))&&uri.getHost()!=null?"url":"text";}catch(Exception e){return "text";}}
     // Two bounded dim/recover cycles are measured from the stored receipt, never from a view redraw.
     static float completionOpacity(long deadline,long now,boolean animate){
@@ -271,8 +239,7 @@ public final class MainActivity extends Activity {
         if(elapsed<0||elapsed>=2*BLINK_CYCLE_MS)return 1;
         float phase=(elapsed%BLINK_CYCLE_MS)/(float)BLINK_CYCLE_MS;return 1-0.75f*(1-Math.abs(2*phase-1));
     }
-    private void finishSend(String id){if(!id.equals(activeId))return;activeId=null;activePeer=null;fraction=Double.NaN;sending=false;persistDraft();render();loadHistory();}
-    private void cancel(){String id=activeId;if(id!=null)CONTROL.execute(()->{try{NativeBridge.call("transfers.cancel",new JSONObject().put("transfer_id",id));}catch(Exception e){fail(e);}});}
+    private void cancel(){if(session!=null)session.cancel();}
 
     private void renderHistory(){if(historyRows==null)return;
         // Native list rows retain stable accessibility focus when engine polling returns unchanged records.
@@ -296,17 +263,6 @@ public final class MainActivity extends Activity {
         else if(items!=null&&items.length()>0&&"receive".equals(record.optString("direction"))&&"completed".equals(record.optString("state")))b.setNeutralButton("파일 열기",(d,w)->openReceived(items));b.show();}
     private void openReceived(JSONArray items){ArrayList<File> files=new ArrayList<>();ArrayList<String> names=new ArrayList<>();for(int i=0;i<items.length();i++){JSONObject item=items.optJSONObject(i);if(item!=null){String saved=item.optString("saved_name","");if(!saved.isEmpty()){File file=new File(NativeBridge.received,saved);if(file.isFile()){files.add(file);names.add(saved);}}}}if(files.isEmpty()){fail(new IOException("수신 파일을 찾을 수 없습니다"));return;}new AlertDialog.Builder(this).setTitle("파일 열기").setItems(names.toArray(new String[0]),(d,w)->{File file=files.get(w);Uri uri=DocumentsContract.buildDocumentUri("app.fta.android.documents",ReceivedDocuments.documentId(file));try{startActivity(new Intent(Intent.ACTION_VIEW).setDataAndType(uri,ReceivedDocuments.mime(file)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));}catch(Exception e){fail(e);}}).show();}
     private void manageDevices(){if(!ready)return;WORK.execute(()->{try{JSONArray devices=(JSONArray)NativeBridge.call("devices.list");main.post(()->{String[] names=new String[devices.length()];for(int i=0;i<names.length;i++){JSONObject p=devices.optJSONObject(i);names[i]=p.optString("display_name")+(p.optBoolean("paired")?" · 등록됨":" · 발견됨");}new AlertDialog.Builder(this).setTitle("등록 해제할 기기").setItems(names,(d,w)->{JSONObject p=devices.optJSONObject(w);if(!p.optBoolean("paired"))return;new AlertDialog.Builder(this).setTitle("기기 등록을 해제할까요?").setMessage(p.optString("display_name")).setNegativeButton("취소",null).setPositiveButton("등록 해제",(a,b)->CONTROL.execute(()->{try{NativeBridge.call("devices.unpair",new JSONObject().put("device_id",p.optString("device_id")));}catch(Exception e){fail(e);}})).show();}).setNegativeButton("닫기",null).show();});}catch(Exception e){fail(e);}});}
-    private void deliverNotifications() throws Exception {
-        // One event can contain a 1 MiB body; page individually to keep native/JVM control allocations bounded.
-        final String consumer="android-ui";JSONObject cursor=(JSONObject)NativeBridge.call("events.cursor",new JSONObject().put("consumer",consumer));JSONObject page=(JSONObject)NativeBridge.call("events.list",new JSONObject().put("after",cursor.optLong("sequence")).put("limit",EVENT_PAGE_SIZE));JSONArray events=page.optJSONArray("events");if(events==null)return;
-        NotificationManager manager=getSystemService(NotificationManager.class);manager.createNotificationChannel(new NotificationChannel("received","FTA 수신",NotificationManager.IMPORTANCE_DEFAULT));
-        boolean allowed=Build.VERSION.SDK_INT<33||checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED;
-        for(int i=0;i<events.length();i++){JSONObject event=events.optJSONObject(i),record=event.optJSONObject("record");if(record!=null&&"receive".equals(record.optString("direction"))&&allowed){String id=event.optString("transfer_id");Intent intent=new Intent(this,MainActivity.class).setData(Uri.parse("fta://receipt/"+id)).putExtra("transfer_id",id).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);PendingIntent open=PendingIntent.getActivity(this,id.hashCode(),intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-            manager.notify(id,0,new Notification.Builder(this,"received").setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle("FTA 수신 "+stateText(record.optString("state"))).setContentText(title(record)).setContentIntent(open).setAutoCancel(true).build());}
-            // Submission/permission suppression advances the DB cursor; it never claims that Android displayed an alert.
-            NativeBridge.call("events.ack",new JSONObject().put("consumer",consumer).put("sequence",event.optLong("sequence")));
-        }
-    }
     // Long license text loads off the UI thread; legal content is local and contains no transfer data.
     private void showLegal(String asset){WORK.execute(()->{try(InputStream input=getAssets().open(asset);ByteArrayOutputStream bytes=new ByteArrayOutputStream()){byte[] buffer=new byte[8192];int n;while((n=input.read(buffer))!=-1)bytes.write(buffer,0,n);String text=bytes.toString(java.nio.charset.StandardCharsets.UTF_8.name());main.post(()->{if(destroyed||isFinishing())return;TextView value=label(text,12);value.setTextIsSelectable(true);value.setPadding(dp(16),dp(8),dp(16),dp(8));ScrollView scroll=new ScrollView(this);scroll.addView(value);new AlertDialog.Builder(this).setTitle(asset.equals("PrivacyPolicy.txt")?"개인정보 처리 안내":"오픈소스 고지").setView(scroll).setPositiveButton("닫기",null).show();});}catch(Exception e){fail(e);}});}
     private void fail(Exception error){main.post(()->{if(destroyed||!visible||isFinishing())return;String text=error.getMessage()==null?"작업을 처리하지 못했습니다":error.getMessage();if(text.equals(lastError))return;lastError=text;new AlertDialog.Builder(this).setTitle("FTA").setMessage(text).setPositiveButton("확인",(d,w)->lastError=null).show();});}

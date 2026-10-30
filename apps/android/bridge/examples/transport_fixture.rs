@@ -23,6 +23,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut config = engine.config.write().map_err(|_| "config lock")?;
         config.listen_addr = listener.local_addr()?;
+        if target["background"].as_bool().unwrap_or(false) {
+            // The Android test-only TCP relay preserves this LAN source while keeping every TLS byte intact.
+            let android: std::net::SocketAddr = target["actual_address"]
+                .as_str()
+                .ok_or("actual LAN endpoint required")?
+                .parse()?;
+            config.listen_addr.set_ip(android.ip());
+            config.allowed_networks.push(
+                target["lan_cidr"]
+                    .as_str()
+                    .ok_or("actual LAN CIDR required")?
+                    .parse()?,
+            );
+        }
         config.display_name = "FTA Mac verification".into();
     }
     let receiver = engine.clone();
@@ -75,12 +89,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     let source = root.join("android-transport-check.txt");
     std::fs::write(&source, "actual TLS to Android ✓")?;
-    let result = engine
+    let mut result = engine
         .dispatch(
             "transfers.send_discovered",
             json!({"to":id,"kind":"files","paths":[source]}),
         )
         .await?;
+    if target["background"].as_bool().unwrap_or(false) && result["state"] != "completed" {
+        // Registration pins the genuine peer first. Its device-LAN address is not host-routable through emulator NAT;
+        // retry the same real file via the verified TCP relay, preserving the certificate and receiver consent.
+        let mut registered = engine.store.device(&id)?;
+        registered.address = target["address"]
+            .as_str()
+            .ok_or("forwarded endpoint required")?
+            .into();
+        engine.store.save_device(&registered)?;
+        result = engine
+            .dispatch(
+                "transfers.send_discovered",
+                json!({"to":id,"kind":"files","paths":[root.join("android-transport-check.txt")]}),
+            )
+            .await?;
+    }
     if result["state"] != "completed" {
         return Err(format!("Android final receipt failed: {result}").into());
     }
@@ -115,6 +145,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err("Android reply timed out".into());
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    // The Android Service fixture keeps real LAN sockets alive through Home, screen off and Activity recreation.
+    if target["background"].as_bool().unwrap_or(false) {
+        const LARGE_BYTES: usize = 32 * 1024 * 1024;
+        let expected: Vec<u8> = (0..LARGE_BYTES).map(|index| (index % 251) as u8).collect();
+        let source = root.join("mac-background.bin");
+        std::fs::write(&source, &expected)?;
+        let stored = engine
+            .dispatch(
+                "transfers.send_discovered",
+                json!({"to":id,"kind":"files","paths":[source]}),
+            )
+            .await?;
+        if stored["state"] != "completed" {
+            return Err("background Android final commit failed".into());
+        }
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(90);
+        loop {
+            let rows = engine.store.history(100)?;
+            if let Some(item) = rows
+                .iter()
+                .filter(|row| row.direction == "receive" && row.state == "completed")
+                .flat_map(|row| &row.items)
+                .find(|item| item.name == "android-background.bin")
+            {
+                if std::fs::read(item.path.as_ref().ok_or("background final path required")?)?
+                    != expected
+                {
+                    return Err("background Android byte stream differs".into());
+                }
+                println!(
+                    "Actual background TLS passed: 32 MiB each direction, final receipts and exact bytes"
+                );
+                break;
+            }
+            if tokio::time::Instant::now() > deadline {
+                return Err("background Android reply timed out".into());
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
     }
     for (kind, body) in [
         ("text", "Android text ✓\n둘째 줄"),

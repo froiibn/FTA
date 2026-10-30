@@ -41,15 +41,15 @@ def main():
     trust=wait('신뢰하는 집 네트워크입니다')
     assert trust.get('enabled')=='true','Emulator must have a real Wi-Fi LAN'
     if trust.get('checked')!='true':tap_node(trust)
-    wait('이 화면이 열려 있는 동안 수신 가능');screen('settings-online')
+    wait('백그라운드에서도 수신 가능');screen('settings-online')
     config=json.loads(adb('exec-out','run-as','app.fta.android','cat','no_backup/engine/config.json'));identity=config['device_id']
-    adb('shell','am','force-stop','app.fta.android');launch();wait('이 화면이 열려 있는 동안 수신 가능');tap('설정');assert wait('신뢰하는 집 네트워크입니다').get('checked')=='true'
+    adb('shell','am','force-stop','app.fta.android');launch();wait('백그라운드에서도 수신 가능');tap('설정');assert wait('신뢰하는 집 네트워크입니다').get('checked')=='true'
     tap('송수신 사용');wait('송수신 중지됨');adb('shell','am','force-stop','app.fta.android');launch();wait('송수신 중지됨');tap('설정');assert wait('송수신 사용').get('checked')=='false'
-    tap('송수신 사용');wait('이 화면이 열려 있는 동안 수신 가능')
+    tap('송수신 사용');wait('백그라운드에서도 수신 가능')
     try:
      adb('shell','svc','wifi','disable');wait('LAN 연결 없음');screen('wifi-disconnected')
     finally:adb('shell','svc','wifi','enable')
-    wait('이 화면이 열려 있는 동안 수신 가능',timeout=40);assert wait('신뢰하는 집 네트워크입니다').get('checked')=='true'
+    wait('백그라운드에서도 수신 가능',timeout=40);assert wait('신뢰하는 집 네트워크입니다').get('checked')=='true'
     tap('기록');wait('전송 기록');screen('history');tap('보내기');wait('텍스트 또는 URL');screen('send')
     config=json.loads(adb('exec-out','run-as','app.fta.android','cat','no_backup/engine/config.json'));assert identity==config['device_id']
     tap('사진');wait('갤러리에서 선택');wait('촬영');screen('photo-source-menu');adb('shell','input','keyevent','4')

@@ -32,7 +32,7 @@ final class LanDiscovery {
     private boolean resolving;
     LanDiscovery(Context context,Executor executor){nsd=context.getSystemService(NsdManager.class);worker=executor;callbacks=context.getMainExecutor();
         WifiManager wifi=(WifiManager)context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        if(wifi!=null){multicast=wifi.createMulticastLock("FTA visible discovery");multicast.setReferenceCounted(false);}}
+        if(wifi!=null){multicast=wifi.createMulticastLock("FTA service discovery");multicast.setReferenceCounted(false);}}
     static Lan current(Context context){
         ConnectivityManager cm=context.getSystemService(ConnectivityManager.class);
         for(Network n:cm.getAllNetworks()){

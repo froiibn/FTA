@@ -29,7 +29,7 @@ NDK 버전은 Android Studio의 SDK Manager에서 설치하거나 `ANDROID_NDK_H
 - 파일 앱의 FTA 문서 공급자는 최종 수신 파일만 열기/삭제하도록 공개한다. 엔진·키·중간 파일은 공개하지 않는다. 수신 파일/URL은 자동 실행하지 않는다.
 - 기록에서 본문을 확인·복사·링크/파일을 열고, 길게 눌러 기록만 삭제할 수 있다. 등록 해제·기기 이름·수신 사용·알림·개인정보/의존성 고지는 설정에 있다.
 
-앱이 보이는 동안만 수신한다. 앱 전환·LAN 상실·수신 해제 시 서비스·NSD를 중지하고 진행 중 네트워크 작업을 취소한다. Foreground Service/백그라운드 지속·부팅 자동 수신·공유 확장·임의 SAF 폴더 자동 수신은 이 초안에 포함하지 않는다. 강제 종료/시스템 회수 뒤 결과 복구는 기존 Rust 저장·기록 규칙을 사용한다.
+신뢰 LAN·필요 권한·송수신 사용을 확인하고 보이는 앱에서 connectedDevice 전경서비스를 시작한다. 지속 알림이 실행되는 동안 Home·화면 꺼짐·Activity 재생성에서도 송수신을 유지한다. 알림 중지/수신 해제/미신뢰 LAN/권한 거절은 전송과 소켓을 정리한다. LAN 상실 뒤 60초의 기존 FGS 재연결 유예가 끝나면 앱을 다시 열어 재개하며, 강제 종료·OS/Doze/제조사 정책을 우회하지 않는다. 부팅 자동 시작·오프라인 대기열·공유 확장·임의 SAF 폴더 자동 수신은 포함하지 않는다.
 
 ## 로컬 검증
 
@@ -57,8 +57,10 @@ ANDROID_SERIAL=emulator-5554 python3 tests/ui-smoke.py
 
 API 37 에뮬레이터의 자동 GPU에서 셰이더 캐시 대기 ANR이 관찰되어 4코어·소프트웨어 GPU로 재검증했다. 앱 자체의 하드웨어 가속은 유지한다. 같은 환경에서는 AVD 이름을 실제 값으로 지정해 `emulator -avd <AVD 이름> -no-snapshot -cores 4 -memory 4096 -gpu swiftshader -feature -Vulkan`로 실행할 수 있다.
 
-첫 초안 APK와 검증 기록은 `output/android`에 있다. 이전 기본 디자인 수정 기록은 `output/android-native-ui-v2`에 있다. 최신 시스템 설정 기준 UI 0.1.0(3)의 APK·SHA-256·검증 요약과 라이트/다크 세 화면 캡처는 `output/android-settings-ui-v3`에 있다. Android 종합 검사 35개·추가 입력 UI 경계 6개·실제 Wi-Fi 재접속/설정 유지/사진 선택/가상 카메라 준비가 통과했다. Android 실기 및 실제 LAN NSD 상호 발견은 미검증이다.
+첫 초안 APK와 검증 기록은 `output/android`에 있다. 이전 기본 디자인 수정 기록은 `output/android-native-ui-v2`에 있다. 이전 시스템 설정 기준 UI 0.1.0(3)의 APK·SHA-256·검증 요약과 라이트/다크 세 화면 캡처는 `output/android-settings-ui-v3`에 있다. Android 종합 검사 35개·추가 입력 UI 경계 6개·실제 Wi-Fi 재접속/설정 유지/사진 선택/가상 카메라 준비가 통과했다. Android 실기 및 실제 LAN NSD 상호 발견은 미검증이다.
 
 화면은 SDK 기본 라이트/다크 테마, Toolbar 새로고침 액션, 아이콘과 선택 상태의 하단 탐색, 경계가 있는 EditText, 배경/테두리 작업 버튼·Switch·그룹 표면 목록을 사용한다. 외부 UI/아이콘 라이브러리를 추가하지 않았다. 외관 변경 시 탭을 복원하고 키보드가 열리면 하단 탐색을 숨긴다. 실제 녹색 전송 진행률·최종 저장 완료 피드백과 기존 사진/파일/메시지·신뢰 정책은 유지한다.
 
 실제 Android 시스템 설정 화면을 관찰해 설정 그룹·제목/설명/값·끝쪽 스위치/액션 구조를 적용했다. 기기 이름 행은 기본 편집 대화상자를 열고 빈 값/길이를 검증한다. 계측 검사 `-e settingsUi true`는 기본 편집 대화상자의 현재 값·취소·빈 값/UTF-8 길이 검증·정확한 저장·표시 갱신을 확인한 뒤 원래 이름을 같은 대화상자로 복원한다. `tests/capture-native-ui.py`는 목적 화면과 선택 탐색 항목을 확인한 뒤 두 테마를 캡처한다.
+
+백그라운드 검증은 `ANDROID_SERIAL=<전용 에뮬레이터> python3 tests/verify-background.py`와 `tests/background-policy.py`를 사용한다. 전자는 실제 Service/TLS/최종 저장·Home·화면 꺼짐·32 MiB 양방향·Activity 재생성·키 보관·명시 중지를, 후자는 계측 없는 정상 앱의 권한/OS 중지/유예 만료를 검사한다. 최신 0.1.0(4) APK·해시·기록·상태별 화면은 루트 `output/android-background-v4`에 보관한다. 실기·물리 mDNS·PIN 잠금·제조사 배터리 동작을 검증한 것으로 해석하지 않는다.
