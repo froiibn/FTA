@@ -22,7 +22,7 @@ import java.util.concurrent.*;
 
 // Framework controls and one Rust engine preserve native interaction without adding an Android UI dependency.
 public final class MainActivity extends Activity {
-    static final int GREEN=Color.rgb(52,199,89), WHITE=Color.WHITE, DIM=0xBFFFFFFF;
+    static final int WHITE=Color.WHITE;
     private static final int PICK_PHOTOS=101,PICK_FILES=102,CAPTURE=103,LAN_PERMISSION=104,NOTIFICATIONS=105,OPEN_RECEIVED=106;
     private static final int MAX_ATTACHMENTS=100, POLL_MS=750, EVENT_PAGE_SIZE=1;
     private static final long COMPLETION_MS=1500, BLINK_CYCLE_MS=600;
@@ -50,17 +50,25 @@ public final class MainActivity extends Activity {
     private EditText message;
     private Button photoButton,fileButton;
     private ImageButton sendButton;
-    private final Button[] tabButtons=new Button[3];
+    private final RadioButton[] tabButtons=new RadioButton[3];
+    private Toolbar toolbar;
+    private LinearLayout navigation;
+    private MenuItem refreshAction;
+    private int background,surface,textPrimary,textSecondary,accent,outline,transferGreen,completionInk;
     private String lastError,pendingReceipt,renderedPeers,renderedHistory,renderedAttachments;
     private List<Uri> deferredUris;
     private Runnable deferredCleanup;
     private static final class Receipt {final String id;final long until;Receipt(String id){this.id=id;until=SystemClock.elapsedRealtime()+COMPLETION_MS;}}
 
     @Override public void onCreate(Bundle state){super.onCreate(state);
+        // Theme attributes keep all Android controls and custom status drawing consistent with system light/night mode.
+        background=themeColor(android.R.attr.colorBackground);surface=themeColor(android.R.attr.colorBackgroundFloating);textPrimary=themeColor(android.R.attr.textColorPrimary);textSecondary=themeColor(android.R.attr.textColorSecondary);accent=themeColor(android.R.attr.colorAccent);outline=withAlpha(textSecondary,0.24f);
+        // Green remains semantic progress/success; theme-specific contrast keeps the ring and check legible in both modes.
+        boolean night=(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;transferGreen=night?0xFF81C995:0xFF188038;completionInk=night?Color.BLACK:WHITE;
         preferences=getSharedPreferences("fta",MODE_PRIVATE);messageDraft=preferences.getString("messageDraft","");cameraToken=preferences.getString("cameraToken",null);
         connectivity=getSystemService(ConnectivityManager.class);discovery=new LanDiscovery(this,CONTROL);discovery.failure=text->fail(new IOException(text));
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        createRoot();showTab(0);
+        createRoot();showTab(state==null?0:state.getInt("selectedTab",0));
         networkCallback=new ConnectivityManager.NetworkCallback(){
             @Override public void onAvailable(Network n){main.post(()->updateLifecycle());}
             @Override public void onLost(Network n){main.post(()->updateLifecycle());}
@@ -124,44 +132,72 @@ public final class MainActivity extends Activity {
             .setPositiveButton("등록",(d,w)->registration(id,true)).setNegativeButton("거절",(d,w)->registration(id,false)).setOnCancelListener(d->registration(id,false)).show();break;}}
     private void registration(String id,boolean accept){CONTROL.execute(()->{try{NativeBridge.call(accept?"registration.accept":"registration.reject",new JSONObject().put("session_id",id));}catch(Exception e){fail(e);}});}
 
-    private void createRoot(){root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF17334A,0xFF10151F}));
-        root.setOnApplyWindowInsetsListener((v,insets)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars());int keyboard=insets.getInsets(WindowInsets.Type.ime()).bottom;v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard));}else v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
+    // Toolbar and checked native navigation replace the iOS-like brand header and text-only tab buttons.
+    private void createRoot(){
+        root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(background);
+        root.setOnApplyWindowInsetsListener((v,insets)->{
+            if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars());int keyboard=insets.getInsets(WindowInsets.Type.ime()).bottom;v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard));if(navigation!=null)navigation.setVisibility(keyboard>0?View.GONE:View.VISIBLE);}
+            else v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;
+        });
+        toolbar=new Toolbar(this);toolbar.setBackgroundColor(surface);toolbar.setTitleTextColor(textPrimary);toolbar.setSubtitleTextColor(textSecondary);toolbar.setContentInsetsRelative(dp(16),dp(8));
+        // Toolbar collapses the start inset against its title margin; include both to keep a 12dp logo gap.
+        toolbar.setTitleMarginStart(dp(16)+dp(12));
+        Bitmap mark=BitmapFactory.decodeResource(getResources(),R.drawable.app_mark);toolbar.setLogo(new BitmapDrawable(getResources(),Bitmap.createScaledBitmap(mark,dp(32),dp(32),true)));
+        refreshAction=toolbar.getMenu().add("기기 새로고침");Drawable refresh=getDrawable(R.drawable.ic_refresh);refresh.setTint(textPrimary);refreshAction.setIcon(refresh);refreshAction.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        toolbar.setOnMenuItemClickListener(item->{if(tab==1)loadHistory();else if(running)poll();else updateLifecycle();return true;});
+        root.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(56)));root.addView(divider());
         body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(8),dp(4),dp(8),dp(4));
-        String[] titles={"보내기","기록","설정"};for(int i=0;i<titles.length;i++){final int index=i;Button b=button(titles[i],()->showTab(index));tabButtons[i]=b;tabs.addView(b,new LinearLayout.LayoutParams(0,dp(52),1));}root.addView(tabs);setContentView(root);
+        navigation=new LinearLayout(this);navigation.setOrientation(LinearLayout.VERTICAL);navigation.setBackgroundColor(surface);navigation.addView(divider());
+        RadioGroup tabs=new RadioGroup(this);tabs.setOrientation(LinearLayout.HORIZONTAL);tabs.setGravity(Gravity.CENTER_VERTICAL);
+        String[] titles={"보내기","기록","설정"};int[] icons={R.drawable.ic_send,R.drawable.ic_history,R.drawable.ic_settings};
+        android.content.res.ColorStateList colors=new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{accent,textSecondary});
+        for(int i=0;i<titles.length;i++){final int index=i;RadioButton button=new RadioButton(this);button.setId(View.generateViewId());button.setButtonDrawable(null);button.setText(titles[i]);button.setTextSize(12);button.setGravity(Gravity.CENTER);button.setPadding(0,dp(8),0,dp(8));button.setTextColor(colors);button.setCompoundDrawablesWithIntrinsicBounds(null,getDrawable(icons[i]),null,null);button.setCompoundDrawableTintList(colors);button.setCompoundDrawablePadding(dp(4));button.setBackground(selectable(false));button.setOnClickListener(v->showTab(index));tabButtons[i]=button;tabs.addView(button,new RadioGroup.LayoutParams(0,dp(64),1));}
+        navigation.addView(tabs);root.addView(navigation);setContentView(root);
     }
-    private void showTab(int value){if(message!=null)messageDraft=message.getText().toString();tab=value;for(int i=0;i<tabButtons.length;i++)if(tabButtons[i]!=null){tabButtons[i].setSelected(i==value);tabButtons[i].setAlpha(i==value?1:0.6f);tabButtons[i].setTypeface(null,i==value?Typeface.BOLD:Typeface.NORMAL);}body.removeAllViews();message=null;status=null;deviceRow=null;historyRows=null;
-        if(tab==0)buildSend();else if(tab==1)buildHistory();else buildSettings();render();}
-    private LinearLayout column(){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(20),dp(18),dp(20),dp(12));return c;}
-    private ScrollView scroll(LinearLayout content){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.setVerticalScrollBarEnabled(false);s.addView(content,new ScrollView.LayoutParams(-1,-2));return s;}
-    private void buildSend(){renderedPeers=null;renderedAttachments=null;LinearLayout content=column();body.addView(scroll(content),new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);ImageView logo=new ImageView(this);logo.setImageResource(app.fta.android.R.drawable.app_mark);brand.addView(logo,new LinearLayout.LayoutParams(dp(46),dp(46)));
-        LinearLayout text=new LinearLayout(this);text.setOrientation(LinearLayout.VERTICAL);text.setPadding(dp(12),0,0,0);text.addView(label("FTA",27));text.addView(label("File Transfer Anything",12));brand.addView(text,new LinearLayout.LayoutParams(0,-2,1));
-        Button refresh=button("↻",()->{if(running)poll();else updateLifecycle();});refresh.setContentDescription("기기 새로고침");refresh.setTextSize(25);refresh.setBackground(glass(28));brand.addView(refresh,new LinearLayout.LayoutParams(dp(52),dp(52)));content.addView(brand);
-        status=label("",12);status.setPadding(0,dp(18),0,dp(22));content.addView(status);
-        content.addView(label("연결 가능한 기기",14));HorizontalScrollView devices=new HorizontalScrollView(this);devices.setHorizontalScrollBarEnabled(false);deviceRow=new LinearLayout(this);deviceRow.setPadding(0,dp(14),0,dp(20));devices.addView(deviceRow);content.addView(devices);
-        empty=label("발견된 기기가 없습니다",15);empty.setPadding(0,dp(16),0,dp(30));content.addView(empty);
-        LinearLayout actions=new LinearLayout(this);photoButton=button("사진",()->photoChoice());fileButton=button("파일",()->pick(false));actions.addView(photoButton,new LinearLayout.LayoutParams(0,dp(50),1));actions.addView(fileButton,new LinearLayout.LayoutParams(0,dp(50),1));content.addView(actions);
-        attachmentText=label("",13);attachmentText.setPadding(0,dp(12),0,0);content.addView(attachmentText);attachmentRow=new LinearLayout(this);attachmentRow.setOrientation(LinearLayout.VERTICAL);content.addView(attachmentRow);
-        LinearLayout composer=new LinearLayout(this);composer.setGravity(Gravity.BOTTOM);composer.setPadding(dp(12),dp(6),dp(6),dp(6));composer.setBackground(glass(26));
-        // Configure native input flags first; changing input mode can reset TextView's line limits.
-        message=new EditText(this);message.setText(messageDraft);message.setTextColor(WHITE);message.setHintTextColor(DIM);message.setHint("텍스트 또는 URL");message.setTextSize(16);message.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);message.setMinLines(1);message.setMaxLines(4);message.setBackgroundColor(Color.TRANSPARENT);message.setVerticalScrollBarEnabled(true);
+    @Override protected void onSaveInstanceState(Bundle state){state.putInt("selectedTab",tab);super.onSaveInstanceState(state);}
+    private void showTab(int value){
+        if(message!=null)messageDraft=message.getText().toString();tab=value;
+        for(int i=0;i<tabButtons.length;i++)if(tabButtons[i]!=null){tabButtons[i].setChecked(i==value);tabButtons[i].setTypeface(null,i==value?Typeface.BOLD:Typeface.NORMAL);}
+        toolbar.setTitle(value==0?"FTA":value==1?"전송 기록":"설정");toolbar.setSubtitle(value==0?"File Transfer Anything":null);refreshAction.setVisible(value!=2);refreshAction.setTitle(value==1?"기록 새로고침":"기기 새로고침");
+        body.removeAllViews();message=null;status=null;deviceRow=null;historyRows=null;
+        if(tab==0)buildSend();else if(tab==1)buildHistory();else buildSettings();render();
+    }
+    private LinearLayout column(){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(16),dp(16),dp(16),dp(16));return c;}
+    private ScrollView scroll(LinearLayout content){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.addView(content,new ScrollView.LayoutParams(-1,-2));return s;}
+    private TextView section(String title){TextView text=label(title,14);text.setTypeface(null,Typeface.BOLD);text.setTextColor(accent);text.setPadding(0,dp(20),0,dp(8));return text;}
+    private void buildSend(){
+        renderedPeers=null;renderedAttachments=null;LinearLayout content=column();body.addView(scroll(content),new LinearLayout.LayoutParams(-1,0,1));
+        status=label("",14);status.setTextColor(textSecondary);status.setPadding(0,0,0,dp(8));content.addView(status);content.addView(section("연결 가능한 기기"));
+        HorizontalScrollView devices=new HorizontalScrollView(this);devices.setHorizontalScrollBarEnabled(false);deviceRow=new LinearLayout(this);deviceRow.setPadding(0,dp(8),0,dp(8));devices.addView(deviceRow);content.addView(devices);
+        empty=label("발견된 기기가 없습니다",16);empty.setTextColor(textSecondary);empty.setPadding(0,dp(24),0,dp(32));content.addView(empty);
+        content.addView(section("사진 및 파일"));LinearLayout actions=new LinearLayout(this);photoButton=button("사진",this::photoChoice);fileButton=button("파일",()->pick(false));setButtonIcon(photoButton,R.drawable.ic_photo);setButtonIcon(fileButton,R.drawable.ic_file);actions.addView(photoButton,new LinearLayout.LayoutParams(0,dp(56),1));actions.addView(fileButton,new LinearLayout.LayoutParams(0,dp(56),1));content.addView(actions);
+        attachmentText=label("",14);attachmentText.setTextColor(textSecondary);attachmentText.setPadding(0,dp(8),0,0);content.addView(attachmentText);attachmentRow=new LinearLayout(this);attachmentRow.setOrientation(LinearLayout.VERTICAL);content.addView(attachmentRow);
+        // The native underlined EditText supplies Android focus, selection and four-line scrolling instead of a pill surface.
+        LinearLayout composer=new LinearLayout(this);composer.setOrientation(LinearLayout.VERTICAL);composer.setBackgroundColor(surface);composer.addView(divider());
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.BOTTOM);row.setPadding(dp(16),dp(8),dp(8),dp(8));
+        message=new EditText(this);message.setText(messageDraft);message.setHint("텍스트 또는 URL");message.setTextSize(16);message.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);message.setMinLines(1);message.setMaxLines(4);message.setVerticalScrollBarEnabled(true);
         message.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){}public void onTextChanged(CharSequence s,int st,int before,int count){messageDraft=s.toString();renderActions();}public void afterTextChanged(Editable e){}});
-        composer.addView(message,new LinearLayout.LayoutParams(0,-2,1));sendButton=new ImageButton(this);sendButton.setImageDrawable(new SendArrow());sendButton.setContentDescription("메시지 보내기");sendButton.setBackground(glass(24));sendButton.setOnClickListener(v->send(false));composer.addView(sendButton,new LinearLayout.LayoutParams(dp(44),dp(44)));
-        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(dp(16),dp(6),dp(16),dp(8));body.addView(composer,cp);
+        row.addView(message,new LinearLayout.LayoutParams(0,-2,1));sendButton=new ImageButton(this);sendButton.setImageResource(R.drawable.ic_send);sendButton.setImageTintList(android.content.res.ColorStateList.valueOf(accent));sendButton.setPadding(dp(12),dp(12),dp(12),dp(12));sendButton.setContentDescription("메시지 보내기");sendButton.setBackground(selectable(true));sendButton.setOnClickListener(v->send(false));row.addView(sendButton,new LinearLayout.LayoutParams(dp(48),dp(48)));composer.addView(row);body.addView(composer,new LinearLayout.LayoutParams(-1,-2));
     }
-    private void buildHistory(){renderedHistory=null;LinearLayout content=column();content.addView(label("전송 기록",26));historyRows=new LinearLayout(this);historyRows.setOrientation(LinearLayout.VERTICAL);content.addView(historyRows);body.addView(scroll(content),new LinearLayout.LayoutParams(-1,-1));loadHistory();}
-    private void buildSettings(){LinearLayout c=column();c.addView(label("설정",26));status=label("",13);status.setPadding(0,dp(14),0,dp(16));c.addView(status);
-        LanDiscovery.Lan lan=LanDiscovery.current(this);c.addView(label(lan==null?"Wi-Fi 또는 유선 LAN에 연결하세요":lan.interfaceName+" · "+lan.cidr,14));
-        Switch trust=new Switch(this);trust.setText("신뢰하는 집 네트워크입니다");trust.setTextColor(WHITE);trust.setChecked(trusted(lan));trust.setEnabled(lan!=null);trust.setPadding(0,dp(16),0,dp(16));trust.setOnCheckedChangeListener((b,on)->{Set<String> scopes=new HashSet<>(preferences.getStringSet("trustedScopes",Collections.emptySet()));if(lan!=null){if(on)scopes.add(lan.scope);else scopes.remove(lan.scope);}preferences.edit().putStringSet("trustedScopes",scopes).apply();if(on&&!permitted())requestPermissions(new String[]{"android.permission.ACCESS_LOCAL_NETWORK"},LAN_PERMISSION);updateLifecycle();});c.addView(trust);
-        Switch receive=new Switch(this);receive.setText("송수신 사용");receive.setTextColor(WHITE);receive.setChecked(preferences.getBoolean("receiveEnabled",true));receive.setOnCheckedChangeListener((b,on)->{preferences.edit().putBoolean("receiveEnabled",on).apply();updateLifecycle();});c.addView(receive);
-        c.addView(label("화면이 열려 있는 동안 수신 가능합니다. 앱을 벗어나면 전송을 중단하며 신뢰 설정은 유지합니다.",13));
-        EditText name=new EditText(this);name.setText(name());name.setTextColor(WHITE);name.setSingleLine(true);name.setContentDescription("기기 이름");c.addView(name);
-        c.addView(button("기기 이름 저장",()->{String value=name.getText().toString().trim();if(value.isEmpty()||value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>128){fail(new IOException("기기 이름은 1~128바이트여야 합니다"));return;}preferences.edit().putString("deviceName",value).apply();desired="restart";updateLifecycle();}));
-        c.addView(button("받은 파일 열기",()->{try{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE).putExtra(DocumentsContract.EXTRA_INITIAL_URI,DocumentsContract.buildRootUri("app.fta.android.documents","received"));startActivityForResult(intent,OPEN_RECEIVED);}catch(Exception e){fail(e);}}));
-        c.addView(button("수신 알림 허용",()->{if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));}));
-        c.addView(button("로컬 네트워크 권한 설정",()->startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())))));
-        c.addView(button("등록된 기기 관리",this::manageDevices));c.addView(button("개인정보 처리 안내",()->showLegal("PrivacyPolicy.txt")));c.addView(button("오픈소스 고지",()->showLegal("ThirdPartyNotices.txt")));c.addView(label("FTA 0.1.0 · Android 초안\n수신 파일은 Android 파일 앱의 FTA에 보관합니다.",12));body.addView(scroll(c),new LinearLayout.LayoutParams(-1,-1));
+    private void buildHistory(){renderedHistory=null;LinearLayout content=column();historyRows=new LinearLayout(this);historyRows.setOrientation(LinearLayout.VERTICAL);content.addView(historyRows);body.addView(scroll(content),new LinearLayout.LayoutParams(-1,-1));loadHistory();}
+    private void buildSettings(){
+        LinearLayout c=column();status=label("",14);status.setTextColor(textSecondary);c.addView(status);c.addView(section("네트워크"));
+        LanDiscovery.Lan lan=LanDiscovery.current(this);TextView network=label(lan==null?"Wi-Fi 또는 유선 LAN에 연결하세요":lan.interfaceName+" · "+lan.cidr,14);network.setTextColor(textSecondary);network.setPadding(0,0,0,dp(8));c.addView(network);
+        Switch trust=new Switch(this);trust.setText("신뢰하는 집 네트워크입니다");trust.setTextSize(16);trust.setMinHeight(dp(56));trust.setChecked(trusted(lan));trust.setEnabled(lan!=null);trust.setOnCheckedChangeListener((b,on)->{Set<String> scopes=new HashSet<>(preferences.getStringSet("trustedScopes",Collections.emptySet()));if(lan!=null){if(on)scopes.add(lan.scope);else scopes.remove(lan.scope);}preferences.edit().putStringSet("trustedScopes",scopes).apply();if(on&&!permitted())requestPermissions(new String[]{"android.permission.ACCESS_LOCAL_NETWORK"},LAN_PERMISSION);updateLifecycle();});c.addView(trust);c.addView(divider());
+        Switch receive=new Switch(this);receive.setText("송수신 사용");receive.setTextSize(16);receive.setMinHeight(dp(56));receive.setChecked(preferences.getBoolean("receiveEnabled",true));receive.setOnCheckedChangeListener((b,on)->{preferences.edit().putBoolean("receiveEnabled",on).apply();updateLifecycle();});c.addView(receive);
+        TextView note=label("화면이 열려 있는 동안 수신합니다. 앱을 벗어나도 신뢰 설정은 유지됩니다.",14);note.setTextColor(textSecondary);note.setPadding(0,0,0,dp(8));c.addView(note);
+        c.addView(section("기기"));EditText name=new EditText(this);name.setText(name());name.setHint("기기 이름");name.setSingleLine(true);name.setTextSize(16);name.setContentDescription("기기 이름");c.addView(name);
+        Button save=button("기기 이름 저장",()->{String value=name.getText().toString().trim();if(value.isEmpty()||value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>128){fail(new IOException("기기 이름은 1~128바이트여야 합니다"));return;}preferences.edit().putString("deviceName",value).apply();desired="restart";updateLifecycle();});LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-2,dp(48));saveParams.gravity=Gravity.END;c.addView(save,saveParams);
+        c.addView(settingsRow("등록된 기기 관리","온라인 상태와 관계없이 등록을 해제할 수 있습니다",R.drawable.ic_network,this::manageDevices));
+        c.addView(section("파일 및 권한"));c.addView(settingsRow("받은 파일 열기","Android 파일 앱에서 확인",R.drawable.ic_file,()->{try{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE).putExtra(DocumentsContract.EXTRA_INITIAL_URI,DocumentsContract.buildRootUri("app.fta.android.documents","received"));startActivityForResult(intent,OPEN_RECEIVED);}catch(Exception e){fail(e);}}));
+        c.addView(settingsRow("수신 알림 허용","전송 결과 알림 설정",R.drawable.ic_notifications,()->{if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));}));
+        c.addView(settingsRow("로컬 네트워크 권한 설정","Android 앱 권한 관리",R.drawable.ic_network,()->startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())))));
+        c.addView(section("앱 정보"));c.addView(settingsRow("개인정보 처리 안내",null,R.drawable.ic_info,()->showLegal("PrivacyPolicy.txt")));c.addView(settingsRow("오픈소스 고지",null,R.drawable.ic_info,()->showLegal("ThirdPartyNotices.txt")));TextView version=label("FTA 0.1.0 · Android 초안",12);version.setTextColor(textSecondary);version.setPadding(0,dp(16),0,0);c.addView(version);body.addView(scroll(c),new LinearLayout.LayoutParams(-1,-1));
+    }
+    private View settingsRow(String title,String summary,int icon,Runnable action){
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,dp(12),0,dp(12));row.setMinimumHeight(dp(64));row.setBackground(selectable(false));row.setOnClickListener(v->action.run());row.setFocusable(true);
+        ImageView image=new ImageView(this);image.setImageResource(icon);image.setImageTintList(android.content.res.ColorStateList.valueOf(textSecondary));LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(24),dp(24));ip.setMargins(0,0,dp(24),0);row.addView(image,ip);
+        LinearLayout labels=new LinearLayout(this);labels.setOrientation(LinearLayout.VERTICAL);labels.addView(label(title,16));if(summary!=null){TextView detail=label(summary,14);detail.setTextColor(textSecondary);detail.setPadding(0,dp(4),0,0);labels.addView(detail);}row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));return row;
     }
     private void render(){if(destroyed)return;renderStatus();if(tab==0){renderPeers();renderActions();renderAttachments();}else if(tab==1)renderHistory();}
     private void renderStatus(){if(status==null)return;LanDiscovery.Lan lan=LanDiscovery.current(this);status.setText(!ready?"엔진 준비 중":running?"이 화면이 열려 있는 동안 수신 가능":lan==null?"LAN 연결 없음":!trusted(lan)?"설정에서 집 네트워크를 확인하세요":!permitted()?"로컬 네트워크 권한을 허용하세요":!preferences.getBoolean("receiveEnabled",true)?"송수신 중지됨":"송수신 준비 중");}
@@ -227,8 +263,16 @@ public final class MainActivity extends Activity {
     private void cancel(){String id=activeId;if(id!=null)CONTROL.execute(()->{try{NativeBridge.call("transfers.cancel",new JSONObject().put("transfer_id",id));}catch(Exception e){fail(e);}});}
 
     private void renderHistory(){if(historyRows==null)return;
-        // Only changed records rebuild rows; otherwise continuous polling prevents native accessibility from becoming idle.
-        String snapshot=history.toString();if(snapshot.equals(renderedHistory))return;renderedHistory=snapshot;historyRows.removeAllViews();if(history.length()==0)historyRows.addView(label("전송 기록이 없습니다",15));for(int i=0;i<history.length();i++){JSONObject record=history.optJSONObject(i);if(record==null)continue;String text=title(record)+"\n"+("receive".equals(record.optString("direction"))?"수신":"송신")+" · "+stateText(record.optString("state"))+"\n"+android.text.format.DateUtils.formatDateTime(this,record.optLong("created_at")*1000,android.text.format.DateUtils.FORMAT_SHOW_DATE|android.text.format.DateUtils.FORMAT_SHOW_TIME);Button row=button(text,()->openReceipt(record.optString("transfer_id")));row.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);row.setOnLongClickListener(v->{new AlertDialog.Builder(this).setTitle("전송 기록을 삭제할까요?").setMessage("최종 수신 파일은 유지됩니다.").setNegativeButton("취소",null).setPositiveButton("기록 삭제",(d,w)->CONTROL.execute(()->{try{NativeBridge.call("inbox.delete",new JSONObject().put("transfer_id",record.optString("transfer_id")));main.post(this::loadHistory);}catch(Exception e){fail(e);}})).show();return true;});historyRows.addView(row,new LinearLayout.LayoutParams(-1,-2));}}
+        // Native list rows retain stable accessibility focus when engine polling returns unchanged records.
+        String snapshot=history.toString();if(snapshot.equals(renderedHistory))return;renderedHistory=snapshot;historyRows.removeAllViews();
+        if(history.length()==0){TextView hint=label("전송 기록이 없습니다",16);hint.setTextColor(textSecondary);hint.setPadding(0,dp(24),0,dp(24));historyRows.addView(hint);}
+        for(int i=0;i<history.length();i++){JSONObject record=history.optJSONObject(i);if(record==null)continue;
+            String summary=("receive".equals(record.optString("direction"))?"수신":"송신")+" · "+stateText(record.optString("state"))+"\n"+android.text.format.DateUtils.formatDateTime(this,record.optLong("created_at")*1000,android.text.format.DateUtils.FORMAT_SHOW_DATE|android.text.format.DateUtils.FORMAT_SHOW_TIME);
+            View row=settingsRow(title(record),summary,"files".equals(record.optString("kind"))?R.drawable.ic_file:R.drawable.ic_history,()->openReceipt(record.optString("transfer_id")));
+            row.setOnLongClickListener(v->{new AlertDialog.Builder(this).setTitle("전송 기록을 삭제할까요?").setMessage("최종 수신 파일은 유지됩니다.").setNegativeButton("취소",null).setPositiveButton("기록 삭제",(d,w)->CONTROL.execute(()->{try{NativeBridge.call("inbox.delete",new JSONObject().put("transfer_id",record.optString("transfer_id")));main.post(this::loadHistory);}catch(Exception e){fail(e);}})).show();return true;});
+            historyRows.addView(row,new LinearLayout.LayoutParams(-1,-2));historyRows.addView(divider());
+        }
+    }
     private static String title(JSONObject record){if("files".equals(record.optString("kind"))){JSONArray items=record.optJSONArray("items");return items!=null&&items.length()>0?items.optJSONObject(0).optString("name")+(items.length()>1?" 외 "+(items.length()-1)+"개":""):"파일";}return "url".equals(record.optString("kind"))?"URL":"텍스트";}
     private static String stateText(String state){switch(state){case "completed":return "완료";case "partial":return "부분 완료";case "failed":return "실패";case "cancelled":return "취소됨";case "unknown":return "결과 확인 필요";case "awaiting_registration":return "상대 등록 승인 대기";default:return state;}}
     private void openReceipt(String id){if(!ready){pendingReceipt=id;return;}WORK.execute(()->{try{JSONObject r=(JSONObject)NativeBridge.call("inbox.get",new JSONObject().put("transfer_id",id));main.post(()->showReceipt(r));}catch(Exception e){fail(e);}});}
@@ -257,9 +301,13 @@ public final class MainActivity extends Activity {
     // Touching outside a text input dismisses the keyboard without intercepting the input's own gestures.
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent event){if(event.getAction()==android.view.MotionEvent.ACTION_DOWN){View focus=getCurrentFocus();if(focus instanceof EditText){Rect bounds=new Rect();focus.getGlobalVisibleRect(bounds);if(!bounds.contains((int)event.getRawX(),(int)event.getRawY())){focus.clearFocus();getSystemService(InputMethodManager.class).hideSoftInputFromWindow(focus.getWindowToken(),0);}}}return super.dispatchTouchEvent(event);}
     private int dp(float x){return Math.round(x*getResources().getDisplayMetrics().density);}
-    private TextView label(String text,int size){TextView t=new TextView(this);t.setText(text);t.setTextColor(WHITE);t.setTextSize(size);return t;}
-    private Button button(String text,Runnable action){Button b=new Button(this);b.setText(text);b.setTextColor(WHITE);b.setAllCaps(false);b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(0x33FFFFFF),null,new ColorDrawable(WHITE)));b.setOnClickListener(v->action.run());return b;}
-    private GradientDrawable glass(float radius){GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0x20FFFFFF,0x0CFFFFFF});d.setCornerRadius(dp(radius));d.setStroke(dp(1),0x33FFFFFF);return d;}
+    private TextView label(String text,int size){TextView t=new TextView(this);t.setText(text);t.setTextColor(textPrimary);t.setTextSize(size);return t;}
+    private Button button(String text,Runnable action){Button b=new Button(this,null,android.R.attr.borderlessButtonStyle);b.setText(text);b.setAllCaps(false);b.setMinHeight(dp(48));b.setOnClickListener(v->action.run());return b;}
+    private void setButtonIcon(Button button,int resource){Drawable icon=getDrawable(resource);icon.setTint(accent);button.setCompoundDrawablesWithIntrinsicBounds(icon,null,null,null);button.setCompoundDrawablePadding(dp(8));button.setPadding(dp(16),0,dp(16),0);button.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);}
+    private int themeColor(int attribute){android.content.res.TypedArray values=obtainStyledAttributes(new int[]{attribute});try{return values.getColor(0,Color.BLACK);}finally{values.recycle();}}
+    private static int withAlpha(int color,float alpha){return (color&0x00FFFFFF)|(Math.round(255*alpha)<<24);}
+    private Drawable selectable(boolean borderless){android.content.res.TypedArray values=obtainStyledAttributes(new int[]{borderless?android.R.attr.selectableItemBackgroundBorderless:android.R.attr.selectableItemBackground});try{return values.getDrawable(0);}finally{values.recycle();}}
+    private View divider(){View view=new View(this);view.setBackgroundColor(outline);view.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.max(1,dp(1))));return view;}
 
     // Draw the desktop's actual 24-unit monitor outline; mobile is a phone and status stays attached to its silhouette.
     private final class IconTile extends View {
@@ -271,15 +319,13 @@ public final class MainActivity extends Activity {
         @Override protected void onDraw(Canvas canvas){super.onDraw(canvas);float w=getWidth(),h=getHeight();String id=peer.optString("device_id");boolean active=id.equals(activePeer)&&activeId!=null;
             Receipt receipt=completed.get(id);long now=SystemClock.elapsedRealtime();boolean success=receipt!=null&&now<receipt.until;
             float opacity=success?completionOpacity(receipt.until,now,ValueAnimator.areAnimatorsEnabled()):1;if(success&&ValueAnimator.areAnimatorsEnabled())postInvalidateOnAnimation();
-            canvas.saveLayerAlpha(0,0,w,h,Math.round(opacity*255));RectF tile=tileBounds;tile.set(dp(2),dp(2),w-dp(2),h-dp(2));paint.setStyle(Paint.Style.FILL);paint.setColor(0xFF25394A);canvas.drawRoundRect(tile,dp(20),dp(20),paint);
-            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(active?3:2));paint.setColor(active?0x33FFFFFF:id.equals(selected)?WHITE:0x33FFFFFF);canvas.drawRoundRect(tile,dp(20),dp(20),paint);
-            if(active&&!Double.isNaN(fraction)){Path border=borderPath,arc=progressPath;border.reset();arc.reset();border.addRoundRect(tile,dp(20),dp(20),Path.Direction.CW);PathMeasure measure=borderMeasure;measure.setPath(border,false);measure.getSegment(0,(float)(measure.getLength()*fraction),arc,true);paint.setColor(GREEN);paint.setStrokeCap(Paint.Cap.ROUND);canvas.drawPath(arc,paint);paint.setStrokeCap(Paint.Cap.BUTT);}
-            float side=dp(34),x=(w-side)/2,y=(h-side)/2;paint.setColor(WHITE);paint.setStrokeWidth(dp(1.7f));boolean mobile="android".equals(peer.optString("os"))||"ios".equals(peer.optString("os"));
+            canvas.saveLayerAlpha(0,0,w,h,Math.round(opacity*255));RectF tile=tileBounds;tile.set(dp(2),dp(2),w-dp(2),h-dp(2));paint.setStyle(Paint.Style.FILL);paint.setColor(surface);canvas.drawRoundRect(tile,dp(12),dp(12),paint);
+            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(active?3:2));paint.setColor(active?outline:id.equals(selected)?accent:outline);canvas.drawRoundRect(tile,dp(12),dp(12),paint);
+            if(active&&!Double.isNaN(fraction)){Path border=borderPath,arc=progressPath;border.reset();arc.reset();border.addRoundRect(tile,dp(12),dp(12),Path.Direction.CW);PathMeasure measure=borderMeasure;measure.setPath(border,false);measure.getSegment(0,(float)(measure.getLength()*fraction),arc,true);paint.setColor(transferGreen);paint.setStrokeCap(Paint.Cap.ROUND);canvas.drawPath(arc,paint);paint.setStrokeCap(Paint.Cap.BUTT);}
+            float side=dp(34),x=(w-side)/2,y=(h-side)/2;paint.setColor(textPrimary);paint.setStrokeWidth(dp(1.7f));boolean mobile="android".equals(peer.optString("os"))||"ios".equals(peer.optString("os"));
             if(mobile){phoneBounds.set(x+side*.28f,y+side*.04f,x+side*.72f,y+side*.96f);canvas.drawRoundRect(phoneBounds,dp(3),dp(3),paint);canvas.drawLine(x+side*.44f,y+side*.15f,x+side*.56f,y+side*.15f,paint);}else{canvas.drawRect(x+side*3/24,y+side*4/24,x+side*21/24,y+side*16/24,paint);canvas.drawLine(x+side/2,y+side*16/24,x+side/2,y+side*21/24,paint);canvas.drawLine(x+side*8/24,y+side*21/24,x+side*16/24,y+side*21/24,paint);}canvas.restore();
-            paint.setStyle(Paint.Style.FILL);paint.setColor(GREEN);canvas.drawCircle(x+side*(mobile?.74f:.89f),y+side*(mobile?.9f:.67f),dp(4),paint);
-            if(success){float cx=w-dp(11),cy=h-dp(11);paint.setColor(GREEN);canvas.drawCircle(cx,cy,dp(11),paint);paint.setColor(WHITE);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));Path check=checkPath;check.reset();check.moveTo(cx-dp(5),cy);check.lineTo(cx-dp(1),cy+dp(4));check.lineTo(cx+dp(6),cy-dp(4));canvas.drawPath(check,paint);}
+            paint.setStyle(Paint.Style.FILL);paint.setColor(transferGreen);canvas.drawCircle(x+side*(mobile?.74f:.89f),y+side*(mobile?.9f:.67f),dp(4),paint);
+            if(success){float cx=w-dp(11),cy=h-dp(11);paint.setColor(transferGreen);canvas.drawCircle(cx,cy,dp(11),paint);paint.setColor(completionInk);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));Path check=checkPath;check.reset();check.moveTo(cx-dp(5),cy);check.lineTo(cx-dp(1),cy+dp(4));check.lineTo(cx+dp(6),cy-dp(4));canvas.drawPath(check,paint);}
         }
     }
-    private static final class SendArrow extends Drawable {
-        final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);public void draw(Canvas c){Rect b=getBounds();p.setColor(WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(2,b.width()/12f));p.setStrokeCap(Paint.Cap.ROUND);float x=b.exactCenterX(),y=b.exactCenterY(),s=Math.min(b.width(),b.height())*.25f;c.drawLine(x,y+s,x,y-s,p);c.drawLine(x,y-s,x-s,y,p);c.drawLine(x,y-s,x+s,y,p);}public void setAlpha(int a){p.setAlpha(a);}public void setColorFilter(ColorFilter f){p.setColorFilter(f);}public int getOpacity(){return PixelFormat.TRANSLUCENT;}}
 }

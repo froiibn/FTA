@@ -4,9 +4,11 @@
 
 ## 화면 계획·검토
 
-FTA의 기존 색과 네이티브 조작을 따른다. 바탕 `#102032`, 상단 색조 `#17334A`, 본문/버튼 `#FFFFFF`, 보조 글자 흰색 75%, 진행/온라인/완료 `#34C759`를 사용한다. 글꼴은 Android 시스템 sans다. 상단 브랜드·상태·가로 대상·사진/파일 두 버튼·선택 초안은 본문 스크롤, 1–4줄 메시지 입력과 기본 탭 버튼은 하단에 둔다. 기기 이름·본문은 왼쪽, 기기 아이콘과 이름은 가운데 정렬한다. 반투명 표면과 옅은 흰 윤곽으로 글래스 느낌을 표현하고 글자/아이콘은 선명하게 유지한다.
+사용자의 Android 기본 디자인 수정 지시에 따라 iOS형 강제 흰색·짙은 글래스·pill 입력을 제거했다. 외부 UI 라이브러리 없이 SDK의 `Theme.Material.Light.NoActionBar`/`Theme.Material.NoActionBar`와 시스템 sans를 사용하고 시스템 라이트/다크를 따른다. 브랜드 아이콘·이름은 유지하며 기본 Toolbar(56dp)의 새로고침 액션, 아이콘과 체크 상태를 가진 하단 RadioGroup 탐색, 16dp 본문 여백, 48dp 이상 작업 터치 영역을 사용한다. 사진/파일은 기본 아이콘 버튼, 메시지는 밑줄 EditText와 별도 보내기 아이콘, 설정은 그룹 제목·기본 Switch·탭 가능한 설정 행, 기록은 제목/요약/구분선 목록이다. 새 벡터는 이 프로젝트에서 작성한 단순 도형이며 외부 아이콘 패키지를 추가하지 않았다.
 
-검토 기준은 사용자가 정한 흰 버튼·휴대폰/기존 컴퓨터 윤곽·녹색 실제 진행률·완료 두 번 깜빡임이다. OS 기본 Ripple·키보드·PopupMenu·AlertDialog·시스템 선택기를 사용한다. 주기적인 엔진 조회가 같은 기기/기록/선택 초안 컨트롤을 계속 교체하지 않도록 실제 내용이 바뀔 때만 행을 갱신한다. 가짜 온라인 대상·가짜 퍼센트·가짜 성공 상태는 넣지 않는다. Android 전용 화면만 추가하고 iOS 기존 레이아웃과 데스크톱 배포본은 수정하지 않는다.
+Activity가 시스템 외관 변경에 맞춰 다시 생성되며 선택한 탭을 복원한다. 상태/내비게이션 바와 IME insets를 적용하고 키보드가 열리면 하단 탐색을 숨긴다. 입력 1–4줄/초과 스크롤·빈 영역 키보드 내리기·OS 기본 Ripple/PopupMenu/AlertDialog/시스템 선택기를 유지한다. 온라인/진행/완료는 실제 엔진 상태의 녹색이며 밝은 표면에서는 `#188038`, 어두운 표면에서는 `#81C995`로 대비를 확보한다. 실제 바이트 테두리 진행률과 최종 저장 후 체크 1.5초·두 번 깜빡임은 변경하지 않는다.
+
+주기적인 엔진 조회가 같은 기기/기록/선택 초안 컨트롤을 계속 교체하지 않도록 실제 내용이 바뀔 때만 행을 갱신한다. 가짜 온라인 대상·가짜 퍼센트·가짜 성공 상태는 넣지 않는다. 이번 디자인 수정은 Android 화면·리소스에 한정하며 공통 Rust·iOS·데스크톱 코드는 수정하지 않는다.
 
 ## 엔진 경계
 
@@ -61,3 +63,7 @@ Android 0.1.0 내부 빌드 1의 개발용 debug APK를 빌드·서명 검사·1
 - 사용자 Mac headless 83 통과·1 ignored, fmt·headless Clippy 통과. 기존 iOS bridge의 localhost 복합 검사 1개와 iOS Rust 타깃 check 통과. Android host/Android 타깃 all-targets Clippy 통과. Mac 데스크톱 check·테스트 10개·Clippy·TypeScript/Vite build 통과. Android lint 오류 0개이며 고정 도구의 새 버전 안내·ARM64 전용/아이콘 등 비차단 경고는 남아 있다.
 
 처음 API 37 에뮬레이터 자동 GPU 모드에서 `HardwareRenderer.setStopped → RenderThread → glGetProgramBinary → qemu_pipe_read` 대기의 ANR 덤프를 관찰했다. 같은 앱의 하드웨어 가속을 끄지 않고 에뮬레이터를 4코어/소프트웨어 GPU로 실행해 UI·키보드·파일 선택·촬영을 재검증했다. 이 결과를 실기 성능 검증으로 해석하지 않는다. 로컬 기록은 `output/android/verification.json`, UI 이미지는 `output/android-ui-checks`, 개발용 설치 파일은 `output/android/FTA-0.1.0-debug-arm64.apk`와 SHA-256이다. 실제 Android 기기에는 설치하지 않았고 외부 배포/Google Play 제출/GitHub Actions는 수행하지 않았다.
+
+### Android 기본 디자인 수정 검증
+
+0.1.0 내부 빌드 2에서 플랫폼 기본 Toolbar·탐색·입력·설정·기록과 라이트/다크 화면을 적용했다. API 37 ARM64 에뮬레이터에서 빌드/Android lint, 양쪽 외관의 입력 검사 각 34개, 양쪽 외관의 실제 Wi-Fi/신뢰 설정 유지 UI 검사, Mac Rust와 실제 JNI TLS/최종 저장 검사 35개를 통과했다. 시스템 글꼴 130%에서도 입력 검사 34개가 통과했다. 실제 Android 실기/TalkBack과 모든 화면의 초대형 글꼴 평가는 별도 검증이 필요하다. 최신 세 화면의 실제 캡처는 `output/android-native-ui-v2/light`와 `output/android-native-ui-v2/dark`, APK/해시/검증 요약은 `output/android-native-ui-v2`에 보관한다. 첫 초안의 기존 엔진 검사 기록을 이번 UI 작업에서 모두 재실행한 것으로 해석하지 않는다.

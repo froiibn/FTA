@@ -37,7 +37,7 @@ def launch():adb('shell','am','start','-W','-n','app.fta.android/.MainActivity',
 def screen(name):(OUT/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
 def main():
     assert adb('shell','getprop','ro.kernel.qemu').strip()==b'1','This test requires a dedicated Android emulator'
-    launch();wait('텍스트 또는 URL');tap('설정')
+    launch();tap('보내기');wait('텍스트 또는 URL');tap('설정')
     trust=wait('신뢰하는 집 네트워크입니다')
     assert trust.get('enabled')=='true','Emulator must have a real Wi-Fi LAN'
     if trust.get('checked')!='true':tap_node(trust)
