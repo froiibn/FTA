@@ -14,7 +14,8 @@
       "같은 LAN에서 직접 전송",
       "갤러리·촬영·파일 앱",
       "파일·텍스트·URL 기록"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "en": {
     "appleLocale": "en-US",
@@ -31,7 +32,8 @@
       "Directly across your LAN",
       "Photos · Camera · Files",
       "Files · Text · URLs"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "ja": {
     "appleLocale": "ja",
@@ -48,7 +50,8 @@
       "同じLANで直接転送",
       "写真・撮影・ファイル",
       "ファイル・テキスト・URLの履歴"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "zh-Hans": {
     "appleLocale": "zh-Hans",
@@ -65,7 +68,8 @@
       "同一局域网直接传输",
       "照片 · 拍摄 · 文件",
       "文件 · 文本 · URL 记录"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "zh-Hant": {
     "appleLocale": "zh-Hant",
@@ -82,7 +86,8 @@
       "同一區域網路直接傳輸",
       "照片 · 拍攝 · 檔案",
       "檔案 · 文字 · URL 記錄"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "de": {
     "appleLocale": "de-DE",
@@ -99,7 +104,8 @@
       "Direkt über Ihr LAN",
       "Fotos · Kamera · Dateien",
       "Dateien · Text · URLs"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "fr": {
     "appleLocale": "fr-FR",
@@ -116,7 +122,8 @@
       "Directement sur votre LAN",
       "Photos · Caméra · Fichiers",
       "Fichiers · Textes · URL"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "es": {
     "appleLocale": "es-ES",
@@ -133,7 +140,8 @@
       "Directamente por tu LAN",
       "Fotos · Cámara · Archivos",
       "Archivos · Texto · URL"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "pt-BR": {
     "appleLocale": "pt-BR",
@@ -150,7 +158,8 @@
       "Direto pela sua LAN",
       "Fotos · Câmera · Arquivos",
       "Arquivos · Texto · URLs"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   },
   "it": {
     "appleLocale": "it",
@@ -167,6 +176,7 @@
       "Direttamente sulla tua LAN",
       "Foto · Fotocamera · File",
       "File · Testo · URL"
-    ]
+    ],
+    "name": "FTA - File Transfer Anything"
   }
 }

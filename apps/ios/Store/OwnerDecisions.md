@@ -2,7 +2,7 @@
 
 실제 심사 제출은 승인되지 않았다. 다음은 코드 결함과 구분되는 계정·권리·규정 확인 항목이다.
 
-1. **영어 앱명**: `FTA`는 영어(미국)에서 이미 사용 중이라는 Apple 오류로 저장되지 않는다. `FTA File Transfer Anything` 등의 표시명은 아직 승인/가용성 확인 전이다. 앱 안의 FTA 이름·아이콘·bundle ID는 바꾸지 않는다.
+1. **스토어 앱명**: 사용자가 `FTA - File Transfer Anything`(28자)을 정확한 제목으로 승인했다. 모든 스토어 로케일에 적용할 준비이며, 2026-10-30 재개 시 App Store Connect 세션이 로그인 화면으로 만료되어 실제 저장/가용성 확인은 재로그인 뒤 진행해야 한다. 앱 안의 FTA 이름·아이콘·bundle ID/SKU는 바꾸지 않는다.
 2. **Xcode 계정**: 최종 distribution export가 `missing Xcode-Username / No Accounts`로 막혔다. Xcode → Settings → Accounts에서 기존 계정을 재인증한다. 암호/2FA를 채팅이나 저장소로 전달하지 않는다.
 3. **저작권**: FTA의 실제 소유자 이름/브랜드를 확정한다. 이전 앱의 `SEIZIA` 문구만으로 FTA의 소유권을 단정하지 않는다.
 4. **App Privacy 게시**: 개발자/제휴사 수집 없음은 코드와 [Apple 수집 정의](https://developer.apple.com/app-store/app-privacy-details/)를 대조한 저장 초안이다. 게시 확인은 정확성·법 준수·향후 갱신 동의까지 포함하므로 소유자 확인/승인이 남아 있다.
