@@ -38,3 +38,7 @@
 미국에서는 [BIS의 현행 5A002 범위](https://www.bis.gov/learn-support/encryption-controls/5a002-a.1-a.5)에 정보 송수신/통신이 포함된다. ‘암호화가 주목적이 아니다’만으로 완전 면제를 주장할 근거가 부족하다. [대중시장 분류](https://www.bis.gov/learn-support/encryption-controls/mass-market)와 [EAR 740.17](https://www.bis.gov/regulations/ear/740)의 허가 예외·분류·보고 요건은 각각 확인해야 하며 프랑스 신고를 면제하지 않는다. 폐기/변경 여부를 확인하지 않은 과거 Note 4 문구나 오픈소스 라이브러리의 지위를 완성 앱에 그대로 적용하지 않는다. 미국의 최종 ECCN/예외 분류도 이 문서에서 확정하지 않았다.
 
 확인할 핵심은 Apple의 외부 TLS HTTPS·양방향 서버·자체 인증서에 대한 실제 면제 적용 여부와 ANSSI의 일반 공급 신고 대상/개별 면제 또는 기존 라이브러리 신고의 적용 가능성이다. [미발송 문의 초안](ExportComplianceQuestions.en.md)을 준비했다. 다른 앱의 설정과 비교 확인했다고 주장하지 않는다.
+
+## 후속 소유자 결정과 적용 경로
+
+소유자가 검토 결과를 읽은 뒤 문서 제출 면제로 처리하기로 명시 결정했다. 법적 개별 면제가 공식 확인된 것으로 바뀐 것은 아니다. [Apple Modify a build](https://developer.apple.com/documentation/appstoreconnectapi/patch-v1-builds-_id_)는 기존 빌드의 면제 설정 변경을 지원하며 `usesNonExemptEncryption=false`는 암호 미사용뿐 아니라 면제 암호 사용을 나타낸다. 현재 UI의 OS 외 표준 → 프랑스 예 경로에는 별도 면제 선언이 없다. 표준 API 개인키 저장 위치와 인증 환경에 사용 가능한 키가 없어 기존 빌드9에 아직 반영하지 않았다. 공식 API 인증을 준비하면 재빌드 없이 변경할 수 있고, 그 인증을 준비하지 않는 대안은 소유자의 면제 결정을 Info.plist에 반영한 새 빌드10이다. 경로 결정 전에 코드/빌드를 바꾸지 않았고 국가/알고리즘 사실도 유지했다.
