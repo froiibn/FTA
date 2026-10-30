@@ -57,6 +57,8 @@ ANDROID_SERIAL=emulator-5554 python3 tests/ui-smoke.py
 
 API 37 에뮬레이터의 자동 GPU에서 셰이더 캐시 대기 ANR이 관찰되어 4코어·소프트웨어 GPU로 재검증했다. 앱 자체의 하드웨어 가속은 유지한다. 같은 환경에서는 AVD 이름을 실제 값으로 지정해 `emulator -avd <AVD 이름> -no-snapshot -cores 4 -memory 4096 -gpu swiftshader -feature -Vulkan`로 실행할 수 있다.
 
-첫 초안 APK와 검증 기록은 `output/android`에 있다. 최신 Android 기본 디자인 수정본 0.1.0(2)의 APK·SHA-256·검증 요약과 라이트/다크 세 화면 캡처는 `output/android-native-ui-v2`에 있다. Android 종합 검사 35개·추가 입력 UI 경계 6개·실제 Wi-Fi 재접속/설정 유지/사진 선택/가상 카메라 준비가 통과했다. Android 실기 및 실제 LAN NSD 상호 발견은 미검증이다.
+첫 초안 APK와 검증 기록은 `output/android`에 있다. 이전 기본 디자인 수정 기록은 `output/android-native-ui-v2`에 있다. 최신 시스템 설정 기준 UI 0.1.0(3)의 APK·SHA-256·검증 요약과 라이트/다크 세 화면 캡처는 `output/android-settings-ui-v3`에 있다. Android 종합 검사 35개·추가 입력 UI 경계 6개·실제 Wi-Fi 재접속/설정 유지/사진 선택/가상 카메라 준비가 통과했다. Android 실기 및 실제 LAN NSD 상호 발견은 미검증이다.
 
-화면은 SDK 기본 라이트/다크 테마, Toolbar 새로고침 액션, 아이콘과 선택 상태의 하단 탐색, 밑줄 EditText, 기본 버튼·Switch·그룹 목록을 사용한다. 외부 UI/아이콘 라이브러리를 추가하지 않았다. 외관 변경 시 탭을 복원하고 키보드가 열리면 하단 탐색을 숨긴다. 실제 녹색 전송 진행률·최종 저장 완료 피드백과 기존 사진/파일/메시지·신뢰 정책은 유지한다.
+화면은 SDK 기본 라이트/다크 테마, Toolbar 새로고침 액션, 아이콘과 선택 상태의 하단 탐색, 경계가 있는 EditText, 배경/테두리 작업 버튼·Switch·그룹 표면 목록을 사용한다. 외부 UI/아이콘 라이브러리를 추가하지 않았다. 외관 변경 시 탭을 복원하고 키보드가 열리면 하단 탐색을 숨긴다. 실제 녹색 전송 진행률·최종 저장 완료 피드백과 기존 사진/파일/메시지·신뢰 정책은 유지한다.
+
+실제 Android 시스템 설정 화면을 관찰해 설정 그룹·제목/설명/값·끝쪽 스위치/액션 구조를 적용했다. 기기 이름 행은 기본 편집 대화상자를 열고 빈 값/길이를 검증한다. 계측 검사 `-e settingsUi true`는 기본 편집 대화상자의 현재 값·취소·빈 값/UTF-8 길이 검증·정확한 저장·표시 갱신을 확인한 뒤 원래 이름을 같은 대화상자로 복원한다. `tests/capture-native-ui.py`는 목적 화면과 선택 탐색 항목을 확인한 뒤 두 테마를 캡처한다.

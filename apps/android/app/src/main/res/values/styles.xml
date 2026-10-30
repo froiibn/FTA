@@ -1,6 +1,9 @@
 <resources>
     <!-- Platform light/night themes own controls and contrast; the Android screen no longer inherits iOS glass colors. -->
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <!-- Settings-like group contrast gives rows and actions visible boundaries in each system appearance. -->
+        <item name="android:colorBackground">#F0EEF5</item>
+        <item name="android:colorBackgroundFloating">#FCFAFF</item>
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#24466B</item>
         <item name="android:windowLightStatusBar">true</item>

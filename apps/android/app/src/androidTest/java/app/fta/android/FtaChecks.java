@@ -51,6 +51,7 @@ public final class FtaChecks extends Instrumentation {
         try{provider.deleteDocument("received");throw new AssertionError("root deletion must fail");}catch(FileNotFoundException expected){checks++;}
         JSONObject cursor=(JSONObject)NativeBridge.call("events.cursor",new JSONObject().put("consumer","android-ui"));check(cursor.has("sequence"),"notification consumer contract");
         if("true".equals(arguments.getString("ui")))uiChecks();
+        if("true".equals(arguments.getString("settingsUi")))settingsUiChecks();
         if("true".equals(arguments.getString("integration")))integration(result);
         result.putString("stream","FTA Android checks passed: "+checks+"; actual JNI/Keystore/identity/File provider/URL/progress verified\n");finish(Activity.RESULT_OK,result);
     }catch(Throwable failure){result.putString("stream","FTA Android checks failed: "+failure.getClass().getSimpleName()+": "+failure.getMessage()+"\n");finish(Activity.RESULT_CANCELED,result);}}
@@ -71,6 +72,25 @@ public final class FtaChecks extends Instrumentation {
         check(!editor.hasFocus(),"blank-area touch dismisses message focus");
         if(Build.VERSION.SDK_INT>=30)check(!activity.getWindow().getDecorView().getRootWindowInsets().isVisible(android.view.WindowInsets.Type.ime()),"blank-area touch hides keyboard");
         runOnMainSync(()->{editor.setText(old);activity.finish();});
+    }
+
+    private android.widget.TextView text(android.view.View view,String value){if(view instanceof android.widget.TextView&&value.contentEquals(((android.widget.TextView)view).getText()))return (android.widget.TextView)view;if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int i=0;i<group.getChildCount();i++){android.widget.TextView found=text(group.getChildAt(i),value);if(found!=null)return found;}}return null;}
+    private android.view.View nameDialog(MainActivity activity){for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews())if(root!=activity.getWindow().getDecorView()&&input(root)!=null)return root;throw new AssertionError("native name dialog exists");}
+    // Exercise real framework dialogs/Editable and validators without asynchronous shell/IME key injection.
+    private void settingsUiChecks()throws Exception{
+        MainActivity activity=(MainActivity)startActivitySync(new Intent(getTargetContext(),MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
+        android.content.SharedPreferences prefs=getTargetContext().getSharedPreferences("fta",Context.MODE_PRIVATE);String previous=prefs.getString("deviceName",Build.MODEL),restore=arguments.getString("restoreName",previous);String valid="FTA Android 설정 검사";
+        try{
+            runOnMainSync(()->{text(activity.getWindow().getDecorView(),"설정").performClick();((android.view.View)text(activity.getWindow().getDecorView(),"기기 이름").getParent().getParent()).performClick();});waitForIdleSync();
+            android.view.View first=nameDialog(activity);check(previous.contentEquals(input(first).getText()),"name dialog shows current value");runOnMainSync(()->text(first,"취소").performClick());waitForIdleSync();check(previous.equals(prefs.getString("deviceName",Build.MODEL)),"cancel preserves name");
+            runOnMainSync(()->((android.view.View)text(activity.getWindow().getDecorView(),"기기 이름").getParent().getParent()).performClick());waitForIdleSync();android.view.View dialog=nameDialog(activity);android.widget.EditText editor=input(dialog);
+            runOnMainSync(()->{editor.setText("");text(dialog,"저장").performClick();});check(editor.getError()!=null&&previous.equals(prefs.getString("deviceName",Build.MODEL)),"empty name rejected without saving");
+            runOnMainSync(()->{editor.setText(new String(new char[43]).replace('\0','가'));text(dialog,"저장").performClick();});check(editor.getError()!=null&&previous.equals(prefs.getString("deviceName",Build.MODEL)),"UTF-8 name over 128 bytes rejected");
+            runOnMainSync(()->{editor.setText(valid);text(dialog,"저장").performClick();});waitForIdleSync();check(valid.equals(prefs.getString("deviceName",Build.MODEL)),"native dialog stores exact Unicode name");check(text(activity.getWindow().getDecorView(),valid)!=null,"settings row refreshes current value");
+        }finally{
+            runOnMainSync(()->{for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews())if(root!=activity.getWindow().getDecorView()&&text(root,"취소")!=null)text(root,"취소").performClick();});
+            runOnMainSync(()->((android.view.View)text(activity.getWindow().getDecorView(),"기기 이름").getParent().getParent()).performClick());waitForIdleSync();android.view.View dialog=nameDialog(activity);runOnMainSync(()->{input(dialog).setText(restore);text(dialog,"저장").performClick();});waitForIdleSync();check(restore.equals(prefs.getString("deviceName",Build.MODEL)),"original name restored through dialog");runOnMainSync(()->{text(activity.getWindow().getDecorView(),"보내기").performClick();activity.finish();});
+        }
     }
 
     // Test-only listeners are loopback-bound and never enter the product UI's discovered-device list.

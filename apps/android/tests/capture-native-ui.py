@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Capture verified native destinations, avoiding stale pre-navigation screenshot frames."""
 import importlib.util
+import os
 from pathlib import Path
 
 spec=importlib.util.spec_from_file_location('ui',Path(__file__).with_name('ui-smoke.py'))
@@ -16,7 +17,7 @@ try:
    # Accessibility idle and the selected native control prove the captured destination, not the previous frame.
    nodes=list(ui.tree().iter('node'))
    assert any(n.get('class')=='android.widget.RadioButton' and n.get('text')==tab and n.get('checked')=='true' for n in nodes)
-   target=ui.ROOT/'output/android-native-ui-v2'/folder/(name+'.png')
+   target=ui.ROOT/Path(os.environ.get('FTA_UI_CAPTURE_ROOT','output/android-settings-ui-v3'))/folder/(name+'.png')
    target.parent.mkdir(parents=True,exist_ok=True)
    target.write_bytes(ui.adb('exec-out','screencap','-p'))
    print(folder,name,'verified destination',flush=True)

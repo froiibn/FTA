@@ -1,6 +1,9 @@
 <resources>
     <!-- A real configuration change selects the platform dark theme, including dialogs, inputs and switches. -->
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <!-- Settings-like group contrast gives rows and actions visible boundaries in each system appearance. -->
+        <item name="android:colorBackground">#17171C</item>
+        <item name="android:colorBackgroundFloating">#27262E</item>
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#AAC9EE</item>
         <item name="android:windowLightStatusBar">false</item>
