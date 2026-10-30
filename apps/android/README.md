@@ -64,3 +64,5 @@ API 37 에뮬레이터의 자동 GPU에서 셰이더 캐시 대기 ANR이 관찰
 실제 Android 시스템 설정 화면을 관찰해 설정 그룹·제목/설명/값·끝쪽 스위치/액션 구조를 적용했다. 기기 이름 행은 기본 편집 대화상자를 열고 빈 값/길이를 검증한다. 계측 검사 `-e settingsUi true`는 기본 편집 대화상자의 현재 값·취소·빈 값/UTF-8 길이 검증·정확한 저장·표시 갱신을 확인한 뒤 원래 이름을 같은 대화상자로 복원한다. `tests/capture-native-ui.py`는 목적 화면과 선택 탐색 항목을 확인한 뒤 두 테마를 캡처한다.
 
 백그라운드 검증은 `ANDROID_SERIAL=<전용 에뮬레이터> python3 tests/verify-background.py`와 `tests/background-policy.py`를 사용한다. 전자는 실제 Service/TLS/최종 저장·Home·화면 꺼짐·32 MiB 양방향·Activity 재생성·키 보관·명시 중지를, 후자는 계측 없는 정상 앱의 권한/OS 중지/유예 만료를 검사한다. 최신 0.1.0(4) APK·해시·기록·상태별 화면은 루트 `output/android-background-v4`에 보관한다. 실기·물리 mDNS·PIN 잠금·제조사 배터리 동작을 검증한 것으로 해석하지 않는다.
+
+0.1.0(5)는 세 페이지의 상단 헤더를 본문과 함께 스크롤하도록 변경한다. 하단 입력/탭바와 기존 디자인은 유지하며 최신 APK·화면·Galaxy S23 업데이트 검증은 `output/android-scroll-v5`에 있다. 전용 에뮬레이터의 `tests/scroll-pages.py`가 창 크기를 원상 복구하며 실제 헤더/하단 좌표·탭별 위치를 검증한다.

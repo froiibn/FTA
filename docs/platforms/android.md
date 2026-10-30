@@ -107,3 +107,10 @@ LAN 상실 시 발견/광고/온라인 목록·소켓/진행 작업을 즉시 �
 API 37 ARM64 에뮬레이터에서 실제 Service 통합 29개와 계측 없는 정상 앱 OS 경계 15개가 통과했다. 후자는 POST_NOTIFICATIONS/LAN 권한 거절, Task Manager/force-stop 뒤 자동 부활 없음, 수신 해제 후 cold start의 실제 기록, 신뢰·기기 ID 유지, 단일 60초 유예 만료와 정상 앱 재진입을 포함한다. 실제 TCP 리스너가 알림 중지/설정 해제 뒤 닫히는지도 검사했다. 기본 입력 묶음 34개·설정 대화상자 묶음 35개·실제 Wi-Fi/UI 스모크가 통과했으며 각 묶음의 기본 JNI 검사 28개는 서로 중복된다.
 
 사용자 Mac에서 기본 headless 83 통과·1 ignored, workspace fmt·headless Clippy, Android host/all-targets Clippy 및 Android 타깃 lib Clippy를 통과했다. Android assembleDebug/assembleDebugAndroidTest/lintDebug, 서명·APK 16 KiB/ELF 정렬을 확인했다. iOS/데스크톱 구현을 변경하거나 이번 작업에서 해당 OS 앱 전체 UI 검증을 재실행한 것으로 해석하지 않는다. 최종 APK·SHA-256·실제 화면·검증 요약은 `output/android-background-v4`에 있다. Android 실기·API 29–36 실제 실행·제조사 절전·보안 PIN 잠금·Deep Doze에서의 수신 보장·물리 LAN mDNS 상호 발견은 미검증이다.
+
+
+### 상단 헤더 스크롤 (내부 빌드 5)
+
+보내기·기록·설정의 Toolbar와 구분선을 각 페이지의 단일 ScrollView 첫 컨텐츠로 이동했다. 헤더 바깥의 고정 높이/공백을 제거하고 같은 Toolbar를 재사용한다. 하단 메시지 입력·탭바·시스템 인셋과 기존 디자인은 유지한다. 탭별 스크롤 위치를 저장하고 비동기 복원 중의 임시 0 위치를 다시 저장하지 않아 탭 재구성/Activity 복원에서 상단으로 초기화되지 않게 한다. 새로고침/서비스 조회는 컨텐츠 갱신 경로를 유지한다.
+
+`tests/scroll-pages.py`는 실제 컨텐츠만 있는 전용 에뮬레이터의 창 높이를 일시 축소해 세 헤더가 실제 터치 스크롤로 화면 밖으로 나가는지, 하단 좌표·서비스 갱신·동일 탭 재구성/탭 왕복 위치를 확인하고 화면 크기를 복원한다. 입력 검사 34개와 로컬 빌드/lint를 통과했다. Galaxy S23에는 삭제 없이 install -r로 업데이트하고 신뢰/송수신/기기 이름·기기 ID 해시가 유지되며 프로세스/전경서비스가 실행 중임을 확인했다. 실기기에서 전송·등록 승인이나 권한/신뢰 설정 변경은 하지 않았다. APK·실제 전후 화면·설치 검증은 `output/android-scroll-v5`에 보관한다.

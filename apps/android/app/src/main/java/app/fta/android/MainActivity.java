@@ -58,6 +58,9 @@ public final class MainActivity extends Activity {
     private ImageButton sendButton;
     private final RadioButton[] tabButtons=new RadioButton[3];
     private Toolbar toolbar;
+    private ScrollView pageScroll;
+    private boolean restoringScroll;
+    private int[] scrollOffsets=new int[3];
     private LinearLayout navigation;
     private MenuItem refreshAction;
     private int background,surface,textPrimary,textSecondary,accent,outline,transferGreen,completionInk;
@@ -73,6 +76,7 @@ public final class MainActivity extends Activity {
         boolean night=(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;transferGreen=night?0xFF81C995:0xFF188038;completionInk=night?Color.BLACK:WHITE;
         preferences=getSharedPreferences("fta",MODE_PRIVATE);messageDraft=preferences.getString("messageDraft","");cameraToken=preferences.getString("cameraToken",null);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        if(state!=null&&state.getIntArray("scrollOffsets")!=null)scrollOffsets=state.getIntArray("scrollOffsets");
         createRoot();showTab(state==null?0:state.getInt("selectedTab",0));
         // Cold-start notification navigation waits for actual engine readiness rather than an arbitrary delay.
         pendingReceipt=getIntent().getStringExtra("transfer_id");
@@ -120,7 +124,6 @@ public final class MainActivity extends Activity {
         Bitmap mark=BitmapFactory.decodeResource(getResources(),R.drawable.app_mark);toolbar.setLogo(new BitmapDrawable(getResources(),Bitmap.createScaledBitmap(mark,dp(32),dp(32),true)));
         refreshAction=toolbar.getMenu().add("기기 새로고침");Drawable refresh=getDrawable(R.drawable.ic_refresh);refresh.setTint(textPrimary);refreshAction.setIcon(refresh);refreshAction.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
         toolbar.setOnMenuItemClickListener(item->{if(tab==1)loadHistory();else if(running)poll();else updateLifecycle();return true;});
-        root.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(56)));root.addView(divider());
         body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         navigation=new LinearLayout(this);navigation.setOrientation(LinearLayout.VERTICAL);navigation.setBackgroundColor(surface);navigation.addView(divider());
         RadioGroup tabs=new RadioGroup(this);tabs.setOrientation(LinearLayout.HORIZONTAL);tabs.setGravity(Gravity.CENTER_VERTICAL);
@@ -129,16 +132,20 @@ public final class MainActivity extends Activity {
         for(int i=0;i<titles.length;i++){final int index=i;RadioButton button=new RadioButton(this);button.setId(View.generateViewId());button.setButtonDrawable(null);button.setText(titles[i]);button.setTextSize(12);button.setGravity(Gravity.CENTER);button.setPadding(0,dp(8),0,dp(8));button.setTextColor(colors);button.setCompoundDrawablesWithIntrinsicBounds(null,getDrawable(icons[i]),null,null);button.setCompoundDrawableTintList(colors);button.setCompoundDrawablePadding(dp(4));button.setBackground(selectable(false));button.setOnClickListener(v->showTab(index));tabButtons[i]=button;tabs.addView(button,new RadioGroup.LayoutParams(0,dp(64),1));}
         navigation.addView(tabs);root.addView(navigation);setContentView(root);
     }
-    @Override protected void onSaveInstanceState(Bundle state){state.putInt("selectedTab",tab);super.onSaveInstanceState(state);}
+    @Override protected void onSaveInstanceState(Bundle state){state.putInt("selectedTab",tab);if(pageScroll!=null&&!restoringScroll)scrollOffsets[tab]=pageScroll.getScrollY();state.putIntArray("scrollOffsets",scrollOffsets);super.onSaveInstanceState(state);}
     private void showTab(int value){
+        if(pageScroll!=null&&!restoringScroll)scrollOffsets[tab]=pageScroll.getScrollY();
         if(message!=null)messageDraft=message.getText().toString();tab=value;
         for(int i=0;i<tabButtons.length;i++)if(tabButtons[i]!=null){tabButtons[i].setChecked(i==value);tabButtons[i].setTypeface(null,i==value?Typeface.BOLD:Typeface.NORMAL);}
         toolbar.setTitle(value==0?"FTA":value==1?"전송 기록":"설정");toolbar.setSubtitle(value==0?"File Transfer Anything":null);refreshAction.setVisible(value!=2);refreshAction.setTitle(value==1?"기록 새로고침":"기기 새로고침");
-        body.removeAllViews();message=null;status=null;deviceRow=null;historyRows=null;
+        // Move the same header between page containers; rebuilding settings must not leave a duplicate or fixed spacer.
+        if(toolbar.getParent() instanceof ViewGroup)((ViewGroup)toolbar.getParent()).removeView(toolbar);
+        body.removeAllViews();pageScroll=null;message=null;status=null;deviceRow=null;historyRows=null;
         if(tab==0)buildSend();else if(tab==1)buildHistory();else buildSettings();render();
     }
     private LinearLayout column(){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(16),dp(16),dp(16),dp(16));return c;}
-    private ScrollView scroll(LinearLayout content){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.addView(content,new ScrollView.LayoutParams(-1,-2));return s;}
+    // Header/body share one viewport; skip transient zero offsets until posted restoration completes, keeping the composer/navigation outside.
+    private ScrollView scroll(LinearLayout content){LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(56)));page.addView(divider());page.addView(content,new LinearLayout.LayoutParams(-1,-2));ScrollView s=new ScrollView(this);s.setFillViewport(true);s.addView(page,new ScrollView.LayoutParams(-1,-2));pageScroll=s;restoringScroll=true;final int restoreOffset=scrollOffsets[tab];s.post(()->{if(pageScroll!=s)return;s.scrollTo(0,restoreOffset);restoringScroll=false;});return s;}
     private TextView section(String title){TextView text=label(title,14);text.setTypeface(null,Typeface.BOLD);text.setTextColor(accent);text.setPadding(0,dp(20),0,dp(8));return text;}
     private void buildSend(){
         renderedPeers=null;renderedAttachments=null;LinearLayout content=column();body.addView(scroll(content),new LinearLayout.LayoutParams(-1,0,1));
