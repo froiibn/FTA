@@ -1,6 +1,8 @@
 # iOS App Store 출시 준비
 
-2026-10-30 기준 0.1.2 내부 빌드 9의 준비 기록이다. 실제 App Store 심사 제출·출시는 하지 않았다. 기존 데스크톱 0.1.2 배포본과 Android 작업은 별도다.
+2026-10-31 기준 0.1.2 내부 빌드 10의 준비 기록이다. 빌드 9는 업로드/버전 연결 이력으로 보존한다. 실제 App Store 심사 제출·출시는 하지 않았다. 기존 데스크톱 0.1.2 배포본과 Android 작업은 별도다.
+
+최신 상태: 소유자의 문서 제출 면제 결정을 `ITSAppUsesNonExemptEncryption=false`로 선언한 빌드 10을 archive하고 실제 번들/언어/고지/개인정보/서명을 검증했다. 암호 미사용이나 정부의 개별 면제 확인을 뜻하지 않는다. 기존 Xcode 인증이 만료되어 배포 export가 `No Accounts` 및 Distribution 개인키 없음으로 실패했다. 개발서명 archive는 업로드하지 않았다. Xcode Accounts 재인증 후 배포 export·엄격한 검증·업로드와 서버 상태 확인이 남는다. Aside App Store Connect도 로그인 화면으로 만료되어 재로그인이 필요하다.
 
 ## 앱과 지원 범위
 
@@ -19,7 +21,7 @@
 python3 apps/ios/scripts/generate-localizations.py --check
 python3 apps/ios/scripts/generate-notices.py --check
 python3 apps/ios/scripts/generate-project.py
-python3 apps/ios/scripts/validate-release.py output/FTA-iOS-0.1.2-build9-runtime-notices.xcarchive
+python3 apps/ios/scripts/validate-release.py output/FTA-iOS-0.1.2-build10-owner-exemption.xcarchive
 xcrun swiftc -parse-as-library apps/ios/scripts/render-store-images.swift -o output/render-store-images
 output/render-store-images
 ```
@@ -55,12 +57,12 @@ Xcode 계정 자격증명 누락은 소유자의 재인증으로 해소됐다. �
 
 실제 제출 전 잔여 항목:
 
-1. 업로드된 0.1.2(9)의 수출 규정 문서 차단 해소 후 연결된 빌드의 테스트 가능 상태 확인. 실제 문서 마법사는 OS 외부 표준 암호화 + 프랑스 배포에 **프랑스 암호화 신고 승인서 사본**을 요구한다. 서류 없이 저장하거나 면제·프랑스 제외를 추측하지 않았다. 이 UI 요구와 법적 신고 의무 확정을 구분하며 [면제 재검토](ExportComplianceReview.md)와 [미발송 문의 초안](ExportComplianceQuestions.en.md)을 준비했다.
+1. Xcode와 App Store Connect 재인증 뒤 빌드 10을 배포 export/검증·업로드하고 면제 선언의 실제 처리와 버전 빌드 연결을 확인한다. 기존 빌드 9는 현재 문서 누락 상태다. 실제 문서 마법사는 OS 외부 표준 암호화 + 프랑스 배포에 **프랑스 암호화 신고 승인서 사본**을 요구한다. 서류 없이 저장하거나 면제·프랑스 제외를 추측하지 않았다. 이 UI 요구와 법적 신고 의무 확정을 구분하며 [면제 재검토](ExportComplianceReview.md)와 [미발송 문의 초안](ExportComplianceQuestions.en.md)을 준비했다.
 2. 저작권 소유자 확인. 다른 앱의 저작권 문구를 이 앱 소유권으로 추정하지 않는다.
 3. App Privacy의 ‘데이터 수집 없음’ 초안은 실제 코드와 Apple의 수집 정의에 기반해 저장했다. 최종 게시의 법적 준수·정보 갱신 동의는 소유자의 확인/승인이 필요하다.
-4. 콘텐츠 권한 진술과 암호화 수출 규정. Rustls/ring의 표준 TLS 암호화가 OS 밖에서 구현되므로 `ITSAppUsesNonExemptEncryption=false`를 임의 추가하지 않는다. 면제 여부/프랑스 등 문서 요건은 소유자가 판정해야 한다.
+4. 콘텐츠 권한 진술. 암호화 문서 면제는 소유자가 명시 결정하여 빌드 10에 선언했으며, 법적 개별 면제를 정부가 확인한 것은 아니다. 실제 TLS 기능과 프랑스 포함 국가 선택은 유지했다.
 5. 중국 본토 ICP 등록 적용 여부 등 국가별 추가 요구가 실제 배포에 해당하는지 소유자가 확인한다. 번호나 권리를 만들어 입력하지 않는다.
-6. 최종 build 9의 실기 전송/권한·수명주기, 가장 오래된 지원 OS, Windows/Linux 상호 운용의 최종 재검증. 이전 build 8의 실기 사용 성공과 새 빌드의 실기 검증은 다르다.
+6. 최종 build 10의 실기 전송/권한·수명주기, 가장 오래된 지원 OS, Windows/Linux 상호 운용의 최종 재검증. 이전 build 8의 실기 사용 성공과 새 빌드의 실기 검증은 다르다.
 
 연령 설문은 Apple의 정의에 따라 직접 메시지 있음, 공개 UGC/소셜 피드·내장 자유 웹브라우저·광고 없음으로 저장했다. 앱이 자체 제공하는 성인/의료/도박 등 콘텐츠는 없다. Apple 계산값은 일반 4+, 한국 전체, 브라질 A12, 베트남 00+다. 어린이 전용이나 임의 상향으로 지정하지 않았다.
 
@@ -76,4 +78,4 @@ Xcode 계정 자격증명 누락은 소유자의 재인증으로 해소됐다. �
 
 최종 추가 검사: `cargo fmt --all --check`, 기본 `cargo test --locked`(83 통과·기존 수동 1 제외), iOS bridge 검사(1 통과), 기본 및 iOS bridge `clippy --all-targets -- -D warnings`를 macOS에서 통과했다. iPhone 시뮬레이터를 실제 다크 외관·접근성 큰 텍스트로 설정해 10개 언어의 사진/파일 버튼 도달과 사진 소스 메뉴 조작도 추가로 통과했다(한 테스트가 10개 로케일을 순회). VoiceOver 사용성 전체를 검증했다거나 App Store 손쉬운 사용 인증을 받았다는 의미는 아니다.
 
-Rust 표준 라이브러리 고지까지 포함한 최신 archive는 `output/FTA-iOS-0.1.2-build9-runtime-notices.xcarchive`다. 앞선 `global`/`system-sqlite` archive와 사전 IPA는 최종 업로드 대상이 아니다. Cargo 외부 의존성 169개에 더해 Rust 툴체인 런타임의 공식 저작권/라이선스 항목을 별도로 포함하며, 소스 구현이나 새 라이브러리는 추가하지 않는다. 배포 검증은 디버깅 권한뿐 아니라 실제 Apple Distribution 서명과 App Store 프로파일의 유형·만료·앱/팀 식별자 일치도 확인한다.
+Rust 표준 라이브러리 고지와 소유자 면제 선언을 포함한 최신 archive는 `output/FTA-iOS-0.1.2-build10-owner-exemption.xcarchive`다. 빌드 10의 실제 번들 버전/면제값/기기 식별 설정과 약 49 MB dSYM을 확인했다. 빌드 9 `runtime-notices` archive의 성공 업로드 이력은 유지한다. 앞선 `global`/`system-sqlite` archive와 사전 IPA는 최종 업로드 대상이 아니다. Cargo 외부 의존성 169개에 더해 Rust 툴체인 런타임의 공식 저작권/라이선스 항목을 별도로 포함하며, 소스 구현이나 새 라이브러리는 추가하지 않는다. 배포 검증은 디버깅 권한뿐 아니라 실제 Apple Distribution 서명과 App Store 프로파일의 유형·만료·앱/팀 식별자 일치도 확인한다.

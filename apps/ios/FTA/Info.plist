@@ -35,7 +35,11 @@
 	<key>CFBundleShortVersionString</key>
 	<string>0.1.2</string>
 	<key>CFBundleVersion</key>
-	<string>9</string>
+	<string>10</string>
+	<!-- The owner elected documentation exemption after review. This declares exempt encryption,
+	     not absence of Rustls/ring TLS or an exemption confirmed by Apple or a government. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
