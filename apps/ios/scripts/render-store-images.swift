@@ -13,14 +13,22 @@ func color(_ hex: UInt32) -> NSColor { NSColor(red:CGFloat((hex>>16)&255)/255,gr
         let root=URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
         let metadata=try JSONDecoder().decode([String:StoreCopy].self,from:Data(contentsOf:root.appendingPathComponent("apps/ios/Store/metadata.json")))
         let assetRoot=root.appendingPathComponent("output/ios-store-assets")
+        let duoOuterDimensions=(width:1398,height:2034)
         let mark=NSImage(contentsOf:root.appendingPathComponent("apps/ios/FTA/Assets.xcassets/AppMark.imageset/AppMark.png"))!
         let scenes=["send","photos","history"]
-        for family in ["phone","ipad"] {
+        // Duo assets require real captures of that display; select a family without overwriting
+        // the already-uploaded phone/iPad set or pretending resized legacy captures are Duo UI.
+        let requested=Array(CommandLine.arguments.dropFirst())
+        let families=requested.isEmpty ? ["phone","ipad"] : requested
+        guard families.allSatisfy({["phone","ipad","duo-outer"].contains($0)}) else { throw NSError(domain:"UnknownCaptureFamily",code:1) }
+        for family in families {
             for (locale,copy) in metadata.sorted(by:{$0.key<$1.key}) {
                 guard copy.headlines.count == scenes.count, copy.captions.count == scenes.count else { throw NSError(domain:"InvalidStoreCopy",code:1) }
                 for (index,scene) in scenes.enumerated() {
                     let source=assetRoot.appendingPathComponent("raw/\(family)/store-\(locale)-\(scene).png")
                     guard let screen=NSImage(contentsOf:source), let image=screen.cgImage(forProposedRect:nil,context:nil,hints:nil) else { throw NSError(domain:"MissingVerifiedCapture",code:1,userInfo:[NSLocalizedDescriptionKey:source.path]) }
+                    // Reject legacy-sized or invalid Duo capture buffers before making store assets.
+                    guard family != "duo-outer" || (image.width == duoOuterDimensions.width && image.height == duoOuterDimensions.height) else { throw NSError(domain:"InvalidDuoCaptureDimensions",code:1) }
                     let width=image.width, height=image.height, w=CGFloat(width), h=CGFloat(height)
                     // Opaque RGB prevents App Store alpha-channel rejection; the underlying UI stays unmodified.
                     let context=CGContext(data:nil,width:width,height:height,bitsPerComponent:8,bytesPerRow:0,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.noneSkipLast.rawValue)!
