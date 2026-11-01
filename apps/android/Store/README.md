@@ -41,6 +41,11 @@ python3 apps/android/scripts/prepare-native-symbols.py \
 The script fails on an unexpected library set, stale archive or linker drift.
 The current app does not use R8/ProGuard, so there is no invented ReTrace map.
 No testers were assigned or invited and no Save and release action was taken.
+The existing Galaxy debug installation was preserved. Its debug certificate is
+different from Google's production signing certificate, so an eventual first
+Play installation cannot be assumed to update that development installation in
+place. No uninstall, data reset or unsafe key export was performed; any transition
+of that test device requires a separate explicit, data-preserving plan.
 
 ## Localization and promotional assets
 
