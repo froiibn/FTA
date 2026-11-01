@@ -42,6 +42,25 @@ these separate data flows. Do not add photos/files/message-body categories merel
 because the app transfers them, or omit them merely because it has no server;
 the documented definitions and exemptions determine the declaration.
 
+## Recommended refinement for owner review
+
+Keep the plaintext installation identifier in the conservative collection scope,
+but change **third-party sharing to No** before finalization if the owner confirms
+the inspected, intended device-to-device use. Google defines a third party as
+another organization and exempts specific user-initiated transfers. There is no
+external organization endpoint/SDK in this release; selecting a receiving peer,
+exporting to the gallery and opening/sharing a received item are explicit user
+actions. The existing Yes sharing draft should therefore not be treated as the
+recommended final answer merely because it was the most conservative preview.
+
+This is an interpretation of the cited definitions, not a claim that NSD is
+secret. Incidental observation of plaintext discovery remains a real exposure
+documented in the privacy policy. “All transmitted data encrypted” remains No;
+the broad negative security badge must be explained alongside the fact that
+actual file/photo/text/URL content is directly TLS-encrypted. The end-to-end
+exception is relevant to content because only the two endpoints hold the keys;
+it does not cover the plaintext discovery identifier.
+
 ## Primary references checked
 
 - [Google Play Data safety form](https://support.google.com/googleplay/android-developer/answer/10787469?hl=en)
