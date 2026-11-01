@@ -17,7 +17,7 @@ public final class FtaChecks extends Instrumentation {
     @Override public void onCreate(Bundle args){super.onCreate(args);arguments=args;start();}
     private void check(boolean condition,String name){if(!condition)throw new AssertionError(name);checks++;}
     private String read(File file)throws Exception{try(InputStream input=new FileInputStream(file)){return new String(input.readAllBytes(),StandardCharsets.UTF_8);}}
-    @Override public void onStart(){if("true".equals(arguments.getString("background"))){new BackgroundChecks(this).run();return;}Bundle result=new Bundle();try{
+    @Override public void onStart(){if("true".equals(arguments.getString("gallery"))){new GalleryChecks(this).run();return;}if("true".equals(arguments.getString("background"))){new BackgroundChecks(this).run();return;}Bundle result=new Bundle();try{
         NativeBridge.initialize(getTargetContext());
         JSONObject identity=new JSONObject(read(new File(NativeBridge.state,"identity.json")));
         check(!identity.has("key"),"private identity must never be plaintext JSON");
@@ -86,17 +86,17 @@ public final class FtaChecks extends Instrumentation {
         MainActivity activity=(MainActivity)startActivitySync(new Intent(getTargetContext(),MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
         android.content.SharedPreferences prefs=getTargetContext().getSharedPreferences("fta",Context.MODE_PRIVATE);String previous=prefs.getString("deviceName",Build.MODEL),restore=arguments.getString("restoreName",previous);String valid="FTA Android 설정 검사";
         try{
-            runOnMainSync(()->{text(activity.getWindow().getDecorView(),"설정").performClick();((android.view.View)text(activity.getWindow().getDecorView(),"기기 이름").getParent().getParent()).performClick();});waitForIdleSync();
-            android.view.View first=nameDialog(activity);check(previous.contentEquals(input(first).getText()),"name dialog shows current value");runOnMainSync(()->text(first,"취소").performClick());waitForIdleSync();check(previous.equals(prefs.getString("deviceName",Build.MODEL)),"cancel preserves name");
-            runOnMainSync(()->((android.view.View)text(activity.getWindow().getDecorView(),"기기 이름").getParent().getParent()).performClick());waitForIdleSync();android.view.View dialog=nameDialog(activity);android.widget.EditText editor=input(dialog);
-            runOnMainSync(()->{editor.setText("");text(dialog,"저장").performClick();});check(editor.getError()!=null&&previous.equals(prefs.getString("deviceName",Build.MODEL)),"empty name rejected without saving");
-            runOnMainSync(()->{editor.setText(new String(new char[43]).replace('\0','가'));text(dialog,"저장").performClick();});check(editor.getError()!=null&&previous.equals(prefs.getString("deviceName",Build.MODEL)),"UTF-8 name over 128 bytes rejected");
-            runOnMainSync(()->{editor.setText(valid);text(dialog,"저장").performClick();});waitForIdleSync();check(valid.equals(prefs.getString("deviceName",Build.MODEL)),"native dialog stores exact Unicode name");check(text(activity.getWindow().getDecorView(),valid)!=null,"settings row refreshes current value");
+            runOnMainSync(()->{text(activity.getWindow().getDecorView(),getTargetContext().getString(R.string.settings)).performClick();((android.view.View)text(activity.getWindow().getDecorView(),getTargetContext().getString(R.string.device_name)).getParent().getParent()).performClick();});waitForIdleSync();
+            android.view.View first=nameDialog(activity);check(previous.contentEquals(input(first).getText()),"name dialog shows current value");runOnMainSync(()->text(first,getTargetContext().getString(R.string.cancel)).performClick());waitForIdleSync();check(previous.equals(prefs.getString("deviceName",Build.MODEL)),"cancel preserves name");
+            runOnMainSync(()->((android.view.View)text(activity.getWindow().getDecorView(),getTargetContext().getString(R.string.device_name)).getParent().getParent()).performClick());waitForIdleSync();android.view.View dialog=nameDialog(activity);android.widget.EditText editor=input(dialog);
+            runOnMainSync(()->{editor.setText("");text(dialog,getTargetContext().getString(R.string.save)).performClick();});check(editor.getError()!=null&&previous.equals(prefs.getString("deviceName",Build.MODEL)),"empty name rejected without saving");
+            runOnMainSync(()->{editor.setText(new String(new char[43]).replace('\0','가'));text(dialog,getTargetContext().getString(R.string.save)).performClick();});check(editor.getError()!=null&&previous.equals(prefs.getString("deviceName",Build.MODEL)),"UTF-8 name over 128 bytes rejected");
+            runOnMainSync(()->{editor.setText(valid);text(dialog,getTargetContext().getString(R.string.save)).performClick();});waitForIdleSync();check(valid.equals(prefs.getString("deviceName",Build.MODEL)),"native dialog stores exact Unicode name");check(text(activity.getWindow().getDecorView(),valid)!=null,"settings row refreshes current value");
         }finally{
-            runOnMainSync(()->{for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews())if(root!=activity.getWindow().getDecorView()&&text(root,"취소")!=null)text(root,"취소").performClick();});
-            runOnMainSync(()->((android.view.View)text(activity.getWindow().getDecorView(),"기기 이름").getParent().getParent()).performClick());waitForIdleSync();android.view.View dialog=nameDialog(activity);runOnMainSync(()->{input(dialog).setText(restore);text(dialog,"저장").performClick();});waitForIdleSync();check(restore.equals(prefs.getString("deviceName",Build.MODEL)),"original name restored through dialog");
+            runOnMainSync(()->{for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews())if(root!=activity.getWindow().getDecorView()&&text(root,getTargetContext().getString(R.string.cancel))!=null)text(root,getTargetContext().getString(R.string.cancel)).performClick();});
+            runOnMainSync(()->((android.view.View)text(activity.getWindow().getDecorView(),getTargetContext().getString(R.string.device_name)).getParent().getParent()).performClick());waitForIdleSync();android.view.View dialog=nameDialog(activity);runOnMainSync(()->{input(dialog).setText(restore);text(dialog,getTargetContext().getString(R.string.save)).performClick();});waitForIdleSync();check(restore.equals(prefs.getString("deviceName",Build.MODEL)),"original name restored through dialog");
             // Instrumentation termination can precede apply() disk flushing; wait for the same restored value before exiting the test process.
-            if(!prefs.edit().putString("deviceName",restore).commit())throw new AssertionError("restored name persisted");runOnMainSync(()->{text(activity.getWindow().getDecorView(),"보내기").performClick();activity.finish();});
+            if(!prefs.edit().putString("deviceName",restore).commit())throw new AssertionError("restored name persisted");runOnMainSync(()->{text(activity.getWindow().getDecorView(),getTargetContext().getString(R.string.send)).performClick();activity.finish();});
         }
     }
 

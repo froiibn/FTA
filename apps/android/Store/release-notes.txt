@@ -1,0 +1,30 @@
+<en-US>
+First Android version for direct LAN transfers of photos, files, text and URLs. Includes registered-device trust, background transfers and optional gallery copies of received photos.
+</en-US>
+<ko-KR>
+같은 LAN에서 사진·파일·텍스트·URL을 직접 전송하는 Android 첫 버전입니다. 기기 등록 신뢰, 백그라운드 송수신과 수신 사진의 선택적 갤러리 저장을 지원합니다.
+</ko-KR>
+<ja-JP>
+同じ LAN で写真、ファイル、テキスト、URL を直接転送する Android 初版です。デバイス登録、バックグラウンド転送、受信写真の任意のギャラリー保存に対応します。
+</ja-JP>
+<zh-CN>
+首个 Android 版本，可在同一局域网直接传输照片、文件、文本和 URL。支持设备注册信任、后台传输和将接收的照片选择性保存到图库。
+</zh-CN>
+<zh-TW>
+首個 Android 版本，可在同一區域網路直接傳輸照片、檔案、文字和 URL。支援裝置註冊信任、背景傳輸與選擇性將收到的照片儲存到相片庫。
+</zh-TW>
+<de-DE>
+Erste Android-Version für direkte LAN-Übertragung von Fotos, Dateien, Text und URLs. Mit Geräteregistrierung, Hintergrundübertragungen und optionalen Galeriekopien empfangener Fotos.
+</de-DE>
+<fr-FR>
+Première version Android pour transférer photos, fichiers, texte et URL sur le LAN. Enregistrement des appareils, transferts en arrière-plan et copies facultatives des photos reçues dans la galerie.
+</fr-FR>
+<es-ES>
+Primera versión Android para transferir fotos, archivos, texto y URL por LAN. Incluye registro de dispositivos, transferencias en segundo plano y copias opcionales de fotos recibidas en la galería.
+</es-ES>
+<pt-BR>
+Primeira versão Android para transferir fotos, arquivos, textos e URLs pela LAN. Inclui registro de dispositivos, transferências em segundo plano e cópias opcionais das fotos recebidas na galeria.
+</pt-BR>
+<it-IT>
+Prima versione Android per trasferire foto, file, testo e URL sulla LAN. Include registrazione dei dispositivi, trasferimenti in background e copie facoltative delle foto ricevute nella galleria.
+</it-IT>

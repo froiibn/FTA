@@ -14,7 +14,7 @@
     <uses-permission android:name="app.fta.android.permission.SERVICE_STATE" />
     <queries><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries>
     <application android:label="FTA" android:icon="@mipmap/ic_launcher" android:theme="@style/AppTheme"
-        android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:supportsRtl="true">
+        android:localeConfig="@xml/locales_config" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize" >
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>

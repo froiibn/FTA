@@ -1,0 +1,192 @@
+{
+  "en": {
+    "playLocale": "en-US",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "Photos, files and text via LAN",
+    "fullDescription": "FTA (File Transfer Anything) sends photos, files, text and URLs directly between your devices on the same local network. No cloud relay or FTA account is required.\n\n• Choose photos from the system picker or take a new photo with the camera app.\n• Choose files through Android’s Files picker.\n• Send text and URLs from one message box.\n• On the first transfer to an unregistered device, only the recipient approves registration. No content is sent before approval.\n• Registered devices must be online and authenticated.\n• View received files in the Files app. From a completed photo receipt, explicitly save selected original photo copies to Pictures/FTA in the gallery.\n• Keep transfer results on your device and open files or links only when you choose.\n• Use the connected-device foreground service for background transfers, with a clear stop action. Android and device battery restrictions still apply.\n\nFTA must be running on both devices, on the same private IPv4 LAN. Compatible FTA peers include Android, iOS, Windows, macOS and Linux. iOS peers must keep FTA in the foreground. Guest Wi-Fi isolation, firewalls or blocked multicast may prevent discovery. Internet transfers and an offline queue are not supported.\n\nAndroid 10 or later and an ARM64 device are required. Local-network permission is required on Android 17 and later; notification display is optional. FTA does not request access to your entire photo library or all files. Gallery copies are separate from app-private originals and may be backed up by your photo provider according to your settings.",
+    "headlines": [
+      "Your files.\nYour nearby devices.",
+      "Photos and files,\nyour way.",
+      "Transfer results,\nkept on your device.",
+      "Your network.\nYour choice."
+    ],
+    "captions": [
+      "Directly across your LAN",
+      "Photos · Camera · Files",
+      "Files · Text · URLs",
+      "Trusted LAN and Android controls"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "ko": {
+    "playLocale": "ko-KR",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "같은 LAN에서 사진·파일·메시지",
+    "fullDescription": "FTA(File Transfer Anything)는 같은 로컬 네트워크의 내 기기 사이에서 사진·파일·텍스트·URL을 직접 주고받는 앱입니다. 클라우드 중계나 FTA 계정이 필요하지 않습니다.\n\n• 시스템 사진 선택기에서 고르거나 카메라 앱으로 새 사진 촬영\n• Android 파일 선택기에서 선택한 파일 전송\n• 한 입력창에서 텍스트와 URL 전송\n• 미등록 기기에 처음 보내면 수신자만 한 번 등록 승인, 승인 전에는 본문을 보내지 않음\n• 등록된 온라인·인증 확인 기기로 전송\n• 파일 앱에서 받은 파일 확인, 완료된 수신 사진은 선택하여 갤러리 Pictures/FTA에 원본 사본 저장\n• 기기 내부 전송 기록, 사용자가 선택한 파일·링크만 열기\n• 명시적 중지 기능이 있는 연결 기기 전경서비스로 백그라운드 송수신, OS·기기 절전 제한 적용\n\n양쪽 기기에 FTA가 실행되어 있고 같은 사설 IPv4 LAN에 연결되어 있어야 합니다. Android·iOS·Windows·macOS·Linux의 호환 FTA 기기와 연결합니다. iOS 기기는 FTA를 화면에 열어두어야 합니다. 게스트 Wi-Fi 격리·방화벽·멀티캐스트 차단 환경에서는 검색이 제한될 수 있습니다. 인터넷 전송과 오프라인 대기열은 지원하지 않습니다.\n\nAndroid 10 이상 ARM64 기기가 필요합니다. Android 17 이상에서는 로컬 네트워크 권한이 필요하며 알림 표시는 선택 사항입니다. 전체 사진 보관함·모든 파일 접근 권한은 요청하지 않습니다. 갤러리 사본은 앱 내부 원본과 별개이며 사진 앱 설정에 따라 백업될 수 있습니다.",
+    "headlines": [
+      "내 파일을,\n가까운 내 기기로",
+      "사진과 파일,\n원하는 방식으로",
+      "전송 결과를\n기기에 보관",
+      "내 네트워크,\n내 선택으로"
+    ],
+    "captions": [
+      "같은 LAN에서 직접 전송",
+      "갤러리·촬영·파일 앱",
+      "파일·텍스트·URL 기록",
+      "신뢰하는 LAN과 Android 설정"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "ja": {
+    "playLocale": "ja-JP",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "同じLANで写真・ファイル・テキスト",
+    "fullDescription": "FTA（File Transfer Anything）は、同じローカルネットワーク上の自分のデバイス間で写真、ファイル、テキスト、URL を直接送受信するアプリです。クラウド中継や FTA アカウントは不要です。\n\n• システムの写真選択機能、またはカメラアプリで撮影した写真を送信\n• Android のファイル選択機能で選んだファイルを送信\n• ひとつの入力欄でテキストと URL を送信\n• 未登録デバイスへの初回送信時は受信者だけが登録を承認。承認前に本文は送信しません\n• オンラインで認証された登録済みデバイスに送信\n• ファイルアプリで受信ファイルを確認。受信完了した写真は、選択してギャラリーの Pictures/FTA に原本のコピーを保存\n• 転送履歴はデバイス内に保存。ファイルやリンクは自分で選んだときだけ開きます\n• 停止操作のある接続デバイス用フォアグラウンドサービスでバックグラウンド送受信。OS や省電力設定の制限は適用されます\n\n両方のデバイスで FTA を実行し、同じプライベート IPv4 LAN に接続してください。Android、iOS、Windows、macOS、Linux の互換 FTA と接続できます。iOS 側では FTA を前面に開いておく必要があります。ゲスト Wi-Fi の隔離、ファイアウォール、マルチキャストの遮断により検索できない場合があります。インターネット転送やオフラインキューには対応しません。\n\nAndroid 10 以降の ARM64 デバイスが必要です。Android 17 以降はローカルネットワーク権限が必要で、通知表示は任意です。写真ライブラリ全体や全ファイルへのアクセスは要求しません。ギャラリーのコピーはアプリ内の原本とは別で、写真アプリの設定によりバックアップされる場合があります。",
+    "headlines": [
+      "自分のファイルを、\n近くの自分の機器へ",
+      "写真もファイルも、\n好きな方法で",
+      "転送結果は\n機器内に保存",
+      "自分のネットワーク。\n自分で選択。"
+    ],
+    "captions": [
+      "同じLANで直接転送",
+      "写真・撮影・ファイル",
+      "ファイル・テキスト・URLの履歴",
+      "信頼する LAN と Android の設定"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "zh-Hans": {
+    "playLocale": "zh-CN",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "在局域网传输照片、文件和文本",
+    "fullDescription": "FTA（File Transfer Anything）可在同一本地网络中的个人设备之间直接收发照片、文件、文本和 URL。无需云端中转或 FTA 账号。\n\n• 从系统照片选择器中选择，或通过相机应用拍摄新照片\n• 通过 Android 文件选择器发送所选文件\n• 在同一个输入框中发送文本与 URL\n• 首次向未注册设备发送时，仅由接收方批准注册；批准前不发送正文\n• 仅向在线且通过身份验证的已注册设备发送\n• 在文件应用中查看接收的文件；已接收完成的照片可由用户选择，将原始副本保存到图库 Pictures/FTA\n• 传输记录保存在设备内，文件和链接仅在用户选择时打开\n• 使用带停止操作的已连接设备前台服务保持后台收发，仍受系统和省电策略限制\n\n两台设备都须运行 FTA，并连接到同一个私有 IPv4 局域网。可连接 Android、iOS、Windows、macOS 和 Linux 上的兼容 FTA。iOS 设备须将 FTA 保持在前台。访客 Wi-Fi 隔离、防火墙或多播限制可能阻止发现设备。不支持互联网传输或离线队列。\n\n需要 Android 10 或更高版本的 ARM64 设备。Android 17 及以上需要本地网络权限，通知显示为可选。应用不请求访问整个照片库或所有文件。图库副本独立于应用内部原件，并可能根据照片应用设置进行备份。",
+    "headlines": [
+      "自己的文件，\n传给身边的设备",
+      "照片和文件，\n按你喜欢的方式",
+      "传输结果，\n保存在设备上",
+      "你的网络，\n由你选择。"
+    ],
+    "captions": [
+      "同一局域网直接传输",
+      "照片 · 拍摄 · 文件",
+      "文件 · 文本 · URL 记录",
+      "可信局域网与 Android 控制"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "zh-Hant": {
+    "playLocale": "zh-TW",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "在區域網路傳輸照片、檔案與文字",
+    "fullDescription": "FTA（File Transfer Anything）可在同一區域網路中的個人裝置之間直接收發照片、檔案、文字和 URL。無需雲端中繼或 FTA 帳號。\n\n• 從系統照片挑選器選取，或透過相機 App 拍攝新照片\n• 透過 Android 檔案挑選器傳送所選檔案\n• 在同一輸入欄中傳送文字與 URL\n• 首次向未註冊裝置傳送時，僅由接收方核准註冊；核准前不傳送本文\n• 僅向上線且通過身分驗證的已註冊裝置傳送\n• 在檔案 App 查看收到的檔案；已接收完成的照片可由使用者選取，將原始副本儲存到相片庫 Pictures/FTA\n• 傳輸記錄保存在裝置內，檔案和連結僅在使用者選取時開啟\n• 使用具有停止操作的已連接裝置前景服務保持背景收發，仍受系統和省電策略限制\n\n兩台裝置都須執行 FTA，並連接到同一私有 IPv4 區域網路。可連接 Android、iOS、Windows、macOS 和 Linux 上的相容 FTA。iOS 裝置須將 FTA 保持在前景。訪客 Wi-Fi 隔離、防火牆或多播限制可能阻止探索裝置。不支援網際網路傳輸或離線佇列。\n\n需要 Android 10 或更新版本的 ARM64 裝置。Android 17 以上需要區域網路權限，通知顯示為選用。App 不要求存取整個照片圖庫或所有檔案。相片庫副本獨立於 App 內部原件，並可能依照片 App 設定進行備份。",
+    "headlines": [
+      "自己的檔案，\n傳給身邊的裝置",
+      "照片與檔案，\n用你喜歡的方式",
+      "傳輸結果，\n保留在裝置上",
+      "你的網路，\n由你選擇。"
+    ],
+    "captions": [
+      "同一區域網路直接傳輸",
+      "照片 · 拍攝 · 檔案",
+      "檔案 · 文字 · URL 記錄",
+      "信任的區域網路與 Android 設定"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "de": {
+    "playLocale": "de-DE",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "Fotos, Dateien und Text im LAN",
+    "fullDescription": "FTA (File Transfer Anything) überträgt Fotos, Dateien, Text und URLs direkt zwischen deinen Geräten im selben lokalen Netzwerk. Ohne Cloud-Vermittlung oder FTA-Konto.\n\n• Fotos mit der Systemauswahl wählen oder mit der Kamera-App aufnehmen\n• Dateien über die Android-Dateiauswahl senden\n• Text und URLs in einem gemeinsamen Eingabefeld senden\n• Beim ersten Senden an ein nicht registriertes Gerät bestätigt nur der Empfänger die Registrierung. Vorher werden keine Inhalte gesendet\n• Registrierte Geräte müssen online und authentifiziert sein\n• Empfangene Dateien in der Dateien-App ansehen. Empfangene Fotos nach Abschluss gezielt als Originalkopien in Pictures/FTA in der Galerie speichern\n• Übertragungsverlauf auf dem Gerät behalten. Dateien und Links nur auf eigenen Wunsch öffnen\n• Hintergrundübertragungen über einen Vordergrunddienst für verbundene Geräte mit Stoppfunktion. System- und Energiesparbeschränkungen gelten weiterhin\n\nAuf beiden Geräten muss FTA laufen; beide müssen sich im selben privaten IPv4-LAN befinden. Kompatible FTA-Geräte unter Android, iOS, Windows, macOS und Linux werden unterstützt. Auf iOS muss FTA im Vordergrund bleiben. Gast-WLAN-Isolierung, Firewalls oder blockiertes Multicast können die Suche verhindern. Internetübertragungen und Offline-Warteschlangen werden nicht unterstützt.\n\nErfordert Android 10 oder neuer und ein ARM64-Gerät. Ab Android 17 ist die Berechtigung für das lokale Netzwerk erforderlich; Benachrichtigungen sind optional. FTA verlangt keinen Zugriff auf die gesamte Fotomediathek oder alle Dateien. Galeriekopien sind von den appinternen Originalen getrennt und können je nach Fotoanbieter-Einstellungen gesichert werden.",
+    "headlines": [
+      "Ihre Dateien.\nIhre Geräte in der Nähe.",
+      "Fotos und Dateien,\nauf Ihre Weise.",
+      "Übertragungsergebnisse\nbleiben auf Ihrem Gerät.",
+      "Dein Netzwerk.\nDeine Entscheidung."
+    ],
+    "captions": [
+      "Direkt über Ihr LAN",
+      "Fotos · Kamera · Dateien",
+      "Dateien · Text · URLs",
+      "Vertrauenswürdiges LAN und Android-Einstellungen"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "fr": {
+    "playLocale": "fr-FR",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "Photos, fichiers et texte LAN",
+    "fullDescription": "FTA (File Transfer Anything) transfère directement photos, fichiers, texte et URL entre vos appareils sur le même réseau local. Aucun relais cloud ni compte FTA requis.\n\n• Choisissez des photos avec le sélecteur système ou prenez-en avec l’application Appareil photo\n• Envoyez les fichiers choisis dans le sélecteur de fichiers Android\n• Envoyez texte et URL depuis un seul champ\n• Au premier envoi vers un appareil non enregistré, seul le destinataire approuve l’enregistrement. Aucun contenu n’est envoyé avant son accord\n• Les appareils enregistrés doivent être en ligne et authentifiés\n• Consultez les fichiers reçus dans Fichiers. Après réception complète, choisissez les photos à copier telles quelles dans Pictures/FTA, dans la galerie\n• Conservez l’historique sur votre appareil. Ouvrez fichiers et liens uniquement à votre initiative\n• Utilisez le service de premier plan pour appareils connectés, avec une commande d’arrêt, pour les transferts en arrière-plan. Les restrictions du système et de batterie restent applicables\n\nFTA doit fonctionner sur les deux appareils, connectés au même LAN IPv4 privé. Les appareils FTA compatibles sous Android, iOS, Windows, macOS et Linux peuvent communiquer. Sur iOS, gardez FTA au premier plan. L’isolation du Wi-Fi invité, un pare-feu ou le blocage du multicast peuvent empêcher la détection. Les transferts par Internet et les files hors ligne ne sont pas pris en charge.\n\nAndroid 10 ou version ultérieure et un appareil ARM64 sont requis. À partir d’Android 17, l’autorisation réseau local est nécessaire ; les notifications sont facultatives. Aucun accès global aux photos ou aux fichiers n’est demandé. Les copies dans la galerie sont distinctes des originaux internes et peuvent être sauvegardées selon vos réglages photo.",
+    "headlines": [
+      "Vos fichiers.\nVos appareils à proximité.",
+      "Photos et fichiers,\nà votre façon.",
+      "Les résultats restent\nsur votre appareil.",
+      "Votre réseau.\nVotre choix."
+    ],
+    "captions": [
+      "Directement sur votre LAN",
+      "Photos · Caméra · Fichiers",
+      "Fichiers · Textes · URL",
+      "LAN de confiance et commandes Android"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "es": {
+    "playLocale": "es-ES",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "Fotos, archivos y texto en LAN",
+    "fullDescription": "FTA (File Transfer Anything) envía fotos, archivos, texto y URL directamente entre tus dispositivos en la misma red local. Sin intermediación en la nube ni cuenta de FTA.\n\n• Elige fotos con el selector del sistema o toma una con la app de cámara\n• Envía archivos elegidos con el selector de archivos de Android\n• Envía texto y URL desde un único campo\n• Al enviar por primera vez a un dispositivo no registrado, solo el destinatario aprueba el registro. No se envía contenido antes de su aprobación\n• Los dispositivos registrados deben estar conectados y autenticados\n• Consulta los archivos recibidos en Archivos. Tras recibir fotos completas, elige cuáles guardar como copias originales en Pictures/FTA de la galería\n• Mantén el historial en tu dispositivo y abre archivos o enlaces solo cuando lo decidas\n• Usa el servicio en primer plano para dispositivos conectados, con una opción para detenerlo, para transferir en segundo plano. Se siguen aplicando las restricciones del sistema y de batería\n\nAmbos dispositivos deben ejecutar FTA y estar en la misma LAN IPv4 privada. Se conecta con FTA compatible en Android, iOS, Windows, macOS y Linux. En iOS, FTA debe permanecer en primer plano. El aislamiento del Wi-Fi de invitados, los cortafuegos o el bloqueo de multidifusión pueden impedir la detección. No admite transferencias por Internet ni colas sin conexión.\n\nRequiere Android 10 o posterior y un dispositivo ARM64. A partir de Android 17 se necesita permiso de red local; las notificaciones son opcionales. No se solicita acceso a toda la fototeca ni a todos los archivos. Las copias en la galería son independientes de los originales internos y pueden incluirse en copias de seguridad según tu configuración de fotos.",
+    "headlines": [
+      "Tus archivos.\nTus dispositivos cercanos.",
+      "Fotos y archivos,\na tu manera.",
+      "Los resultados quedan\nen tu dispositivo.",
+      "Tu red.\nTu decisión."
+    ],
+    "captions": [
+      "Directamente por tu LAN",
+      "Fotos · Cámara · Archivos",
+      "Archivos · Texto · URL",
+      "LAN de confianza y controles Android"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "pt-BR": {
+    "playLocale": "pt-BR",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "Fotos, arquivos e texto na LAN",
+    "fullDescription": "O FTA (File Transfer Anything) envia fotos, arquivos, textos e URLs diretamente entre seus dispositivos na mesma rede local. Sem intermediação na nuvem nem conta do FTA.\n\n• Escolha fotos no seletor do sistema ou tire uma foto com o app de câmera\n• Envie arquivos escolhidos pelo seletor de arquivos do Android\n• Envie textos e URLs em um único campo\n• No primeiro envio para um dispositivo não registrado, somente o destinatário aprova o registro. Nenhum conteúdo é enviado antes da aprovação\n• Dispositivos registrados precisam estar online e autenticados\n• Veja os arquivos recebidos no app Arquivos. Após receber fotos completas, escolha quais salvar como cópias originais em Pictures/FTA na galeria\n• Mantenha o histórico no dispositivo e abra arquivos ou links apenas quando quiser\n• Use o serviço em primeiro plano para dispositivos conectados, com opção de parar, para transferir em segundo plano. As restrições de sistema e bateria continuam valendo\n\nOs dois dispositivos precisam executar o FTA na mesma LAN IPv4 privada. Conecte-se a versões compatíveis do FTA para Android, iOS, Windows, macOS e Linux. No iOS, mantenha o FTA em primeiro plano. Isolamento de Wi-Fi para visitantes, firewalls ou bloqueio de multicast podem impedir a descoberta. Não há transferências pela Internet nem fila offline.\n\nRequer Android 10 ou posterior e dispositivo ARM64. A partir do Android 17, é necessária a permissão de rede local; notificações são opcionais. O FTA não solicita acesso a toda a biblioteca de fotos nem a todos os arquivos. Cópias da galeria são separadas dos originais internos e podem ser incluídas em backups conforme as configurações do seu provedor de fotos.",
+    "headlines": [
+      "Seus arquivos.\nSeus dispositivos por perto.",
+      "Fotos e arquivos,\ndo seu jeito.",
+      "Os resultados ficam\nno seu dispositivo.",
+      "Sua rede.\nSua escolha."
+    ],
+    "captions": [
+      "Direto pela sua LAN",
+      "Fotos · Câmera · Arquivos",
+      "Arquivos · Texto · URLs",
+      "LAN confiável e controles do Android"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  },
+  "it": {
+    "playLocale": "it-IT",
+    "name": "FTA - File Transfer Anything",
+    "shortDescription": "Foto, file e testo via LAN",
+    "fullDescription": "FTA (File Transfer Anything) invia foto, file, testo e URL direttamente tra i tuoi dispositivi sulla stessa rete locale. Non servono un account FTA o un servizio cloud di intermediazione.\n\n• Scegli foto con il selettore di sistema o scattane una con l’app Fotocamera\n• Invia file scelti con il selettore di file Android\n• Invia testo e URL da un unico campo\n• Al primo invio a un dispositivo non registrato, solo il destinatario approva la registrazione. Nessun contenuto viene inviato prima dell’approvazione\n• I dispositivi registrati devono essere online e autenticati\n• Consulta i file ricevuti nell’app File. Dopo la ricezione completa, scegli le foto da salvare come copie originali in Pictures/FTA nella galleria\n• Conserva la cronologia sul dispositivo e apri file o link solo quando lo decidi\n• Usa il servizio in primo piano per dispositivi connessi, con un comando di arresto, per i trasferimenti in background. Restano valide le restrizioni del sistema e della batteria\n\nFTA deve essere in esecuzione su entrambi i dispositivi nella stessa LAN IPv4 privata. Puoi collegarti a FTA compatibile su Android, iOS, Windows, macOS e Linux. Su iOS, tieni FTA in primo piano. L’isolamento del Wi-Fi ospiti, i firewall o il blocco del multicast possono impedire il rilevamento. Non sono supportati trasferimenti via Internet o code offline.\n\nSono richiesti Android 10 o successivo e un dispositivo ARM64. Da Android 17 serve l’autorizzazione alla rete locale; le notifiche sono facoltative. FTA non richiede accesso all’intera libreria fotografica o a tutti i file. Le copie nella galleria sono separate dagli originali interni e possono essere sottoposte a backup secondo le impostazioni del servizio fotografico.",
+    "headlines": [
+      "I tuoi file.\nI tuoi dispositivi vicini.",
+      "Foto e file,\na modo tuo.",
+      "I risultati restano\nsul tuo dispositivo.",
+      "La tua rete.\nLa tua scelta."
+    ],
+    "captions": [
+      "Direttamente sulla tua LAN",
+      "Foto · Fotocamera · File",
+      "File · Testo · URL",
+      "LAN affidabile e controlli Android"
+    ],
+    "privacyPolicyUrl": "https://github.com/froiibn/FTA/blob/main/docs/privacy-policy.android.en.md"
+  }
+}

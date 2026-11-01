@@ -1,0 +1,130 @@
+{
+  "en": {
+    "item_count": {
+      "one": "%1$d item",
+      "other": "%1$d items"
+    },
+    "selected_count": {
+      "one": "%1$d selected",
+      "other": "%1$d selected"
+    },
+    "extra_files": {
+      "one": " and %1$d more",
+      "other": " and %1$d more"
+    }
+  },
+  "ko": {
+    "item_count": {
+      "other": "%1$d개"
+    },
+    "selected_count": {
+      "other": "%1$d개 선택됨"
+    },
+    "extra_files": {
+      "other": " 외 %1$d개"
+    }
+  },
+  "ja": {
+    "item_count": {
+      "other": "%1$d 項目"
+    },
+    "selected_count": {
+      "other": "%1$d 件選択"
+    },
+    "extra_files": {
+      "other": " ほか %1$d 件"
+    }
+  },
+  "zh-Hans": {
+    "item_count": {
+      "other": "%1$d 项"
+    },
+    "selected_count": {
+      "other": "已选择 %1$d 项"
+    },
+    "extra_files": {
+      "other": "，另有 %1$d 项"
+    }
+  },
+  "zh-Hant": {
+    "item_count": {
+      "other": "%1$d 個項目"
+    },
+    "selected_count": {
+      "other": "已選取 %1$d 個項目"
+    },
+    "extra_files": {
+      "other": "，另有 %1$d 個項目"
+    }
+  },
+  "de": {
+    "item_count": {
+      "one": "%1$d Element",
+      "other": "%1$d Elemente"
+    },
+    "selected_count": {
+      "one": "%1$d ausgewählt",
+      "other": "%1$d ausgewählt"
+    },
+    "extra_files": {
+      "one": " und %1$d weitere",
+      "other": " und %1$d weitere"
+    }
+  },
+  "fr": {
+    "item_count": {
+      "one": "%1$d élément",
+      "other": "%1$d éléments"
+    },
+    "selected_count": {
+      "one": "%1$d sélectionné",
+      "other": "%1$d sélectionnés"
+    },
+    "extra_files": {
+      "one": " et %1$d autre",
+      "other": " et %1$d autres"
+    }
+  },
+  "es": {
+    "item_count": {
+      "one": "%1$d elemento",
+      "other": "%1$d elementos"
+    },
+    "selected_count": {
+      "one": "%1$d seleccionado",
+      "other": "%1$d seleccionados"
+    },
+    "extra_files": {
+      "one": " y %1$d más",
+      "other": " y %1$d más"
+    }
+  },
+  "pt-BR": {
+    "item_count": {
+      "one": "%1$d item",
+      "other": "%1$d itens"
+    },
+    "selected_count": {
+      "one": "%1$d selecionado",
+      "other": "%1$d selecionados"
+    },
+    "extra_files": {
+      "one": " e mais %1$d",
+      "other": " e mais %1$d"
+    }
+  },
+  "it": {
+    "item_count": {
+      "one": "%1$d elemento",
+      "other": "%1$d elementi"
+    },
+    "selected_count": {
+      "one": "%1$d selezionato",
+      "other": "%1$d selezionati"
+    },
+    "extra_files": {
+      "one": " e altri %1$d",
+      "other": " e altri %1$d"
+    }
+  }
+}

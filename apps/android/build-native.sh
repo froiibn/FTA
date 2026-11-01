@@ -15,10 +15,19 @@ export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$tool_bin/aarch64-linux-androi
 export CC_aarch64_linux_android="$tool_bin/aarch64-linux-android29-clang"
 export AR_aarch64_linux_android="$tool_bin/llvm-ar"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS='-C link-arg=-Wl,-z,max-page-size=16384'
-"${CARGO:-$HOME/.cargo/bin/cargo}" build --locked --manifest-path "$project_dir/bridge/Cargo.toml" --target aarch64-linux-android
-out_dir="$project_dir/app/build/generated/jniLibs/arm64-v8a"
+# The variant owns its profile/output so a release cannot silently ship Cargo debug artifacts.
+profile="${1:-debug}"
+cargo_arguments=(build --locked --manifest-path "$project_dir/bridge/Cargo.toml" --target aarch64-linux-android)
+case "$profile" in debug) ;; release) cargo_arguments+=(--release) ;; *) echo 'Expected debug or release native profile' >&2; exit 1 ;; esac
+"${CARGO:-$HOME/.cargo/bin/cargo}" "${cargo_arguments[@]}"
+out_dir="$project_dir/app/build/generated/jniLibs/$profile/arm64-v8a"
 mkdir -p "$out_dir"
-"$CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER" -std=c11 -Wall -Wextra -Werror -fPIC -shared \
- "$project_dir/native/bridge.c" "$repo_dir/target/aarch64-linux-android/debug/libfta_android.a" \
+native_arguments=(-std=c11 -Wall -Wextra -Werror -fPIC -shared)
+if [[ "$profile" == release ]]; then native_arguments+=(-O2 -DNDEBUG); fi
+"$CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER" "${native_arguments[@]}" \
+ "$project_dir/native/bridge.c" "$repo_dir/target/aarch64-linux-android/$profile/libfta_android.a" \
  -Wl,--gc-sections -Wl,--exclude-libs,ALL -Wl,--version-script,"$project_dir/native/exports.map" \
  -Wl,-z,max-page-size=16384 -Wl,-z,defs -ldl -llog -landroid -lm -o "$out_dir/libfta_android.so"
+
+# Strip only release debug sections; the explicit JNI export map and TLS/file behavior stay unchanged.
+if [[ "$profile" == release ]]; then "$tool_bin/llvm-strip" --strip-unneeded "$out_dir/libfta_android.so"; fi

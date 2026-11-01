@@ -13,6 +13,8 @@ import java.util.concurrent.Executor;
 
 // NSD is an address hint only: the Rust engine probes reachability and authenticates every registration/transfer.
 final class LanDiscovery {
+    // Application resources localize discovery errors without retaining an Activity across network changes.
+    private final Context context;
     static final String TRANSFER="_fta._tcp.", PAIRING="_fta-pair._tcp.";
     static final class Lan {
         final Network network; final String address,cidr,interfaceName,scope;
@@ -30,7 +32,7 @@ final class LanDiscovery {
     java.util.function.Consumer<String> failure;
     private final ArrayDeque<Runnable> resolveQueue=new ArrayDeque<>();
     private boolean resolving;
-    LanDiscovery(Context context,Executor executor){nsd=context.getSystemService(NsdManager.class);worker=executor;callbacks=context.getMainExecutor();
+    LanDiscovery(Context context,Executor executor){this.context=context.getApplicationContext();nsd=context.getSystemService(NsdManager.class);worker=executor;callbacks=context.getMainExecutor();
         WifiManager wifi=(WifiManager)context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         if(wifi!=null){multicast=wifi.createMulticastLock("FTA service discovery");multicast.setReferenceCounted(false);}}
     static Lan current(Context context){
@@ -56,7 +58,7 @@ final class LanDiscovery {
         for(String type:new String[]{TRANSFER,PAIRING}){
             NsdManager.DiscoveryListener listener=new NsdManager.DiscoveryListener(){
                 public void onDiscoveryStarted(String t){} public void onDiscoveryStopped(String t){}
-                public void onStartDiscoveryFailed(String t,int error){if(version==generation&&failure!=null)failure.accept("기기 검색을 시작하지 못했습니다. 로컬 네트워크 권한과 Wi-Fi를 확인하세요.");}public void onStopDiscoveryFailed(String t,int error){}
+                public void onStartDiscoveryFailed(String t,int error){if(version==generation&&failure!=null)failure.accept(context.getString(R.string.discovery_failed));}public void onStopDiscoveryFailed(String t,int error){}
                 public void onServiceFound(NsdServiceInfo found){
                     if(version!=generation||resolveQueue.size()+resolvedIDs.size()>=MAX_SERVICES)return;
                     // Older Android NSD allows one outstanding resolution. Queue instead of losing peers to ALREADY_ACTIVE.
@@ -75,7 +77,7 @@ final class LanDiscovery {
             else nsd.discoverServices(type,NsdManager.PROTOCOL_DNS_SD,listener);
         }
     }
-    private void drain(){if(resolving||resolveQueue.isEmpty())return;resolving=true;try{resolveQueue.removeFirst().run();}catch(RuntimeException e){resolving=false;resolveQueue.clear();if(failure!=null)failure.accept("기기 주소를 확인하지 못했습니다. 네트워크 권한과 연결을 확인하세요.");}}
+    private void drain(){if(resolving||resolveQueue.isEmpty())return;resolving=true;try{resolveQueue.removeFirst().run();}catch(RuntimeException e){resolving=false;resolveQueue.clear();if(failure!=null)failure.accept(context.getString(R.string.resolve_failed));}}
     private void resolved(){resolving=false;drain();}
     private void accept(NsdServiceInfo info,String type,int version){
         Map<String,byte[]> attrs=info.getAttributes();String id=text(attrs,"device_id"),name=text(attrs,"display_name"),os=text(attrs,"os");
@@ -97,7 +99,7 @@ final class LanDiscovery {
         NsdServiceInfo info=new NsdServiceInfo();info.setServiceName(id);info.setServiceType(type);info.setPort(port);if(Build.VERSION.SDK_INT>=33)info.setNetwork(selectedNetwork);
         info.setAttribute("device_id",id);info.setAttribute("display_name",name);info.setAttribute("os","android");info.setAttribute("version","1");
         NsdManager.RegistrationListener registration=new NsdManager.RegistrationListener(){
-            public void onRegistrationFailed(NsdServiceInfo s,int e){callbacks.execute(()->{if(publishers.get(type)==this){publishedKeys.remove(type);if(failure!=null)failure.accept("수신 서비스를 알리지 못했습니다. 로컬 네트워크 권한과 Wi-Fi를 확인하세요.");}});}public void onUnregistrationFailed(NsdServiceInfo s,int e){}
+            public void onRegistrationFailed(NsdServiceInfo s,int e){callbacks.execute(()->{if(publishers.get(type)==this){publishedKeys.remove(type);if(failure!=null)failure.accept(context.getString(R.string.advertise_failed));}});}public void onUnregistrationFailed(NsdServiceInfo s,int e){}
             public void onServiceRegistered(NsdServiceInfo s){}public void onServiceUnregistered(NsdServiceInfo s){}
         };publishers.put(type,registration);publishedKeys.put(type,key);nsd.registerService(info,NsdManager.PROTOCOL_DNS_SD,registration);
     }}
