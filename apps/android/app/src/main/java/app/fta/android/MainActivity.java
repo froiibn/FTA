@@ -197,11 +197,14 @@ public final class MainActivity extends Activity {
         // Stable rows preserve native accessibility focus; polling identical engine data must not recreate controls.
         String snapshot=peers.toString()+"|"+selected+"|"+activeId+"|"+fraction+"|"+completed.toString();if(snapshot.equals(renderedPeers))return;renderedPeers=snapshot;
         deviceRow.removeAllViews();boolean exists=false;
-        for(int i=0;i<peers.length();i++){JSONObject p=peers.optJSONObject(i);if(p==null||!p.optBoolean("online"))continue;String id=p.optString("device_id");if(selected.isEmpty()&&id.equals(preferredPeer))selected=id;if(id.equals(selected))exists=true;
+        for(int i=0;i<peers.length();i++){JSONObject p=peers.optJSONObject(i);if(!availableTarget(p))continue;String id=p.optString("device_id");if(selected.isEmpty()&&id.equals(preferredPeer))selected=id;if(id.equals(selected))exists=true;
             LinearLayout item=new LinearLayout(this);item.setOrientation(LinearLayout.VERTICAL);item.setGravity(Gravity.CENTER_HORIZONTAL);item.setPadding(0,0,dp(16),0);IconTile icon=new IconTile(p);item.addView(icon,new LinearLayout.LayoutParams(dp(78),dp(76)));TextView title=label(p.optString("display_name"),12);title.setGravity(Gravity.CENTER);title.setMaxLines(2);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(dp(90),-2);tp.topMargin=dp(8);item.addView(title,tp);String feedback="";Receipt receipt=completed.get(id);if(receipt!=null&&SystemClock.elapsedRealtime()<receipt.until)feedback=", 전송 완료";else if(id.equals(activePeer)&&activeId!=null)feedback=Double.isNaN(fraction)?", 전송 준비 중":", 전송 중 "+(int)(fraction*100)+"%";item.setContentDescription(p.optString("display_name")+(p.optBoolean("paired")?", 온라인":", 최초 등록 필요")+feedback);item.setSelected(id.equals(selected));item.setOnClickListener(v->{if(sending)return;selected=id;preferredPeer=id;renderPeers();renderActions();});deviceRow.addView(item);
         }
         if(!exists)selected="";empty.setVisibility(deviceRow.getChildCount()==0?View.VISIBLE:View.GONE);
     }
+    // Only Service available_only results enter this renderer: unpaired targets already passed TCP reachability,
+    // while their online field remains false until registration. Preserve offline filtering for saved registrations.
+    static boolean availableTarget(JSONObject peer){return peer!=null&&(!peer.optBoolean("paired")||peer.optBoolean("online"));}
     private void renderActions(){if(tab!=0||sendButton==null)return;boolean can=running&&!selected.isEmpty()&&!sending&&!importing;sendButton.setEnabled(can&&!messageDraft.trim().isEmpty());sendButton.setAlpha(sendButton.isEnabled()?1:0.4f);photoButton.setEnabled(!sending&&!importing&&ready);fileButton.setEnabled(!sending&&!importing&&ready);}
     private void renderAttachments(){if(attachmentText==null)return;
         String snapshot=attachments.toString()+"|"+importing+"|"+sending+"|"+running+"|"+selected;if(snapshot.equals(renderedAttachments))return;renderedAttachments=snapshot;

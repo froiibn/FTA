@@ -38,6 +38,11 @@ public final class FtaChecks extends Instrumentation {
         for(long offset:new long[]{300,900})check(Math.abs(MainActivity.completionOpacity(1500,offset,true)-0.25)<0.00001,"exactly two receipt dim phases");
         check(MainActivity.completionOpacity(1500,300,false)==1,"disabled system animations keep steady completion");
         check(MainActivity.completionOpacity(1500,-1,true)==1,"no blink before completion");
+        // Pure display decisions catch the real unpaired discovery regression without injecting devices into UI/engine.
+        check(MainActivity.availableTarget(new JSONObject().put("paired",false).put("online",false)),"reachable unpaired target is displayed before approval");
+        check(MainActivity.availableTarget(new JSONObject().put("paired",true).put("online",true)),"registered online target remains displayed");
+        check(!MainActivity.availableTarget(new JSONObject().put("paired",true).put("online",false)),"registered offline target stays hidden");
+        check(!MainActivity.availableTarget(null),"missing device is not selectable");
         File visible=File.createTempFile("FTA-check-",".txt",NativeBridge.received);try(FileOutputStream out=new FileOutputStream(visible)){out.write("receive test".getBytes(StandardCharsets.UTF_8));}
         ReceivedDocuments provider=new ReceivedDocuments();provider.attachInfo(getTargetContext(),getTargetContext().getPackageManager().resolveContentProvider("app.fta.android.documents",0));
         try(Cursor roots=provider.queryRoots(null)){check(roots.moveToFirst(),"Files root is available");}
