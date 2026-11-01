@@ -6,7 +6,7 @@
 
 Organizer는 **App upload complete: FTA 0.1.2 (10) uploaded**를 표시했다. 로컬 검증 IPA는 `output/ios-app-store-export-final10-organizer/FTA.ipa`, SHA-256은 `623b78320f96c94500a8811f5968a425ff4ae81b35cc3c1f8111cff130ba362e`다. 실제 App Store 프로파일 유형·만료·앱/팀 식별자·서명 인증서 일치, `get-task-allow=false`, 버전 0.1.2(10), 면제값 false, 10개 언어·권한 설명·법률 고지·PrivacyManifest를 확인했다. 증빙 요약은 `output/ios-app-store-build10-validation.json`에 있으며 비밀 서명 식별자는 포함하지 않는다.
 
-업로드 후 새 탭 목록/스냅샷에서도 Aside는 `https://appstoreconnect.apple.com/login`의 로그인 입력 화면이다. Apple 서버 처리 완료·Compliance 해소·실제 테스트 상태·버전 0.1.2의 빌드 10 연결/저장/재접속 확인은 아직 못 했다. 업로드 성공과 구분하며 재업로드나 빌드번호 증가는 필요하지 않다.
+2026-11-01 재로그인 후 Apple 서버 처리와 빌드 10의 문서 누락 해소를 확인했다. TestFlight 표시는 ‘제출 준비 완료’지만 테스터 그룹/설치가 없어 실제 TestFlight 테스트를 했다는 뜻은 아니다. 버전 0.1.2의 연결을 9에서 10으로 변경·저장·재접속 검증했다. 최종 필수정보 검증을 거쳐 **제출 초안 1개 / 심사 준비됨(Ready for Review)** 이며 항목은 `iOS 0.1.2 (10)` 하나다. 별도 최종 버튼 **‘심사를 위해 제출’은 누르지 않았다**. [Apple 공식 절차](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app)에서 Add for Review는 초안 준비이고 Submit for Review가 실제 제출이다. 재접속 후 상태·빌드·초안 유지와 수동 출시를 확인했다. 재업로드/재빌드는 하지 않았다.
 
 ## 앱과 지원 범위
 
@@ -59,16 +59,17 @@ output/render-store-images
 - 실제 iOS 시뮬레이터의 SQLite 3.54.0: TLS 1 MiB 송수신·동명 파일 비덮어쓰기·DB 재열기/WAL·최종 저장 중단 복구·무결성 검사 통과.
 - 최종 Release archive, Swift/Rust dSYM, 엄격한 로컬 서명/번들 검증 성공. 개발 서명 archive를 App Store 배포 export와 혼동하지 않는다.
 
-Xcode 계정 자격증명 누락은 소유자의 재인증으로 해소됐다. 최신 `runtime-notices` archive를 Apple Distribution/App Store 프로파일로 export하고 `validate-release.py --require-distribution`으로 검증했다. 로컬 검증 IPA는 `output/ios-app-store-export-final9/FTA.ipa`이며 SHA-256은 `e92f0657b4fa8ae63f7fed71a78de990fb1c6910d5a3c430ddc141e0181aa32a`다. 동일 최종 archive의 App Store Connect 업로드와 서버 처리는 성공했고 0.1.2(9)가 TestFlight/버전의 빌드 추가 화면에 나타났다. 현재 상태는 **수출 규정 관련 문서 누락**이다. 버전 0.1.2에 빌드 9를 연결·저장한 뒤 재접속하여 유지됨을 확인했다. 테스트/심사 준비 완료를 의미하지 않는다. 사전 IPA를 업로드하지 않았다.
+Xcode 계정 자격증명 누락은 소유자의 재인증으로 해소됐다. 최신 `runtime-notices` archive를 Apple Distribution/App Store 프로파일로 export하고 `validate-release.py --require-distribution`으로 검증했다. 로컬 검증 IPA는 `output/ios-app-store-export-final9/FTA.ipa`이며 SHA-256은 `e92f0657b4fa8ae63f7fed71a78de990fb1c6910d5a3c430ddc141e0181aa32a`다. 동일 최종 archive의 App Store Connect 업로드와 서버 처리는 성공했고 0.1.2(9)가 TestFlight/버전의 빌드 추가 화면에 나타났다. 빌드 9 확인 당시 상태는 **수출 규정 관련 문서 누락**이었다. 당시 빌드 9 연결/재접속 이력을 보존하며 현재 제출 초안에는 빌드 10만 연결돼 있다. 테스트/심사 준비 완료를 의미하지 않는다. 사전 IPA를 업로드하지 않았다.
 
-실제 제출 전 잔여 항목:
+2026-11-01 현재 전체 점검 및 소유자 승인 반영:
 
-1. App Store Connect 브라우저 로그인 뒤 이미 업로드된 빌드 10의 Apple 처리 완료·면제 상태·테스트 가능 상태를 확인하고 버전 0.1.2에서 빌드 10을 선택·저장·재접속 확인한다. 기존 빌드 9는 현재 문서 누락 상태다. 실제 문서 마법사는 OS 외부 표준 암호화 + 프랑스 배포에 **프랑스 암호화 신고 승인서 사본**을 요구한다. 서류 없이 저장하거나 면제·프랑스 제외를 추측하지 않았다. 이 UI 요구와 법적 신고 의무 확정을 구분하며 [면제 재검토](ExportComplianceReview.md)와 [미발송 문의 초안](ExportComplianceQuestions.en.md)을 준비했다.
-2. 저작권 소유자 확인. 다른 앱의 저작권 문구를 이 앱 소유권으로 추정하지 않는다.
-3. App Privacy의 ‘데이터 수집 없음’ 초안은 실제 코드와 Apple의 수집 정의에 기반해 저장했다. 최종 게시의 법적 준수·정보 갱신 동의는 소유자의 확인/승인이 필요하다.
-4. 콘텐츠 권한 진술. 암호화 문서 면제는 소유자가 명시 결정하여 빌드 10에 선언했으며, 법적 개별 면제를 정부가 확인한 것은 아니다. 실제 TLS 기능과 프랑스 포함 국가 선택은 유지했다.
-5. 중국 본토 ICP 등록 적용 여부 등 국가별 추가 요구가 실제 배포에 해당하는지 소유자가 확인한다. 번호나 권리를 만들어 입력하지 않는다.
-6. 최종 build 10의 실기 전송/권한·수명주기, 가장 오래된 지원 OS, Windows/Linux 상호 운용의 최종 재검증. 이전 build 8의 실기 사용 성공과 새 빌드의 실기 검증은 다르다.
+- 전10개 언어의 앱명/부제/설명/키워드/프로모션은 `metadata.json`과 일치하며 지원 URL과 정책 URL도 전수 확인했다. 각 언어 iPhone 중형(대형 자산 상속), iPad 33cm, Duo에 각 3장씩 90장이 표시되고 처리 중 자산은 없다. 크기/원본 캡처 검사는 앞선 기록과 구분하며 이번에는 기존 자산을 재업로드하지 않았다.
+- 소유자 명시 승인에 따라 저작권 `2026 SEIZIA`, 콘텐츠 권한 ‘아니요, 이 앱은 타사 콘텐츠를 포함, 표시 또는 이용하지 않습니다’를 저장·재접속 확인했다. ‘데이터 수집되지 않음’은 정확성/법 준수/향후 갱신 동의까지 승인받아 실제 게시했고 재접속 후 게시함 표시를 확인했다.
+- 무료/유료 계약과 기존 DSA 규정 준수 상태는 활성화됨이며 앱은 거래자로 선언돼 있다. 연락처·은행·세금의 비공개 값은 문서에 기록하지 않는다. 연락처 필수 4항목은 채워졌고 심사 로그인 불필요, 메모는 `ReviewNotes.en.txt`와 일치한다.
+- 실제 가격은 전175개 지역 모두 0.00이며 상태도 전부 ‘앱 출시 후 사용 가능’이다. 중국 본토도 같은 상태이고 ICP 누락 차단은 표시되지 않는다. 사전 주문 없음, 공개 배포, Mac/Vision Pro 배포 비활성, 수동 출시를 유지한다.
+- 중국 ICP는 빈칸이나 [Apple 현재 설명](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information)은 일부 앱/해당되는 경우라고 구분한다. 사용자 선택 자료의 LAN 전송 앱을 뉴스/종교/출판/게임 허가 대상이나 ICP 필수 대상으로 단정하지 않는다. 개별 법 적용을 기관이 확정한 것은 아니지만 현재 서버의 필수정보 누락 차단으로 보고하지 않는다. 암호화도 소유자 면제 선언 반영과 정부의 법적 판정을 구분한다.
+
+현재 확인된 필수 스토어 항목 누락은 없으며 최종 사용자 동작은 제출 초안의 **‘심사를 위해 제출’** 이다. 서버가 초안을 허용한 사실은 Apple 심사 승인이나 규정에 대한 개별 법적 판단을 보장하지 않는다. 실기 build 10의 사진/파일·권한·네트워크 재접속/수명주기, 최소 iOS 17, Windows/Linux 최종 상호 운용은 별도의 미검증 범위다. 이전 build 8 실기 성공·시뮬레이터 검증을 이를 대신한 것으로 보고하지 않는다.
 
 연령 설문은 Apple의 정의에 따라 직접 메시지 있음, 공개 UGC/소셜 피드·내장 자유 웹브라우저·광고 없음으로 저장했다. 앱이 자체 제공하는 성인/의료/도박 등 콘텐츠는 없다. Apple 계산값은 일반 4+, 한국 전체, 브라질 A12, 베트남 00+다. 어린이 전용이나 임의 상향으로 지정하지 않았다.
 
