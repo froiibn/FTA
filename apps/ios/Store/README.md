@@ -1,8 +1,12 @@
 # iOS App Store 출시 준비
 
-2026-10-31 기준 0.1.2 내부 빌드 10의 준비 기록이다. 빌드 9는 업로드/버전 연결 이력으로 보존한다. 실제 App Store 심사 제출·출시는 하지 않았다. 기존 데스크톱 0.1.2 배포본과 Android 작업은 별도다.
+2026-11-01 기준 0.1.2 내부 빌드 10의 준비 기록이다. 빌드 9는 업로드/버전 연결 이력으로 보존한다. 실제 App Store 심사 제출·출시는 하지 않았다. 기존 데스크톱 0.1.2 배포본과 Android 작업은 별도다.
 
-최신 상태: 소유자의 문서 제출 면제 결정을 `ITSAppUsesNonExemptEncryption=false`로 선언한 빌드 10을 archive하고 실제 번들/언어/고지/개인정보/서명을 검증했다. 암호 미사용이나 정부의 개별 면제 확인을 뜻하지 않는다. 기존 Xcode 인증이 만료되어 배포 export가 `No Accounts` 및 Distribution 개인키 없음으로 실패했다. 개발서명 archive는 업로드하지 않았다. Xcode Accounts 재인증 후 배포 export·엄격한 검증·업로드와 서버 상태 확인이 남는다. Aside App Store Connect도 로그인 화면으로 만료되어 재로그인이 필요하다.
+최신 상태: 빌드 10의 Apple Distribution/App Store export·엄격한 검증·업로드 접수까지 완료했다. 실제 배포 번들의 `ITSAppUsesNonExemptEncryption=false`는 소유자의 문서면제 결정이며 암호 미사용/정부의 개별 면제 확인을 뜻하지 않는다. CLI는 `No Accounts`와 새 인증서/기존 프로파일 불일치로 실패했으나 GUI 계정·팀 권한과 CLI의 UID/HOME/Xcode/키체인 문맥은 정상 일치했다. 따라서 단순 사용자 미로그인으로 단정하지 않고 Organizer 경로를 사용했다. GUI 자동 서명이 FTA 프로파일을 준비했고 실제 서명이 소유자의 새 Distribution 신원 및 프로파일 인증서와 일치함을 검증했다. 인증서 삭제/폐기/재발급과 개인키 추출은 하지 않았다.
+
+Organizer는 **App upload complete: FTA 0.1.2 (10) uploaded**를 표시했다. 로컬 검증 IPA는 `output/ios-app-store-export-final10-organizer/FTA.ipa`, SHA-256은 `623b78320f96c94500a8811f5968a425ff4ae81b35cc3c1f8111cff130ba362e`다. 실제 App Store 프로파일 유형·만료·앱/팀 식별자·서명 인증서 일치, `get-task-allow=false`, 버전 0.1.2(10), 면제값 false, 10개 언어·권한 설명·법률 고지·PrivacyManifest를 확인했다. 증빙 요약은 `output/ios-app-store-build10-validation.json`에 있으며 비밀 서명 식별자는 포함하지 않는다.
+
+업로드 후 새 탭 목록/스냅샷에서도 Aside는 `https://appstoreconnect.apple.com/login`의 로그인 입력 화면이다. Apple 서버 처리 완료·Compliance 해소·실제 테스트 상태·버전 0.1.2의 빌드 10 연결/저장/재접속 확인은 아직 못 했다. 업로드 성공과 구분하며 재업로드나 빌드번호 증가는 필요하지 않다.
 
 ## 앱과 지원 범위
 
@@ -59,7 +63,7 @@ Xcode 계정 자격증명 누락은 소유자의 재인증으로 해소됐다. �
 
 실제 제출 전 잔여 항목:
 
-1. Xcode와 App Store Connect 재인증 뒤 빌드 10을 배포 export/검증·업로드하고 면제 선언의 실제 처리와 버전 빌드 연결을 확인한다. 기존 빌드 9는 현재 문서 누락 상태다. 실제 문서 마법사는 OS 외부 표준 암호화 + 프랑스 배포에 **프랑스 암호화 신고 승인서 사본**을 요구한다. 서류 없이 저장하거나 면제·프랑스 제외를 추측하지 않았다. 이 UI 요구와 법적 신고 의무 확정을 구분하며 [면제 재검토](ExportComplianceReview.md)와 [미발송 문의 초안](ExportComplianceQuestions.en.md)을 준비했다.
+1. App Store Connect 브라우저 로그인 뒤 이미 업로드된 빌드 10의 Apple 처리 완료·면제 상태·테스트 가능 상태를 확인하고 버전 0.1.2에서 빌드 10을 선택·저장·재접속 확인한다. 기존 빌드 9는 현재 문서 누락 상태다. 실제 문서 마법사는 OS 외부 표준 암호화 + 프랑스 배포에 **프랑스 암호화 신고 승인서 사본**을 요구한다. 서류 없이 저장하거나 면제·프랑스 제외를 추측하지 않았다. 이 UI 요구와 법적 신고 의무 확정을 구분하며 [면제 재검토](ExportComplianceReview.md)와 [미발송 문의 초안](ExportComplianceQuestions.en.md)을 준비했다.
 2. 저작권 소유자 확인. 다른 앱의 저작권 문구를 이 앱 소유권으로 추정하지 않는다.
 3. App Privacy의 ‘데이터 수집 없음’ 초안은 실제 코드와 Apple의 수집 정의에 기반해 저장했다. 최종 게시의 법적 준수·정보 갱신 동의는 소유자의 확인/승인이 필요하다.
 4. 콘텐츠 권한 진술. 암호화 문서 면제는 소유자가 명시 결정하여 빌드 10에 선언했으며, 법적 개별 면제를 정부가 확인한 것은 아니다. 실제 TLS 기능과 프랑스 포함 국가 선택은 유지했다.

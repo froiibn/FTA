@@ -43,4 +43,6 @@
 
 소유자가 검토 결과를 읽은 뒤 문서 제출 면제로 처리하기로 명시 결정했다. 법적 개별 면제가 공식 확인된 것으로 바뀐 것은 아니다. [Apple Modify a build](https://developer.apple.com/documentation/appstoreconnectapi/patch-v1-builds-_id_)는 기존 빌드의 면제 설정 변경을 지원하며 `usesNonExemptEncryption=false`는 암호 미사용뿐 아니라 면제 암호 사용을 나타낸다. 현재 UI의 OS 외 표준 → 프랑스 예 경로에는 별도 면제 선언이 없다. 표준 API 개인키 저장 위치와 인증 환경에 사용 가능한 키가 없어 기존 빌드9에 아직 반영하지 않았다. 공식 API 인증을 준비하면 재빌드 없이 변경할 수 있고, 그 인증을 준비하지 않는 대안은 소유자의 면제 결정을 Info.plist에 반영한 새 빌드10이다. 경로 결정 전에 코드/빌드를 바꾸지 않았고 국가/알고리즘 사실도 유지했다.
 
-2026-10-31 후속 실행: 기존 Xcode 서명 경로가 선택되어 `ITSAppUsesNonExemptEncryption=false`와 빌드 10을 소스에 반영했다. 실제 archive의 값·기존 10개 언어/고지/PrivacyManifest/서명 검사를 통과했다. 배포 export는 Xcode 계정 재인증 필요 오류로 막혔으므로 업로드·서버 면제 상태 반영은 아직 수행하지 못했다. 실제 암호 구현과 국가 선택은 바꾸지 않았다.
+2026-10-31 후속 실행: 기존 Xcode 서명 경로가 선택되어 `ITSAppUsesNonExemptEncryption=false`와 빌드 10을 소스에 반영했다. 실제 archive의 값·기존 10개 언어/고지/PrivacyManifest/서명 검사를 통과했다. 당시 배포 export는 CLI No Accounts 오류로 막혔으므로 업로드·서버 면제 상태 반영은 아직 수행하지 못했다. 실제 암호 구현과 국가 선택은 바꾸지 않았다.
+
+2026-11-01 후속 결과: GUI Apple 계정/팀은 정상인데 CLI가 No Accounts와 기존 프로파일/새 인증서 불일치로 실패했다. 실행 사용자·HOME·선택 Xcode·키체인 문맥도 일치하므로 단순 사용자 재로그인 문제로 단정하지 않는다. Organizer가 FTA App Store 프로파일을 준비해 소유자의 새 Distribution 신원으로 export했고 실제 배포 IPA의 면제값 false·엄격한 검증·업로드 접수를 완료했다. 현재 Aside 로그인 화면으로 서버 Compliance 결과는 아직 확인하지 못했다.
