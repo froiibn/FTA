@@ -1,7 +1,9 @@
 # Google Play Data safety — owner-approved submission preparation
 
 This records the owner's approved answers and their technical basis. Final
-Console Save succeeded on 2026-11-03; changes remain unsubmitted for review.
+Console Save succeeded on 2026-11-03. The owner subsequently instructed release;
+these answers are included in production submission 1 with build 8. Google
+approval and public availability remain pending.
 
 ## Observed data flows
 
@@ -22,7 +24,8 @@ the developer.
 - Data collection/sharing: Yes; **Device or other IDs only**.
 - Purpose: app functionality for collection. Sharing is unchecked under the
   user-initiated transfer exception below. The owner approved final Save after
-  reviewing the exact public security warning; no review submission occurred.
+  reviewing the exact public security warning; the answers are now submitted
+  with the owner's later release authorization.
 - Required for the direct device-transfer feature; not marked ephemeral because
   registered identities can persist locally.
 - Encryption of all transmitted data: No, because discovery TXT is plaintext.

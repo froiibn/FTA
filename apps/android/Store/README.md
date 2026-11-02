@@ -1,13 +1,28 @@
 # Android Google Play preparation
 
-Status checkpoint: 2026-11-03. This folder records preparation, not review
-submission or a production/internal-test rollout. Android source checkpoint:
-`fb60bfb`; version `0.1.0 (7)`, package `app.fta.android`, ARM64, Android 10/API 29+.
+Status checkpoint: 2026-11-03. The owner explicitly instructed release after the
+last UI changes. **Production version 0.1.0 (8) was submitted**, submission ID
+**1**, and a fresh Console entry reports **In review**. The Publishing overview
+still includes Google's automatic pre-review checks; this is not public
+availability or a completed Google approval. Managed publishing is disabled,
+so an approved release is configured for automatic publication.
 
-**Newer local candidate:** build 8 fixes adaptive launcher icon clipping. Its
-artifacts and validation are in `output/android-icon-v8`; Console still selects
-build 7. Replace the pending production bundle with validated build 8 before
-review submission. No Console upload/submission was performed for this icon fix.
+Android source checkpoint: `3296281`; package `app.fta.android`, ARM64, Android
+10/API 29+. The uploaded AAB SHA-256 is
+`556f3e5399250ecead7e51e737f4eb7a5def0c885974699e93f27ff9605ff66a`.
+Artifacts and signature/resource/alignment validation: `output/android-icon-v8`.
+The pending production build 7 was replaced; its internal testing draft was not
+rolled out. No tester invitation or user-device uninstall was performed.
+
+[Submission 1](https://play.google.com/console/u/1/developers/6290721239636852370/app/4973686468229683954/publishing/submission-activity/1/details)
+contains 20 changes: build 8, 10 localized Store listings, 178 country/region
+entries and the saved content/privacy/category declarations. The newly captured
+Send/photo-source screens replaced **60** old images across all 10 languages and
+phone/7-inch/10-inch families. Original capture pixels are preserved; history,
+settings, icon and feature graphics retain the same design. AI labeling remains
+No label as explicitly selected by the owner. 131 RGB assets passed dimensions,
+alpha and size validation; the updated 10-language phone contact sheet was
+visually reviewed. Newly visible peers are genuinely discovered test devices.
 
 ## Console and signing
 
@@ -19,7 +34,7 @@ The organization account's new FTA record exists as an App / Free / en-US app.
 The owner approved its two creation declarations and disabled automatic
 protection. No existing organization's other app was changed.
 
-The release AAB version 7 has been uploaded and processed. Console confirms API
+The release AAB version 8 has been uploaded and processed. Console confirms API
 29 minimum, API 37 target, ARM64 and **16 KB memory page support**. This catalog
 compatibility result is not testing of every listed device.
 
@@ -32,14 +47,14 @@ Private upload material is outside the repository with restricted permissions;
 its password is protected by macOS Keychain. Never include it in an artifact,
 log or commit. Secure independent backup remains an owner responsibility.
 
-The supplied `native-debug-symbols.zip` is attached to version 7 in Console.
+The supplied `native-debug-symbols.zip` is attached to version 8 in Console.
 It contains a symbol table, not full source-level DWARF. A stripped relink was
 compared byte-for-byte with the AAB's actual library before upload. Reproduce a
 sidecar without changing the signed app using:
 
 ```sh
 python3 apps/android/scripts/prepare-native-symbols.py \
-  output/android-play-v7/FTA-0.1.0-7-release.aab \
+  output/android-icon-v8/FTA-0.1.0-8-release.aab \
   --output-dir output/android-play-v7/symbol-check
 ```
 
@@ -64,7 +79,7 @@ device identifiers, filenames and protocol fields are not translated.
 `release-notes.txt` contains all 10 release-note sections. The owner selected
 no AI asset label after reviewing the actual capture/composition workflow.
 Final Store Save succeeded and the page reports ready to send for review;
-this is not actual submission. After that save, a fresh release-editor entry
+the final updated assets were subsequently included in submission 1. After the first save, a fresh release-editor entry
 confirmed all 10 release-note languages persisted. Earlier English-only re-entry
 must not be mistaken for loss of the local translations or reported as current.
 
@@ -84,7 +99,7 @@ Artifacts live under `output/android-play-v7/`: `assets/`, `raw/`,
 `visual-review/`, release AAB/APK, `release-validation.json`,
 `native-symbol-validation.json`, and `SHA256SUMS`.
 
-## Completed technical/content drafts and remaining decisions
+## Saved declarations and remaining limits
 
 Dashboard initial setup is complete: Data safety was saved after explicit owner
 approval. The dashboard now exposes the production release workflow.
@@ -94,7 +109,7 @@ saved. Advertising ID is separately saved No. Tools category and owner-approved
 public support email `info@seizia.com` are saved. App access explains the second LAN device,
 local-network permission, trusted network and recipient's first approval.
 
-The following must not be silently completed on the owner's behalf:
+The following records the owner's choices and current release limits:
 
 1. Store AI choice is complete: the owner explicitly selected no label; final
    Store Save succeeded. Captures are genuine and no image generator was used;
@@ -109,7 +124,7 @@ The following must not be silently completed on the owner's behalf:
    with explicit plaintext-discovery / encrypted-content distinction. The owner
    approved the exact classification and broad negative encryption warning.
    Final Save succeeded: Device IDs collection, no third-party sharing, not
-   all transmitted data encrypted. These answers remain unsubmitted for review.
+   all transmitted data encrypted. These answers are included in submission 1.
 4. Production country targeting has all **178 current Console country/region
    entries** saved, including Other countries, Korea, China, Japan and the US;
    the production track remains inactive. This is preparation, not rollout or a
@@ -132,14 +147,13 @@ SHA-256. GitHub's blob page does not preview this large file; use the
 [public MP4 download](https://raw.githubusercontent.com/froiibn/FTA/main/docs/android-review/connected-device-review.mp4).
 No app source or workflow was included in publication.
 
-Production release `7 (0.1.0)` and all 10 release notes were saved to Publishing
-overview after validation. The only listed release warning is the absent
-R8/ProGuard mapping file; R8/ProGuard is not used. There are **20 pending changes**,
-including all 10 store locales and 178 country/region entries. The page explicitly
-states changes have not been sent for review. Google's automatic pre-review
-checks are running; their result remains pending. Managed publishing is disabled,
-so future review approval can lead to automatic publication; this was not changed.
-The actual Send changes for review button was not clicked.
+Production release `8 (0.1.0)` and all 10 release notes were saved and submitted.
+The only listed release warning is the absent R8/ProGuard mapping file;
+R8/ProGuard is not used. Submission ID 1 confirms all 20 changes and build 8.
+Google's automatic pre-review checks remain distinguishable from its full review
+and public rollout. The owner authorized and the agent clicked the actual Send
+changes for review confirmation; no further submission should be created merely
+to refresh this status.
 
 The internal-release preview shows two warnings: no assigned testers and no
 R8/ProGuard mapping file. No testers were invited; R8 is not used, so a fabricated
@@ -167,5 +181,6 @@ not clicked.
   emulators use a 4 KB kernel. No force-stop, lock-screen or OS restriction
   bypass is implemented or promised.
 
-No actual review submission, public rollout, tester invitation, iOS change,
-GitHub Actions execution or mobile source push was performed.
+Actual review submission was performed under the owner's explicit release
+instruction. Public availability remains pending. No tester invitation, iOS
+change, GitHub Actions execution or mobile source push was performed.

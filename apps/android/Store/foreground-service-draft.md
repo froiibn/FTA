@@ -75,7 +75,8 @@ the video without login, rather than providing a GitHub embedded player.
 Production-release validation exposed the previously absent foreground-service
 questionnaire. Continuous data transfer to an external device and the public MP4
 URL were saved on 2026-11-03. Revalidation cleared the blocking declaration
-error. This is a saved declaration, not Google approval or review submission.
+error. The owner subsequently authorized production release; the declaration
+is now included with build 8 in submission 1. This does not claim Google approval.
 
 ## Official requirements checked
 
