@@ -56,12 +56,12 @@ ship together without requiring a language download. Existing preference keys,
 device identifiers, filenames and protocol fields are not translated.
 
 `metadata.json` contains all 10 localized store names/descriptions/headlines;
-`release-notes.txt` contains all 10 release-note sections. Console has all 10
-store metadata and image sets saved as **drafts**, but final Store save is
-pending the AI-asset declaration below. Release notes appear in all 10 in the
-editor/preview; a fresh full page entry has shown only English. Remote
-re-entry persistence of the other nine must be confirmed before reporting them
-as finally saved.
+`release-notes.txt` contains all 10 release-note sections. The owner selected
+no AI asset label after reviewing the actual capture/composition workflow.
+Final Store Save succeeded and the page reports ready to send for review;
+this is not actual submission. After that save, a fresh release-editor entry
+confirmed all 10 release-note languages persisted. Earlier English-only re-entry
+must not be mistaken for loss of the local translations or reported as current.
 
 Processed draft assets: **131** — one shared 512×512 icon, ten 1024×500 feature
 graphics, forty 1080×1920 phone images and forty each of the 7-inch and 10-inch
@@ -81,26 +81,31 @@ Artifacts live under `output/android-play-v7/`: `assets/`, `raw/`,
 
 ## Completed technical/content drafts and remaining decisions
 
-Dashboard initial setup is 6/11 complete: privacy URL, access instructions,
-no ads, not a government app, no financial features, no health features.
-Advertising ID is separately saved No. Tools category is saved; public support
-email is still required. App access correctly explains the second LAN device,
+Dashboard initial setup is 10/11 complete: only Data safety remains pending.
+Privacy URL, access instructions, no ads, not a government app, no financial
+features, no health features, store listing, category/contact and ratings are
+saved. Advertising ID is separately saved No. Tools category and owner-approved
+public support email `info@seizia.com` are saved. App access explains the second LAN device,
 local-network permission, trusted network and recipient's first approval.
 
 The following must not be silently completed on the owner's behalf:
 
-1. Final Store AI-asset choice: Google's current form offers no AI label or
-   labeling assets as AI generated/modified. Captures are genuine and no image
-   generator was used; copy, translation and composition code were AI-assisted.
-   Owner decision is pending before final Store save.
-2. IARC service terms: the questionnaire explicitly implies agreement to
-   [IARC terms](https://web.iarcservices.com/terms). It has not been completed.
-   Proposed target audience is 13–15, 16–17, 18+; it is not saved or a claimed
-   obtained rating. Public support/rating contact email is not inferred from a
-   private Google login.
+1. Store AI choice is complete: the owner explicitly selected no label; final
+   Store Save succeeded. Captures are genuine and no image generator was used;
+   copy, translation and composition code were AI-assisted.
+2. The owner approved [IARC terms](https://web.iarcservices.com/terms) and rating
+   contact `info@seizia.com`. The questionnaire and resulting ratings were saved:
+   Korea/Rest of world 3+, ESRB Everyone, PEGI 3, Germany/Brazil all ages,
+   with Users Interact. User exchange is Yes; public sharing, reporting and
+   moderation are No; interaction can be limited to approved peers. Target
+   audience 13–15, 16–17, 18+ is separately saved, not an IARC age rating.
 3. [Data safety draft](data-safety-draft.md): conservative Device IDs draft only,
    with explicit plaintext-discovery / encrypted-content distinction. Final
-   classification and store security badge need owner review.
+   classification and store security badge need owner review. The revised
+   temporary draft now excludes third-party sharing under the user-initiated
+   transfer exception, while retaining Device IDs collection and the negative
+   all-data-encrypted answer. The exact resulting broad warning was shown to
+   the owner before requesting final Save.
 4. Production country targeting has all **178 current Console country/region
    entries** saved, including Other countries, Korea, China, Japan and the US;
    the production track remains inactive. This is preparation, not rollout or a
@@ -119,8 +124,17 @@ two-emulator NSD connection, first recipient approval and a subsequent Completed
 receipt while the receiver was at Home. Its local 66-second composed video and
 both original recordings are under `output/android-play-v7/fgs-review/`; complete
 native app pixels are preserved and exported frames were visually checked.
-No video has been externally posted. A reviewer-accessible video URL still
-requires an approved hosting location.
+The owner approved public GitHub hosting. Publication was prepared as a
+two-file-only commit in an isolated worktree, but Git push has no credentials
+and Aside GitHub is signed out. No video has been externally posted yet; the
+GitHub login page is prepared. Never report the prepared local commit as a
+published reviewer-accessible URL.
+
+The internal-release preview shows two warnings: no assigned testers and no
+R8/ProGuard mapping file. No testers were invited; R8 is not used, so a fabricated
+mapping file must not be uploaded. The native-symbol attachment is present.
+No blocking error was listed in that internal preview; production validation is
+still a separate required check. Save and release was not clicked.
 
 ## Actual verification and limits
 

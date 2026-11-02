@@ -20,7 +20,9 @@ the developer.
 ## Current conservative Console draft
 
 - Data collection/sharing: Yes; **Device or other IDs only**.
-- Purpose: app functionality for collection and sharing.
+- Purpose: app functionality for collection. The revised temporary Console
+  draft unchecks sharing under the user-initiated transfer exception below;
+  no final Save or app review submission has occurred.
 - Required for the direct device-transfer feature; not marked ephemeral because
   registered identities can persist locally.
 - Encryption of all transmitted data: No, because discovery TXT is plaintext.
@@ -28,9 +30,9 @@ the developer.
   automatic 90-day deletion claim.
 - Optional deletion-request question remains unanswered.
 
-This deliberately conservative draft needs a final policy decision. Its preview
-currently produces broad labels equivalent to “device IDs shared with other
-companies/organizations” and “data is not transferred over a secure connection.”
+This deliberately conservative draft needs a final policy decision. Its revised
+preview reports no third-party sharing, Device IDs collection and the broad
+“data is not transferred over a secure connection” security warning.
 Those labels must **not** be represented as an accurate description of file/text
 transport: content uses authenticated TLS. Conversely, the absence of a developer
 backend must not be used to claim that every network byte is encrypted or that
