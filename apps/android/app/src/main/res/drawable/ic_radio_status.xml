@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp" android:height="20dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- Original radio-wave geometry matches the iOS status metaphor without bundling SF Symbols. -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FF000000"
+        android:strokeWidth="1.8" android:strokeLineCap="round"
+        android:pathData="M8,7C5.2,9.8 5.2,14.2 8,17M4.5,3.5C-0.2,8.2 -0.2,15.8 4.5,20.5M16,7C18.8,9.8 18.8,14.2 16,17M19.5,3.5C24.2,8.2 24.2,15.8 19.5,20.5" />
+    <path android:fillColor="#FF000000"
+        android:pathData="M12,10a2,2 0,1 0,0 4a2,2 0,1 0,0 -4" />
+</vector>

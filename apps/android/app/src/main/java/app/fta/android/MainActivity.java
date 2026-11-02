@@ -202,7 +202,10 @@ public final class MainActivity extends Activity {
     private android.graphics.drawable.Drawable inputSurface(){StateListDrawable states=new StateListDrawable();for(boolean focus:new boolean[]{true,false}){GradientDrawable fill=new GradientDrawable();fill.setColor(background);fill.setCornerRadius(dp(12));fill.setStroke(dp(focus?2:1),focus?accent:withAlpha(textSecondary,0.55f));states.addState(focus?new int[]{android.R.attr.state_focused}:new int[]{},fill);}return states;}
     private int actionInk(){return (getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES?0xFF102032:Color.WHITE;}
     private void render(){if(destroyed)return;renderStatus();if(tab==0){renderPeers();renderActions();renderAttachments();}else if(tab==1)renderHistory();}
-    private void renderStatus(){if(status!=null)status.setText(session==null?getString(R.string.binding_service):session.status());}
+    private void renderStatus(){if(status!=null){status.setText(session==null?getString(R.string.binding_service):session.status());
+        // Green means the real LAN transfer service is running, not merely that Wi-Fi is enabled.
+        if(tab==0){Drawable radio=getDrawable(R.drawable.ic_radio_status);radio.setTint(running?transferGreen:textSecondary);radio.setBounds(0,0,dp(20),dp(20));status.setCompoundDrawablesRelative(radio,null,null,null);status.setCompoundDrawablePadding(dp(6));status.setGravity(Gravity.CENTER_VERTICAL);}
+    }}
     private void renderPeers(){if(deviceRow==null)return;
         // Stable rows preserve native accessibility focus; polling identical engine data must not recreate controls.
         String snapshot=peers.toString()+"|"+selected+"|"+activeId+"|"+fraction+"|"+completed.toString();if(snapshot.equals(renderedPeers))return;renderedPeers=snapshot;
