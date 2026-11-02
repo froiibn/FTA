@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="1024" android:viewportHeight="1024">
+    <!-- Reuse the desktop arrow geometry, reduced around its center to stay inside
+         Android's 66dp safe zone even with round launcher masks and motion. -->
+    <group android:pivotX="512" android:pivotY="512"
+        android:scaleX="0.875" android:scaleY="0.875">
+        <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFF"
+            android:strokeWidth="58" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M264,352H760M632,224l128,128 -128,128" />
+        <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFF"
+            android:strokeWidth="58" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M760,672H264M392,544L264,672l128,128" />
+    </group>
+</vector>

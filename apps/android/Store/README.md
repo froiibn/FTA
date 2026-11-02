@@ -4,6 +4,11 @@ Status checkpoint: 2026-11-03. This folder records preparation, not review
 submission or a production/internal-test rollout. Android source checkpoint:
 `fb60bfb`; version `0.1.0 (7)`, package `app.fta.android`, ARM64, Android 10/API 29+.
 
+**Newer local candidate:** build 8 fixes adaptive launcher icon clipping. Its
+artifacts and validation are in `output/android-icon-v8`; Console still selects
+build 7. Replace the pending production bundle with validated build 8 before
+review submission. No Console upload/submission was performed for this icon fix.
+
 ## Console and signing
 
 - [FTA dashboard](https://play.google.com/console/u/1/developers/6290721239636852370/app/4973686468229683954/app-dashboard)

@@ -7,8 +7,8 @@ android {
         applicationId = "app.fta.android"
         minSdk = 29
         targetSdk = 37
-        // Identify the localized Play release candidate without changing existing app identity.
-        versionCode = 7
+        // The launcher safe-zone fix must be distinguishable from the already uploaded Play build 7.
+        versionCode = 8
         versionName = "0.1.0"
         testInstrumentationRunner = "app.fta.android.FtaChecks"
         ndk { abiFilters += "arm64-v8a" }

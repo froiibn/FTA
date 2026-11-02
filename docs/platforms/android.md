@@ -134,3 +134,9 @@ Galaxy S23(Android 16/API 36)를 Mac과 동일 LAN에 연결해 확인했다. An
 사용자는 별도로 Android·iPhone·컴퓨터 간 실제 전송 시험 완료를 확인했다. 이는 사용자 수행 상호운용 확인이며 자동 시험이나 모든 OS·버전 검증으로 확대하지 않는다.
 
 출시 준비를 위해 10개 언어의 Android 문자열/수량 리소스와 영어 fallback·OS 앱별 언어 설정을 구성했다. 최종 모든 언어의 화면/큰 글자/외관 검증 및 Google Play 제출 준비는 진행 중이다. Rust debug/release 빌드 경로를 분리해 출시 후보가 실제 최적화된 네이티브 라이브러리를 사용하도록 했다. iOS·PC·공통 Rust와 기존 앱 신뢰 설정은 변경하지 않는다.
+
+### 런처 아이콘 안전 영역 (내부 빌드 8)
+
+완성된 정사각형 `app_mark`를 adaptive icon의 전체 전경으로 사용하면 Android 런처의 확대·마스크에 화살표가 잘릴 수 있었다. 런처만 데스크톱 원본의 두 화살표 경로와 동일 배경색으로 분리하고, 중심 기준 0.875배 전경을 108dp 레이어의 중앙 66dp 안전 영역 안에 배치했다. 외곽 모양은 OS 마스크가 담당한다. 앱 내부 헤더와 스토어용 브랜드 이미지는 유지한다. [Android adaptive icon 규격](https://developer.android.com/develop/ui/views/launch/icon_design_adaptive)을 기준으로 한다.
+
+사용자 Mac에서 debug 빌드/lint를 통과하고 API 37 에뮬레이터에 기존 debug 서명으로 업데이트했다. 실제 런처의 전후 화면에서 화살표 잘림 해소를 확인했고 앱 실행/버전 코드 8을 확인했다. 실기기는 연결되지 않아 이번 수정의 Galaxy 설치·검증은 수행하지 않았다. 증빙과 새 로컬 출시 패키지는 `output/android-icon-v8`에 있으며, Console의 기존 빌드 7은 이 수정을 포함하지 않는다. 심사 제출 전에 검증한 새 빌드로 교체해야 한다.
