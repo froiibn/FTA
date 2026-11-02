@@ -1,6 +1,6 @@
 # Android Google Play preparation
 
-Status checkpoint: 2026-11-02. This folder records preparation, not review
+Status checkpoint: 2026-11-03. This folder records preparation, not review
 submission or a production/internal-test rollout. Android source checkpoint:
 `fb60bfb`; version `0.1.0 (7)`, package `app.fta.android`, ARM64, Android 10/API 29+.
 
@@ -81,7 +81,8 @@ Artifacts live under `output/android-play-v7/`: `assets/`, `raw/`,
 
 ## Completed technical/content drafts and remaining decisions
 
-Dashboard initial setup is 10/11 complete: only Data safety remains pending.
+Dashboard initial setup is complete: Data safety was saved after explicit owner
+approval. The dashboard now exposes the production release workflow.
 Privacy URL, access instructions, no ads, not a government app, no financial
 features, no health features, store listing, category/contact and ratings are
 saved. Advertising ID is separately saved No. Tools category and owner-approved
@@ -100,12 +101,10 @@ The following must not be silently completed on the owner's behalf:
    moderation are No; interaction can be limited to approved peers. Target
    audience 13–15, 16–17, 18+ is separately saved, not an IARC age rating.
 3. [Data safety draft](data-safety-draft.md): conservative Device IDs draft only,
-   with explicit plaintext-discovery / encrypted-content distinction. Final
-   classification and store security badge need owner review. The revised
-   temporary draft now excludes third-party sharing under the user-initiated
-   transfer exception, while retaining Device IDs collection and the negative
-   all-data-encrypted answer. The exact resulting broad warning was shown to
-   the owner before requesting final Save.
+   with explicit plaintext-discovery / encrypted-content distinction. The owner
+   approved the exact classification and broad negative encryption warning.
+   Final Save succeeded: Device IDs collection, no third-party sharing, not
+   all transmitted data encrypted. These answers remain unsubmitted for review.
 4. Production country targeting has all **178 current Console country/region
    entries** saved, including Other countries, Korea, China, Japan and the US;
    the production track remains inactive. This is preparation, not rollout or a
@@ -116,25 +115,33 @@ The following must not be silently completed on the owner's behalf:
    observed warning mentioned possible withholding/delay, not an observed FTA
    upload block, a new registration charge or a stated deadline.
 
-The connected-device foreground-service declaration is not currently shown in
-the observed app-content pending/handled lists. This is not an exemption;
-recheck the production setup form after initial requirements are complete.
-[The declaration draft](foreground-service-draft.md) records an actual
-two-emulator NSD connection, first recipient approval and a subsequent Completed
-receipt while the receiver was at Home. Its local 66-second composed video and
-both original recordings are under `output/android-play-v7/fgs-review/`; complete
-native app pixels are preserved and exported frames were visually checked.
-The owner approved public GitHub hosting. Publication was prepared as a
-two-file-only commit in an isolated worktree, but Git push has no credentials
-and Aside GitHub is signed out. No video has been externally posted yet; the
-GitHub login page is prepared. Never report the prepared local commit as a
-published reviewer-accessible URL.
+The connected-device declaration appeared during production validation, although
+it had been absent from the app-content checklist. Continuous data transfer to
+an external device and the public demonstration URL were saved; the blocking
+validation error cleared. The recording shows actual NSD connection, first
+recipient approval and a subsequent Completed receipt with the receiver at Home.
+
+The owner-approved video and README are public in documentation-only commit
+`ff2faf4` (`[skip ci]`). An anonymous HTTP 200 download matched the original
+SHA-256. GitHub's blob page does not preview this large file; use the
+[public MP4 download](https://raw.githubusercontent.com/froiibn/FTA/main/docs/android-review/connected-device-review.mp4).
+No app source or workflow was included in publication.
+
+Production release `7 (0.1.0)` and all 10 release notes were saved to Publishing
+overview after validation. The only listed release warning is the absent
+R8/ProGuard mapping file; R8/ProGuard is not used. There are **20 pending changes**,
+including all 10 store locales and 178 country/region entries. The page explicitly
+states changes have not been sent for review. Google's automatic pre-review
+checks are running; their result remains pending. Managed publishing is disabled,
+so future review approval can lead to automatic publication; this was not changed.
+The actual Send changes for review button was not clicked.
 
 The internal-release preview shows two warnings: no assigned testers and no
 R8/ProGuard mapping file. No testers were invited; R8 is not used, so a fabricated
 mapping file must not be uploaded. The native-symbol attachment is present.
-No blocking error was listed in that internal preview; production validation is
-still a separate required check. Save and release was not clicked.
+No blocking error was listed in that internal preview. Production validation
+was subsequently completed as described above. Internal Save and release was
+not clicked.
 
 ## Actual verification and limits
 

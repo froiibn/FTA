@@ -1,7 +1,7 @@
-# Google Play Data safety — owner review draft
+# Google Play Data safety — owner-approved submission preparation
 
-This is an evidence record, not a final legal declaration. Console values saved
-to a temporary draft have not been submitted for review.
+This records the owner's approved answers and their technical basis. Final
+Console Save succeeded on 2026-11-03; changes remain unsubmitted for review.
 
 ## Observed data flows
 
@@ -17,12 +17,12 @@ The app's private-storage backup exclusion does not control a user's independent
 gallery backup. Sending a file to another device is distinct from sending it to
 the developer.
 
-## Current conservative Console draft
+## Saved Console answers
 
 - Data collection/sharing: Yes; **Device or other IDs only**.
-- Purpose: app functionality for collection. The revised temporary Console
-  draft unchecks sharing under the user-initiated transfer exception below;
-  no final Save or app review submission has occurred.
+- Purpose: app functionality for collection. Sharing is unchecked under the
+  user-initiated transfer exception below. The owner approved final Save after
+  reviewing the exact public security warning; no review submission occurred.
 - Required for the direct device-transfer feature; not marked ephemeral because
   registered identities can persist locally.
 - Encryption of all transmitted data: No, because discovery TXT is plaintext.
@@ -30,7 +30,7 @@ the developer.
   automatic 90-day deletion claim.
 - Optional deletion-request question remains unanswered.
 
-This deliberately conservative draft needs a final policy decision. Its revised
+The owner approved this conservative classification. Its saved
 preview reports no third-party sharing, Device IDs collection and the broad
 “data is not transferred over a secure connection” security warning.
 Those labels must **not** be represented as an accurate description of file/text
@@ -38,21 +38,20 @@ transport: content uses authenticated TLS. Conversely, the absence of a develope
 backend must not be used to claim that every network byte is encrypted or that
 discovery identifiers do not exist.
 
-Before final Save, review Google's definitions of off-device collection,
-user-initiated sharing, end-to-end encryption and applicable exemptions against
-these separate data flows. Do not add photos/files/message-body categories merely
+Google's definitions of off-device collection, user-initiated sharing,
+end-to-end encryption and applicable exemptions were reviewed against these
+separate data flows. Do not add photos/files/message-body categories merely
 because the app transfers them, or omit them merely because it has no server;
 the documented definitions and exemptions determine the declaration.
 
-## Recommended refinement for owner review
+## Basis for excluding third-party sharing
 
-Keep the plaintext installation identifier in the conservative collection scope,
-but change **third-party sharing to No** before finalization if the owner confirms
-the inspected, intended device-to-device use. Google defines a third party as
+The saved answers keep the plaintext installation identifier in collection scope
+and set **third-party sharing to No**, as approved by the owner. Google defines a third party as
 another organization and exempts specific user-initiated transfers. There is no
 external organization endpoint/SDK in this release; selecting a receiving peer,
 exporting to the gallery and opening/sharing a received item are explicit user
-actions. The existing Yes sharing draft should therefore not be treated as the
+actions. The superseded Yes sharing draft must not be treated as the
 recommended final answer merely because it was the most conservative preview.
 
 This is an interpretation of the cited definitions, not a claim that NSD is

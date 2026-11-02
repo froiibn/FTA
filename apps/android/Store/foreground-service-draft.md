@@ -63,11 +63,19 @@ swift apps/android/scripts/render-fgs-review.swift \
   output/android-play-v7/fgs-review/connected-device-review.mp4
 ```
 
-No video has been externally hosted. The Console declaration needs an accessible
-video URL; choose an owner-approved hosting location before posting. The
-foreground-service questionnaire is not yet visible in the observed content
-checklist and must be revisited; lack of a displayed form is not a policy
-exemption or a completed declaration.
+The owner approved GitHub publication. The original 66-second MP4 and its
+README were published in documentation-only commit `ff2faf4` with `[skip ci]`;
+no workflow existed and no application source was pushed. Unauthenticated GET
+returned HTTP 200 and the original SHA-256
+`1134b6dc226bec3aab9ab0084fbd9bb0dbf62092fd6d6e593e60af192f6e46c7`.
+[Public MP4 download](https://raw.githubusercontent.com/froiibn/FTA/main/docs/android-review/connected-device-review.mp4).
+GitHub's blob page does not preview this large file; the supplied URL downloads
+the video without login, rather than providing a GitHub embedded player.
+
+Production-release validation exposed the previously absent foreground-service
+questionnaire. Continuous data transfer to an external device and the public MP4
+URL were saved on 2026-11-03. Revalidation cleared the blocking declaration
+error. This is a saved declaration, not Google approval or review submission.
 
 ## Official requirements checked
 
