@@ -7,9 +7,9 @@ android {
         applicationId = "app.fta.android"
         minSdk = 29
         targetSdk = 37
-        // The launcher safe-zone fix must be distinguishable from the already uploaded Play build 7.
-        versionCode = 8
-        versionName = "0.1.0"
+        // Continue the existing Play version-code sequence so this update preserves installed app data.
+        versionCode = 9
+        versionName = "0.1.4"
         testInstrumentationRunner = "app.fta.android.FtaChecks"
         ndk { abiFilters += "arm64-v8a" }
     }
