@@ -81,21 +81,20 @@ html.platform-windows {
 .platform-windows .file-selection, .platform-windows .selection-actions, .platform-windows .detail-body { background: var(--win-field); border-color: var(--line); }
 .platform-windows .file-selection li, .platform-windows .history-row { border-color: var(--line); }
 .platform-windows .history-open:hover:not(:disabled) { background: #ffffff08; border-radius: 4px; }
-.platform-windows .notice { background: #25343d; color: #cdeeff; }
-.platform-windows .notice.error { background: #3c252a; border-color: var(--error); color: #ffc1cc; }
 .platform-windows dialog { background: var(--win-card); border-color: var(--line); }
 .platform-windows .settings-progress-label { background: var(--win-card); border-color: #505050; }
-.platform-windows .settings-toast { background: var(--win-card); color: var(--ink); border: 1px solid #505050; }
-.platform-windows .settings-toast.error { background: #3c252a; color: #ffc1cc; border-color: #70404b; }
+.platform-windows .app-toast { background: var(--win-card); color: var(--ink); border: 1px solid #505050; }
+.platform-windows .app-toast.error { background: #3c252a; color: #ffc1cc; border-color: #70404b; }
 .platform-windows .expand-widget { background: var(--surface); border-color: #555555; border-radius: 8px; }
 .platform-windows #settings-content { scrollbar-width: thin; scrollbar-color: #626262 transparent; }
 
 /* Fill the compact sender without changing its dimensions or the existing wide-window rail layout. */
 @media (max-width: 759px) {
   .platform-windows .shell { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
-  .platform-windows .send-board { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 8px 10px 10px; }
+  .platform-windows .send-board { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; padding: 8px 10px 10px; }
   .platform-windows .target-rail { flex: none; }
-  .platform-windows .send-workspace { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  /* Preserve the compact layout while letting attachments/progress remain reachable by internal scrolling. */
+  .platform-windows .send-workspace { display: flex; flex-direction: column; flex: 1 0 auto; min-height: auto; }
   .platform-windows .composer { display: flex; flex-direction: column; flex: 1; min-height: 58px; }
   .platform-windows .message-input { display: flex; flex: 1; min-height: 0; }
   .platform-windows .message-input textarea { flex: 1; height: 100%; min-height: 0; }

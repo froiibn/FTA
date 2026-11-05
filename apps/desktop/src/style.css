@@ -45,8 +45,6 @@ p { margin: 0; }
 .quiet[aria-pressed="true"] { background: #2b3a4a; color: var(--navy); border-color: #647e99; }
 .icon-label { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .icon-label svg { width: 15px; height: 15px; }
-.notice { margin: 12px 20px 0; padding: 10px 12px; border-left: 3px solid var(--navy); background: #253241; color: #bed4e9; font-size: 12px; overflow-wrap: anywhere; }
-.notice.error { background: #382828; border-color: var(--error); color: #efaaa4; }
 .panel { padding: 22px 20px 28px; }
 .section-heading { margin-bottom: 12px; min-height: 24px; }
 .section-caption { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -86,7 +84,8 @@ textarea::placeholder, input::placeholder { color: #8c9aaa; }
 .history-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #343d48; }
 .history-open { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; background: transparent; text-align: left; flex: 1; min-width: 0; padding: 5px 0; color: var(--ink); }
 .history-icon { display: flex; color: #9baec4; }
-.history-copy { min-width: 0; }
+/* Only record text wraps; the surrounding button must keep its status and delete actions separate. */
+.history-copy { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .history-copy strong, .history-copy small { display: block; }
 .history-copy strong { font-size: 12px; font-weight: 550; overflow-wrap: anywhere; }
 .history-copy small { font-size: 11px; color: var(--muted); margin-top: 3px; overflow-wrap: anywhere; }
@@ -103,6 +102,9 @@ label { display: block; margin: 13px 0 5px; font-size: 12px; color: #bdcad8; }
 .settings-row + .settings-row { border-top: 1px solid #343d48; }
 .settings-row strong { font-weight: 550; }
 .settings-row p { margin-top: 3px; color: var(--muted); font-size: 11px; }
+/* A valid unbroken peer name must shrink/wrap instead of pushing its unpair action offscreen. */
+#paired-devices .settings-row > span { min-width: 0; overflow-wrap: anywhere; }
+#paired-devices .settings-row > button { flex-shrink: 0; }
 /* Keep a native focusable checkbox behind each switch so keyboard and screen-reader behavior survives. */
 /* Reserve the outline's space so the content scroller does not clip keyboard focus on the right. */
 .settings-toggle { position: relative; display: inline-flex; flex: 0 0 42px; width: 42px; height: 24px; margin: 0 5px 0 0; }
@@ -136,7 +138,6 @@ label { display: block; margin: 13px 0 5px; font-size: 12px; color: #bdcad8; }
   .brand-mark svg { width: 20px; height: 20px; }
   h1 { font-size: 16px; }
   .window-actions .quiet { padding: 4px 5px; min-height: 28px; }
-  .notice { margin: 7px 12px 0; padding: 6px 9px; font-size: 11px; }
   .panel { padding: 7px 8px 9px; }
   .section-heading { margin-bottom: 3px; min-height: 22px; }
   .empty-device { padding: 8px 10px; gap: 2px; }
@@ -158,10 +159,9 @@ label { display: block; margin: 13px 0 5px; font-size: 12px; color: #bdcad8; }
 .utility-window { min-height: 100dvh; padding: 14px 18px 20px; background: var(--paper); }
 .utility-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -14px -18px 14px; padding: 8px 18px; background: var(--paper); border-bottom: 1px solid var(--line); user-select: none; cursor: default; }
 .utility-header button { font-size: 20px; line-height: 1; }
-.utility-window .notice { margin: 8px 0; }
 /* Keep actions in the viewport while long tab content scrolls; narrow windows wrap the buttons. */
 #settings-panel.utility-window { display: flex; flex-direction: column; height: 100dvh; min-height: 0; padding-bottom: 0; overflow: hidden; }
-#settings-panel > .utility-header, #settings-panel > .settings-tabs, #settings-panel > .notice, .settings-footer { flex-shrink: 0; }
+#settings-panel > .utility-header, #settings-panel > .settings-tabs, .settings-footer { flex-shrink: 0; }
 #settings-content { flex: 1; min-height: 0; overflow: auto; }
 #settings-content > .settings-section { margin-bottom: 0; border-bottom: 0; }
 .settings-footer { padding: 12px 0 18px; border-top: 1px solid var(--line); }
@@ -187,11 +187,11 @@ body.folded .shell { display: none; }
 #network-profile-row { margin-top: 14px; font-size: 12px; }
 #network-profile-row .form-actions { margin-top: 10px; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
 
-/* A content-sized, quiet toast confirms actions without covering the settings form. */
-.settings-toast { position: fixed; z-index: 1000; bottom: calc(14px + var(--settings-actions-height, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(300px, calc(100% - 32px)); padding: 6px 10px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
-.settings-toast span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.settings-toast[hidden] { display: none; }
-.settings-toast.error { background: #382e2e; color: #efaaa4; }
+/* Transient feedback floats above each window; it never adds a top row or moves the composer. */
+.app-toast { position: fixed; z-index: 1000; bottom: calc(14px + var(--settings-actions-height, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(300px, calc(100% - 32px)); padding: 6px 10px; border-radius: 6px; background: #303432; color: #d7edde; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
+.app-toast span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.app-toast[hidden] { display: none; }
+.app-toast.error { background: #382e2e; color: #efaaa4; }
 
 /* A real pending operation owns the donut; there are no fabricated percentages or minimum delays. */
 .settings-progress { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; background: #00000018; pointer-events: none; }
@@ -240,8 +240,6 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos #close-app-window:hover::after, .platform-macos .utility-header [data-close-window]:hover::after { content: "×"; position: absolute; inset: -1px; color: #651b15; font: 12px/12px -apple-system, sans-serif; text-align: center; }
 .platform-macos body.folded { background: rgb(20 20 20 / 90%); }
 .platform-macos .expand-widget { background: transparent; border-radius: 14px; border-color: #ffffff25; }
-.platform-macos .notice { background: #ffffff0c; color: var(--ink); }
-.platform-macos .notice.error { background: #382828; color: #efaaa4; }
 /* Honor the Mac accessibility preference while retaining a solid, readable black appearance. */
 @media (prefers-reduced-transparency: reduce) { .platform-macos body, .platform-macos .utility-window { background: #161616; } }
 
@@ -262,9 +260,10 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos .utility-header button[data-close-window]:hover:not(:disabled), .platform-macos #close-app-window:hover:not(:disabled) { background: #ff5f57; border-color: #e34a43; opacity: 1; filter: none; }
 /* Fill the Mac widget's remaining height instead of leaving fixed-textarea and empty-progress space below it. */
 .platform-macos .shell { display: flex; flex-direction: column; height: 100dvh; }
-.platform-macos .send-board { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.platform-macos .send-board { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
 .platform-macos .target-rail { flex: none; }
-.platform-macos .send-workspace { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+/* Keep the existing input minimum and attachment controls; overflow scrolls inside the fixed-size board. */
+.platform-macos .send-workspace { display: flex; flex-direction: column; flex: 1 0 auto; min-height: auto; }
 .platform-macos .composer { display: flex; flex-direction: column; flex: 1; min-height: 58px; }
 .platform-macos .message-input { display: flex; flex: 1; min-height: 0; }
 .platform-macos .message-input textarea { flex: 1; height: 100%; min-height: 0; }
@@ -276,7 +275,7 @@ button.action-icon svg { width: 20px; height: 20px; flex-shrink: 0; }
 
 /* Receipt content fills an independent resizable window, with actions outside the scrolling body. */
 #detail-panel.utility-window { display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden; }
-#detail-panel > .detail-header, #detail-panel > .help, #detail-panel > .notice, #detail-panel > .detail-actions { flex-shrink: 0; }
+#detail-panel > .detail-header, #detail-panel > .help, #detail-panel > .detail-actions { flex-shrink: 0; }
 #detail-panel > .help { overflow-wrap: anywhere; }
 .detail-content { flex: 1; min-height: 0; overflow: auto; }
 #detail-panel .detail-body { font-size: 14px; min-height: 100%; margin: 0; }

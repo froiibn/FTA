@@ -62,7 +62,6 @@ root.innerHTML = `
       <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4 4-4-4 4-4"/></svg></span><h1>FTA</h1></div>
       <div class="window-actions"><button data-window="inbox" class="quiet icon-label" aria-label="기록" title="기록"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6M12 7v5l3 2"/></svg></button><button data-window="settings" class="quiet icon-label" aria-label="설정" title="설정"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 1-1h4l1 3 2 1 3-1 2 4-2 2v2l2 2-2 4-3-1-2 1-1 3h-4l-1-3-2-1-3 1-2-4 2-2v-2L2 9l2-4 3 1 2-1Z"/><circle cx="12" cy="12" r="3"/></svg></button><button id="fold-window" class="quiet icon-label" aria-label="접기" title="접기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button><button id="pin" class="quiet icon-label" aria-pressed="false" title="항상 위에 표시" aria-label="항상 위에 표시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 6 0-1 6 4 4H6l4-4-1-6Zm3 10v8"/></svg></button><button id="close-app-window" class="quiet icon-label" aria-label="창 닫기" title="창 닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     </header>
-    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
     <section id="send-panel" class="panel send-board">
       <aside class="target-rail"><div class="section-heading"><h2>기기</h2><div class="device-tools"><button id="refresh" class="quiet icon-label" aria-label="새로고침" title="새로고침"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button></div></div><div id="devices" class="devices" role="group" aria-label="전송 대상"></div></aside>
       <div class="send-workspace">
@@ -100,10 +99,8 @@ if (isMain) {
   root.querySelector("#settings-panel")?.remove();
   root.querySelector("#detail-panel")?.remove();
 } else if (utilityPanel) {
-  const notice = root.querySelector<HTMLElement>("#notice");
   root.replaceChildren(utilityPanel);
   utilityPanel.classList.add("utility-window");
-  if (notice) utilityPanel.querySelector(".utility-header")?.after(notice);
 }
 // Shared handlers bind only to controls belonging to this native view.
 function on(id: string, type: string, handler: EventListener): void {
@@ -141,9 +138,9 @@ const TOAST_DURATION_MS = 1000;
 // One shared batch includes nested native calls; an inner completion must not hide outer work.
 let settingsActionCount = 0;
 let settingsActionResult: { message: string; error: boolean } | undefined;
-// Settings scroll independently; feedback must stay in the viewport instead of above the form.
+// All windows use one transient overlay so feedback never inserts a persistent top row.
 const toast = document.createElement("div");
-toast.className = "settings-toast";
+toast.className = "app-toast";
 toast.hidden = true;
 toast.setAttribute("role", "status");
 toast.setAttribute("aria-live", "polite");
@@ -151,9 +148,26 @@ const toastMessage = document.createElement("span");
 toast.append(toastMessage);
 document.body.append(toast);
 let toastTimer: number | undefined;
+// Passive polling must not replay the same fault forever after its toast expires.
+// Clear a source only on recovery so a later recurrence can be reported again.
+const passiveNotices = new Map<string, string>();
+
+function clearPassiveNotice(source: string): void {
+  passiveNotices.delete(source);
+}
+
+// Folding must cancel the pending expiry as well as hide the current toast, so
+// unfolding cannot reveal an old result or leave its timer attached to a new one.
+function hideToast(): void {
+  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
+  toastTimer = undefined;
+  toast.hidden = true;
+}
 
 // Each completed action batch gets one small toast for a full second, after its loading state ends.
-function showSettingsToast(message: string, error: boolean): void {
+function showToast(message: string, error: boolean): void {
+  // The 44px folded control has no room for message content; saved records remain unchanged.
+  if (isMain && document.body.classList.contains("folded")) return;
   if (toastTimer !== undefined) window.clearTimeout(toastTimer);
   // A save confirmation must not cover the restart button in the persistent footer.
   const footer = document.getElementById("settings-actions");
@@ -180,9 +194,7 @@ function rememberSettingsResult(message: string, error: boolean): void {
 function beginSettingsAction(): void {
   if (settingsActionCount++ > 0) return;
   settingsActionResult = undefined;
-  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
-  toastTimer = undefined;
-  toast.hidden = true;
+  hideToast();
   setSettingsWorking(true);
 }
 
@@ -191,33 +203,20 @@ function finishSettingsAction(): void {
   setSettingsWorking(false);
   const result = settingsActionResult ?? { message: "완료했습니다.", error: false };
   settingsActionResult = undefined;
-  showSettingsToast(result.message, result.error);
+  showToast(result.message, result.error);
 }
 
-// Errors remain visible without echoing arbitrary received content into HTML.
+// Every transient result uses the same expiry, including errors and connectivity.
+// Keep native consent dialogs and persistent settings/record content outside this path.
 function showNotice(message: string, error = false, source = "action"): void {
-  const notice = element("notice");
-  // Initial connection/load errors also prevent the shared batch from reporting generic success.
-  if (view === "settings" && settingsActionCount > 0 && error) rememberSettingsResult(message, true);
-  // Queue action results until all work ends; background connectivity keeps its persistent banner.
-  if (view === "settings" && source === "action") {
-    if (notice.dataset.source === "action") notice.hidden = true;
-    if (settingsActionCount > 0) rememberSettingsResult(message, error);
-    else showSettingsToast(message, error);
-    return;
+  if (source !== "action") {
+    const signature = JSON.stringify([message, error]);
+    if (passiveNotices.get(source) === signature) return;
+    passiveNotices.set(source, signature);
   }
-  // Keep connection recovery from clearing an unrelated transfer or permission failure.
-  notice.dataset.source = source;
-  notice.textContent = message;
-  notice.classList.toggle("error", error);
-  notice.hidden = false;
-  positionNotice();
-}
-
-// Each native window owns its feedback; receipt details no longer use a nested modal.
-function positionNotice(): void {
-  const anchor = document.querySelector(".detail-header, .utility-header, .app-header");
-  anchor?.after(element("notice"));
+  // Report nested settings results after their progress overlay ends, preserving failures.
+  if (view === "settings" && settingsActionCount > 0) rememberSettingsResult(message, error);
+  else showToast(message, error);
 }
 
 // Translate stable engine codes into corrective actions while preserving unexpected native diagnostics.
@@ -471,7 +470,6 @@ async function loadDetail(id: string): Promise<void> {
   element("open-detail").hidden = record.kind !== "url";
   element("reveal-detail").hidden = record.kind !== "files" || !record.items.some((item) => item.path);
   element("detail-body").hidden = !record.body;
-  positionNotice();
 }
 
 // Refreshes are serialized so a slow response cannot overwrite a newer device selection state.
@@ -483,10 +481,9 @@ async function refresh(): Promise<void> {
     // Offline registrations belong to settings, never to the send/drop target list.
     devices = await rpc<Device[]>("devices.list", { available_only: isMain });
     connected = true;
-    // Startup can outlast the initial IPC probe; remove its stale error only after a real successful response.
-    if (element("notice").dataset.source === "connection") element("notice").hidden = true;
     networkReady = status.network_available !== false && status.network_reconfirmation_required !== true;
     if (!networkReady) showNotice("네트워크가 변경되었습니다. 설정 확인 후 서비스를 재시작하세요.", true, "connection");
+    else clearPassiveNotice("connection");
     if (!selectedDevice()) selectedId = "";
     renderDevices();
     if (connected && isMain) { void act(processPendingActivations); void act(processRegistrationRequests); }
@@ -582,14 +579,12 @@ async function sendFiles(): Promise<void> {
   element("transfer-status").textContent = target.paired ? `${target.display_name}에 파일을 전송하고 있어요…` : `${target.display_name}에서 처음 한 번 등록을 허용해주세요.`;
   try {
     const result = await invoke<TransferRecord>("send_files", { to: target.device_id, paths: selectedPaths, transferId: inFlightId });
-    element("transfer-status").textContent = `파일 전송 ${stateLabel(result.state)}`;
-    if (result.state === "completed") selectedPaths = [];
+    if (result.state === "completed") {
+      selectedPaths = [];
+      showNotice(`파일 전송 ${stateLabel(result.state)}`);
+    }
     else showNotice(transferFailureMessage(result), true);
     await refreshHistory();
-  } catch (error) {
-    // Failed approval creates no transfer row; do not leave its old waiting caption visible.
-    element("transfer-status").textContent = userError(error);
-    throw error;
   } finally {
     await finishProgress();
     sending = false;
@@ -623,8 +618,6 @@ async function sendMessage(): Promise<void> {
     await refreshHistory();
   } finally {
     await finishProgress();
-    // Message results already clear the draft or show an error; stale progress also creates scroll.
-    element("transfer-status").hidden = true;
     sending = false;
     updateActions();
   }
@@ -698,6 +691,9 @@ async function finishProgress(): Promise<void> {
   await updateProgress();
   inFlightId = "";
   element("cancel-transfer").hidden = true;
+  // Terminal results belong to the expiring toast/history, never a leftover progress caption.
+  element("transfer-status").hidden = true;
+  element("transfer-progress-bar").hidden = true;
 }
 
 // Settings write only known engine keys; the bridge never interprets arbitrary shell configuration.
@@ -855,6 +851,7 @@ on("restart-engine", "click", () => { void act(async () => {
 function applyFolded(folded: boolean): void {
   if (!isMain) return;
   document.body.classList.toggle("folded", folded);
+  if (folded) hideToast();
   element("expand-window").hidden = !folded;
   dragPoint = undefined;
   highlightDropTarget();
@@ -1126,7 +1123,7 @@ async function refreshUtility(): Promise<void> {
     // device query must never prevent the first list load or require a manual refresh.
     if (view === "inbox") {
       await refreshHistory();
-      if (element("notice").dataset.source === "utility-refresh") element("notice").hidden = true;
+      clearPassiveNotice("utility-refresh");
       try {
         // Resolve peer display names after rendering saved records, never before it.
         devices = await rpc<Device[]>("devices.list", { available_only: false });
@@ -1139,9 +1136,8 @@ async function refreshUtility(): Promise<void> {
     await refresh();
     if (!connected) return;
     if (!settingsLoaded) { await loadSettings(); await refreshNetworkSetup(); settingsLoaded = true; }
-    // A recovered background query must clear only its own error; a failed user transfer,
-    // settings save or permission action must remain visible after an unrelated status poll.
-    if (element("notice").dataset.source === "utility-refresh") element("notice").hidden = true;
+    // Recovery rearms only this source; it never cuts short another action’s toast.
+    clearPassiveNotice("utility-refresh");
   } catch (error) {
     showNotice(userError(error), true, "utility-refresh");
   }
@@ -1172,7 +1168,11 @@ async function initialize(): Promise<void> {
     const id = new URLSearchParams(window.location.search).get("transfer");
     if (!id) { showNotice("수신 항목을 찾을 수 없습니다.", true); return; }
     // Retry an unavailable engine without resetting selection/scroll after a successful read.
-    const read = async (): Promise<void> => { if (!currentDetail) await loadDetail(id); };
+    const read = async (): Promise<void> => {
+      if (currentDetail) return;
+      try { await loadDetail(id); clearPassiveNotice("detail-refresh"); }
+      catch (error) { showNotice(userError(error), true, "detail-refresh"); }
+    };
     window.setInterval(() => { void act(read); }, REFRESH_INTERVAL_MS);
     await act(read);
     return;

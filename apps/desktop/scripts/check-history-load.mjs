@@ -14,10 +14,10 @@ function declaration(name) {
   return source.slice(start, end + 2);
 }
 function fixture(rpc) {
-  const notice = { dataset: { source: "utility-refresh" }, hidden: false };
   const context = vm.createContext({
     view: "inbox", records: [], devices: [], HISTORY_LIMIT: 100, settingsLoaded: false,
-    rpc, renders: [], failures: [], element: () => notice,
+    rpc, renders: [], failures: [], recoveredSources: [],
+    clearPassiveNotice(source) { context.recoveredSources.push(source); },
     renderHistory() { context.renders.push([...context.records]); },
     refresh() { throw new Error("History must not depend on status readiness"); },
     userError: String, showNotice(error) { context.failures.push(error); },
@@ -61,7 +61,7 @@ test("a failed initial history query is retried by the same passive refresh", as
   ready = true;
   await c.refreshUtility();
   assert.equal(c.renders[0][0].transfer_id, "recovered");
-  assert.equal(c.element().hidden, true);
+  assert.ok(c.recoveredSources.includes("utility-refresh"));
 });
 
 test("reopening refreshes new persisted records and resolves peer labels afterwards", async () => {

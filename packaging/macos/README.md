@@ -2,6 +2,10 @@
 
 현재 릴리즈는 Apple Silicon(arm64)용이다. Intel Mac용 실행·빌드 검증은 수행하지 않았다.
 
+## 0.1.4 배포
+
+[0.1.4 릴리스](https://github.com/froiibn/FTA/releases/tag/v0.1.4)의 `FTA_0.1.4_aarch64.dmg`를 사용한다. 기존 앱을 종료하고 DMG의 FTA를 Applications에 옮겨 교체한다. 기존 설정과 등록은 유지한다. Developer ID 서명·Apple 공증·검증 결과는 릴리스의 `build-info-macos-0.1.4.json`·`SHA256SUMS-macos-0.1.4.txt`에 기록한다. 변경 내용과 Windows 후속 빌드 경계는 [0.1.4 기록](../../docs/releases/0.1.4.md)을 따른다. 기존 배포본·태그는 유지한다.
+
 ## 0.1.3 배포
 
 [0.1.3 릴리스](https://github.com/froiibn/FTA/releases/tag/v0.1.3)의 `FTA_0.1.3_aarch64.dmg`를 사용한다. Developer ID 서명·Apple 공증과 검증 결과는 같은 릴리스의 `build-info-macos-0.1.3.json`·`SHA256SUMS-macos-0.1.3.txt`에서 확인한다. 기존 앱을 종료하고 DMG의 FTA를 Applications에 옮겨 교체하며, 사용자 설정과 등록 정보는 유지한다. 변경 내용과 플랫폼별 후속 배포 경계는 [0.1.3 기록](../../docs/releases/0.1.3.md)을 따른다.
