@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-window",
-  "description": "Only the bundled transfer, history and settings windows receive local events; no filesystem, shell or network plugin grants.",
+  "description": "Only bundled transfer, history, settings and UUID-scoped receipt windows receive local events; no filesystem, shell or network plugin grants.",
   "windows": [
     "main",
     "inbox",
-    "settings"
+    "settings",
+    "detail-*"
   ],
   "permissions": [
     "core:event:default"

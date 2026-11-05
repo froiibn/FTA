@@ -2,6 +2,60 @@ import XCTest
 
 // Exercise real native controls and the actual listener; never inject pretend online devices.
 final class FTAFlowTests: XCTestCase {
+    // Verify the offline Settings route, explicit clipboard action, and Linux readiness message remain reachable in both layouts.
+    func testDesktopInstallGuide() {
+        for (locale,settings,title,copy,done,confirmation) in [
+            ("ko","설정","컴퓨터에 FTA 설치하기","주소 복사","확인","주소를 복사했습니다"),
+            ("en","Settings","Install FTA on a computer","Copy address","OK","Address copied")
+        ] {
+            let app = makeApp(language:locale); app.launch(); storeTab(app,label:settings).tap()
+            let entry = app.buttons[title]
+            for _ in 0..<8 { if entry.isHittable { break }; app.swipeUp() }
+            XCTAssertTrue(entry.isHittable); entry.tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout:5))
+            capture("desktop-guide-\(locale)-top",app)
+            let copyRelease = app.buttons[copy + " https://github.com/froiibn/FTA/releases/tag/v0.1.2"]
+            for _ in 0..<5 { if copyRelease.isHittable { break }; app.swipeUp() }
+            XCTAssertTrue(copyRelease.isHittable); copyRelease.tap()
+            XCTAssertTrue(app.alerts[confirmation].waitForExistence(timeout:3)); app.alerts.buttons[done].tap()
+            let linuxStatus = app.staticTexts[locale == "ko" ? "지원 준비 중" : "Support coming soon"]
+            for _ in 0..<5 { if linuxStatus.isHittable { break }; app.swipeUp() }
+            XCTAssertTrue(linuxStatus.isHittable)
+            XCTAssertFalse(app.buttons[copy + " https://github.com/froiibn/FTA#readme"].exists)
+            capture("desktop-guide-\(locale)-bottom",app)
+            app.navigationBars.buttons.element(boundBy:0).tap()
+            XCTAssertTrue(entry.waitForExistence(timeout:3)); app.terminate()
+        }
+    }
+    // Opt-in integration uses a real Mac fixture/Bonjour and the same one-time recipient approval as production.
+    func testRealReceiveBanner() throws {
+        guard ProcessInfo.processInfo.environment["FTA_IOS_RECEIPT_CHECK"] == "1" else { throw XCTSkip("Run with the real Mac receipt fixture") }
+        let app = makeApp(); app.launch()
+        let interruption = addUIInterruptionMonitor(withDescription:"FTA notification and LAN permissions") { alert in
+            for label in ["허용","Allow"] { if alert.buttons[label].exists { alert.buttons[label].tap(); return true } }
+            return false
+        }
+        defer { removeUIInterruptionMonitor(interruption) }
+        app.tabBars.buttons["설정"].tap()
+        let trust=app.switches["신뢰하는 집 네트워크입니다"], receive=app.switches["송수신 사용"]
+        XCTAssertTrue(trust.waitForExistence(timeout:10))
+        let original=receive.value as? String
+        if trust.value as? String != "1" { tapSwitch(trust) }
+        if receive.value as? String != "1" { tapSwitch(receive) }
+        app.tabBars.buttons["보내기"].tap()
+        let approval=app.buttons["기기 등록 허용"]
+        XCTAssertTrue(approval.waitForExistence(timeout:90)); approval.tap()
+        let banner=app.descendants(matching:.any).matching(identifier:"receipt-banner").firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout:15))
+        capture("real-receive-banner",app)
+        let open=banner.buttons.matching(NSPredicate(format:"label != %@","닫기")).firstMatch
+        XCTAssertTrue(open.exists); open.tap()
+        XCTAssertTrue(app.buttons["닫기"].waitForExistence(timeout:5))
+        capture("real-receive-detail",app)
+        app.buttons["닫기"].firstMatch.tap()
+        app.tabBars.buttons["설정"].tap()
+        if original == "0", receive.value as? String == "1" { tapSwitch(receive) }
+    }
     // Capture the real app in each supported language; no invented peers or transfer receipts.
     func testStoreLocalizedScreenshots() throws {
         let path = try XCTUnwrap(Bundle(for:Self.self).url(forResource:"LocaleExpectations",withExtension:"json"))
@@ -153,6 +207,24 @@ final class FTAFlowTests: XCTestCase {
         app.scrollViews["send-scroll"].coordinate(withNormalizedOffset:CGVector(dx:0.02,dy:0.2)).tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout:5))
         capture("keyboard-dismissed",app)
+    }
+    // Choose real simulator Photos assets and prove removing one private copy preserves its sibling.
+    func testAttachmentPreviewRows() throws {
+        let app = makeApp(); app.launch(); app.buttons["사진"].tap(); app.buttons["갤러리에서 선택"].tap()
+        let thumbnails = app.images.matching(identifier:"PXGGridLayout-Info")
+        XCTAssertTrue(thumbnails.firstMatch.waitForExistence(timeout:10))
+        guard thumbnails.count >= 2 else { throw XCTSkip("Seed two real simulator Photos assets first") }
+        thumbnails.element(boundBy:0).tap(); thumbnails.element(boundBy:1).tap()
+        let confirm = app.buttons.matching(NSPredicate(format:"label BEGINSWITH '추가' OR label BEGINSWITH 'Add' OR label == '완료' OR label == 'Done'")).firstMatch
+        confirm.tap(); XCTAssertTrue(app.buttons["send-attachments"].waitForExistence(timeout:15))
+        let remove = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","선택 해제 "))
+        XCTAssertEqual(remove.count,2)
+        app.scrollViews["send-scroll"].swipeUp()
+        capture("attachment-preview-rows",app)
+        remove.firstMatch.tap(); XCTAssertEqual(remove.count,1)
+        XCTAssertTrue(app.buttons["send-attachments"].exists)
+        capture("attachment-after-single-remove",app)
+        app.buttons["선택 해제"].tap(); XCTAssertFalse(app.buttons["send-attachments"].exists)
     }
     func testPhotoLibraryUsesCombinedAttachmentDraft() throws {
         let app = makeApp(); app.launch(); app.buttons["사진"].tap(); app.buttons["갤러리에서 선택"].tap()

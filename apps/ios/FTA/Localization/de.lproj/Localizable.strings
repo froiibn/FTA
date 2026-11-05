@@ -11,8 +11,10 @@
 "File Transfer Anything" = "File Transfer Anything";
 "LAN 연결" = "LAN-Verbindung";
 "Wi-Fi 연결 없음" = "Keine WLAN-Verbindung";
+"Windows: x64-setup.exe 설치 파일을 실행하세요." = "Windows: Führe das Installationsprogramm x64-setup.exe aus.";
 "iOS 빌드의 기존 라이브러리와 빌드 도구 고지입니다. 원문 전체는 앱에 함께 포함됩니다." = "Hinweise zu vorhandenen iOS-Bibliotheken und Build-Werkzeugen. Die vollständigen Originaltexte sind in der App enthalten.";
 "iOS 설정 열기" = "iOS-Einstellungen öffnen";
+"macOS: Apple Silicon용 aarch64.dmg를 열고 FTA를 응용 프로그램 폴더로 드래그하세요. Intel Mac 설치 파일은 아직 제공하지 않습니다." = "macOS: Öffne aarch64.dmg für Apple Silicon und ziehe FTA in den Programme-Ordner. Ein Installationsprogramm für Intel-Macs ist noch nicht verfügbar.";
 "같은 LAN에서 상대 FTA를 실행하세요." = "Starten Sie FTA auf einem anderen Gerät im selben LAN.";
 "개인정보 및 지원" = "Datenschutz und Support";
 "개인정보 처리방침" = "Datenschutzerklärung";
@@ -42,6 +44,7 @@
 "링크 열기" = "Link öffnen";
 "메시지 전송" = "Nachricht senden";
 "무결성 확인 중" = "Integrität wird geprüft";
+"무료 PC 버전입니다. 컴퓨터의 브라우저에서 아래 주소를 열어 설치하세요." = "Die PC-Version ist kostenlos. Öffne die folgende Adresse im Browser deines Computers zur Installation.";
 "문서를 불러오지 못했습니다." = "Das Dokument konnte nicht geladen werden.";
 "문서를 불러오지 못했습니다. 지원 페이지에서 문의해 주세요." = "Das Dokument konnte nicht geladen werden. Besuchen Sie die Supportseite.";
 "미리보기" = "Vorschau";
@@ -113,7 +116,10 @@
 "전송 취소" = "Übertragung abbrechen";
 "전송할 텍스트 또는 URL" = "Text oder URL zum Senden";
 "전체" = "Alle";
+"주소 복사" = "Adresse kopieren";
+"주소를 복사했습니다" = "Adresse kopiert";
 "지원 및 문의" = "Support und Kontakt";
+"지원 준비 중" = "Unterstützung in Vorbereitung";
 "진행률 확인 중" = "Fortschritt wird geprüft";
 "차단됨" = "Blockiert";
 "촬영" = "Foto aufnehmen";
@@ -122,6 +128,8 @@
 "취소 확인 중" = "Abbruch wird bestätigt";
 "취소됨" = "Abgebrochen";
 "카메라 접근이 허용되지 않았습니다. iOS 설정에서 FTA의 카메라 권한을 확인하세요." = "Kamerazugriff nicht erlaubt. Prüfen Sie die Kameraberechtigung von FTA in den iOS-Einstellungen.";
+"컴퓨터에 FTA 설치하기" = "FTA auf einem Computer installieren";
+"컴퓨터에서 FTA를 실행하고 모바일과 같은 LAN에 연결하세요. 양쪽에서 사용할 네트워크를 신뢰하도록 설정한 뒤 기기를 선택해 전송하세요. 최초 전송은 수신 기기에서 한 번 등록을 승인해야 합니다." = "Starte FTA auf deinem Computer und verbinde ihn mit demselben LAN wie dein Smartphone. Vertraue dem Netzwerk auf beiden Geräten und wähle ein Gerät zum Senden. Beim ersten Transfer muss das empfangende Gerät die Registrierung einmal bestätigen.";
 "크기" = "Größe";
 "텍스트" = "Text";
 "텍스트 또는 URL" = "Text oder URL";

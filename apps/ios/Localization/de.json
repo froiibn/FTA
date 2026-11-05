@@ -135,5 +135,13 @@
   "허용 대역": "Erlaubtes Subnetz",
   "허용됨": "Erlaubt",
   "확인": "OK",
-  "확인 중": "Wird geprüft"
+  "확인 중": "Wird geprüft",
+  "컴퓨터에 FTA 설치하기": "FTA auf einem Computer installieren",
+  "무료 PC 버전입니다. 컴퓨터의 브라우저에서 아래 주소를 열어 설치하세요.": "Die PC-Version ist kostenlos. Öffne die folgende Adresse im Browser deines Computers zur Installation.",
+  "Windows: x64-setup.exe 설치 파일을 실행하세요.": "Windows: Führe das Installationsprogramm x64-setup.exe aus.",
+  "macOS: Apple Silicon용 aarch64.dmg를 열고 FTA를 응용 프로그램 폴더로 드래그하세요. Intel Mac 설치 파일은 아직 제공하지 않습니다.": "macOS: Öffne aarch64.dmg für Apple Silicon und ziehe FTA in den Programme-Ordner. Ein Installationsprogramm für Intel-Macs ist noch nicht verfügbar.",
+  "컴퓨터에서 FTA를 실행하고 모바일과 같은 LAN에 연결하세요. 양쪽에서 사용할 네트워크를 신뢰하도록 설정한 뒤 기기를 선택해 전송하세요. 최초 전송은 수신 기기에서 한 번 등록을 승인해야 합니다.": "Starte FTA auf deinem Computer und verbinde ihn mit demselben LAN wie dein Smartphone. Vertraue dem Netzwerk auf beiden Geräten und wähle ein Gerät zum Senden. Beim ersten Transfer muss das empfangende Gerät die Registrierung einmal bestätigen.",
+  "주소 복사": "Adresse kopieren",
+  "주소를 복사했습니다": "Adresse kopiert",
+  "지원 준비 중": "Unterstützung in Vorbereitung"
 }

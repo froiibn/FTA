@@ -11,8 +11,10 @@
 "File Transfer Anything" = "File Transfer Anything";
 "LAN 연결" = "Conexión LAN";
 "Wi-Fi 연결 없음" = "Sin conexión Wi-Fi";
+"Windows: x64-setup.exe 설치 파일을 실행하세요." = "Windows: ejecuta el instalador x64-setup.exe.";
 "iOS 빌드의 기존 라이브러리와 빌드 도구 고지입니다. 원문 전체는 앱에 함께 포함됩니다." = "Avisos de las bibliotecas y herramientas de compilación de iOS existentes. Los textos originales completos se incluyen en la app.";
 "iOS 설정 열기" = "Abrir Ajustes de iOS";
+"macOS: Apple Silicon용 aarch64.dmg를 열고 FTA를 응용 프로그램 폴더로 드래그하세요. Intel Mac 설치 파일은 아직 제공하지 않습니다." = "macOS: abre aarch64.dmg para Apple Silicon y arrastra FTA a Aplicaciones. Aún no hay un instalador para Mac con Intel.";
 "같은 LAN에서 상대 FTA를 실행하세요." = "Abre FTA en otro dispositivo de la misma red local.";
 "개인정보 및 지원" = "Privacidad y soporte";
 "개인정보 처리방침" = "Política de privacidad";
@@ -42,6 +44,7 @@
 "링크 열기" = "Abrir enlace";
 "메시지 전송" = "Enviar mensaje";
 "무결성 확인 중" = "Verificando integridad";
+"무료 PC 버전입니다. 컴퓨터의 브라우저에서 아래 주소를 열어 설치하세요." = "La versión para PC es gratuita. Abre la siguiente dirección en el navegador del ordenador para instalarla.";
 "문서를 불러오지 못했습니다." = "No se pudo cargar el documento.";
 "문서를 불러오지 못했습니다. 지원 페이지에서 문의해 주세요." = "No se pudo cargar el documento. Visita la página de soporte.";
 "미리보기" = "Vista previa";
@@ -113,7 +116,10 @@
 "전송 취소" = "Cancelar transferencia";
 "전송할 텍스트 또는 URL" = "Texto o URL para enviar";
 "전체" = "Todo";
+"주소 복사" = "Copiar dirección";
+"주소를 복사했습니다" = "Dirección copiada";
 "지원 및 문의" = "Soporte y contacto";
+"지원 준비 중" = "Compatibilidad en preparación";
 "진행률 확인 중" = "Comprobando progreso";
 "차단됨" = "Bloqueado";
 "촬영" = "Hacer foto";
@@ -122,6 +128,8 @@
 "취소 확인 중" = "Confirmando cancelación";
 "취소됨" = "Cancelado";
 "카메라 접근이 허용되지 않았습니다. iOS 설정에서 FTA의 카메라 권한을 확인하세요." = "No se permite acceder a la cámara. Comprueba el permiso de FTA en Ajustes de iOS.";
+"컴퓨터에 FTA 설치하기" = "Instalar FTA en un ordenador";
+"컴퓨터에서 FTA를 실행하고 모바일과 같은 LAN에 연결하세요. 양쪽에서 사용할 네트워크를 신뢰하도록 설정한 뒤 기기를 선택해 전송하세요. 최초 전송은 수신 기기에서 한 번 등록을 승인해야 합니다." = "Inicia FTA en el ordenador y conéctalo a la misma LAN que el teléfono. Marca la red como de confianza en ambos dispositivos y selecciona uno para enviar. En la primera transferencia, el receptor debe aprobar el registro una sola vez.";
 "크기" = "Tamaño";
 "텍스트" = "Texto";
 "텍스트 또는 URL" = "Texto o URL";

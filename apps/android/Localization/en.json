@@ -137,5 +137,15 @@
   "gallery_saved_title": "Gallery save result",
   "gallery_result": "Saved %1$d of %2$d photos to Pictures/FTA. Failed: %3$d. Received originals are kept.",
   "gallery_cancelled": "Remaining gallery copies were cancelled.",
-  "view_photo": "View photo"
+  "view_photo": "View photo",
+  "desktop_install_title": "Install FTA on a computer",
+  "desktop_install_intro": "The PC version is free. Open the address below in your computer’s browser to install it.",
+  "desktop_install_windows": "Windows: Run the x64-setup.exe installer.",
+  "desktop_install_mac": "macOS: Open aarch64.dmg for Apple Silicon and drag FTA to Applications. An Intel Mac installer is not available yet.",
+  "desktop_install_linux": "Support coming soon",
+  "desktop_install_connect": "Run FTA on your computer and connect to the same LAN as your phone. Trust the network on both devices, then select a device to send. The receiving device must approve registration once on the first transfer.",
+  "desktop_copy_address": "Copy address",
+  "desktop_address_copied": "Address copied",
+  "receive_alerts": "Receive alerts",
+  "history_unread": "%1$s (%2$s)"
 }

@@ -26,6 +26,7 @@
 		DAF33EF923DC2D9BEE59D4E4 /* FTA/Legal/PrivacyPolicy.txt in Resources */ = {isa = PBXBuildFile; fileRef = D789367518AFF3699E104A0A /* FTA/Legal/PrivacyPolicy.txt */; };
 		F2687002D4A70A82C8684105 /* FTA/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8BF729FFE074CAEE622C0292 /* FTA/Assets.xcassets */; };
 		F76153C3B615164A18D12A1A /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 89832BF4CA493217BDB4BD8B /* InfoPlist.strings */; };
+		1310DA51F4F6334051018317 /* FTA/ReceiptState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A182F119752E2779AB70DFD /* FTA/ReceiptState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +80,7 @@
 		F1E29A4B751E043A1BC240DE /* FTA/Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = FTA/Signing.xcconfig; sourceTree = "<group>"; };
 		F7B860DB40E02C3BF234DAC3 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "FTA/Localization/zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		FF15D1A465F33444B504A493 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = FTA/Localization/es.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		0A182F119752E2779AB70DFD /* FTA/ReceiptState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTA/ReceiptState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +122,7 @@
 				1C4314591E7F13C8911CEFA2 /* FTA/LegalView.swift */,
 				BFB0697EF0F6E683531E6BF0 /* FTA/MediaPicker.swift */,
 				677415A2A97C8E682845BA4E /* FTA/NetworkPreferences.swift */,
+				0A182F119752E2779AB70DFD /* FTA/ReceiptState.swift */,
 				8077FB198463AE188DEAC41D /* FTA/TransferFeedback.swift */,
 				F1E29A4B751E043A1BC240DE /* FTA/Signing.xcconfig */,
 				8BF729FFE074CAEE622C0292 /* FTA/Assets.xcassets */,
@@ -276,6 +279,7 @@
 				692E6C1E41A06FC5325D5B46 /* FTA/LegalView.swift in Sources */,
 				CE57FC1BF4DE4359E84E5BD9 /* FTA/MediaPicker.swift in Sources */,
 				96B4084424BA5E95AC67F51A /* FTA/NetworkPreferences.swift in Sources */,
+				1310DA51F4F6334051018317 /* FTA/ReceiptState.swift in Sources */,
 				B82A5675DE603493C54700F9 /* FTA/TransferFeedback.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

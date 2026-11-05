@@ -18,6 +18,12 @@ public final class FtaChecks extends Instrumentation {
     private void check(boolean condition,String name){if(!condition)throw new AssertionError(name);checks++;}
     private String read(File file)throws Exception{try(InputStream input=new FileInputStream(file)){return new String(input.readAllBytes(),StandardCharsets.UTF_8);}}
     @Override public void onStart(){if("true".equals(arguments.getString("gallery"))){new GalleryChecks(this).run();return;}if("true".equals(arguments.getString("background"))){new BackgroundChecks(this).run();return;}Bundle result=new Bundle();try{
+        // Native channel policy checks avoid mutating any user-managed channel or posting synthetic UI receipts.
+        android.app.NotificationChannel normal=new android.app.NotificationChannel("receipt-test","test",android.app.NotificationManager.IMPORTANCE_DEFAULT);
+        check(!ReceiptAlerts.preserveChannel(normal),"unchanged default channel may adopt heads-up default");
+        normal.setSound(null,null);check(ReceiptAlerts.preserveChannel(normal),"explicitly silent legacy channel stays silent");
+        android.app.NotificationChannel blocked=new android.app.NotificationChannel("receipt-blocked-test","test",android.app.NotificationManager.IMPORTANCE_NONE);
+        check(ReceiptAlerts.preserveChannel(blocked),"blocked legacy channel is never bypassed");
         NativeBridge.initialize(getTargetContext());
         JSONObject identity=new JSONObject(read(new File(NativeBridge.state,"identity.json")));
         check(!identity.has("key"),"private identity must never be plaintext JSON");
@@ -79,7 +85,8 @@ public final class FtaChecks extends Instrumentation {
         runOnMainSync(()->{editor.setText(old);activity.finish();});
     }
 
-    private android.widget.TextView text(android.view.View view,String value){if(view instanceof android.widget.TextView&&value.contentEquals(((android.widget.TextView)view).getText()))return (android.widget.TextView)view;if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int i=0;i<group.getChildCount();i++){android.widget.TextView found=text(group.getChildAt(i),value);if(found!=null)return found;}}return null;}
+    // Text-only labels may have no content description; icon actions expose their name there instead.
+    private android.widget.TextView text(android.view.View view,String value){if(view instanceof android.widget.TextView&&(value.contentEquals(((android.widget.TextView)view).getText())||(view.getContentDescription()!=null&&value.contentEquals(view.getContentDescription()))))return (android.widget.TextView)view;if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int i=0;i<group.getChildCount();i++){android.widget.TextView found=text(group.getChildAt(i),value);if(found!=null)return found;}}return null;}
     private android.view.View nameDialog(MainActivity activity){for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews())if(root!=activity.getWindow().getDecorView()&&input(root)!=null)return root;throw new AssertionError("native name dialog exists");}
     // Exercise real framework dialogs/Editable and validators without asynchronous shell/IME key injection.
     private void settingsUiChecks()throws Exception{

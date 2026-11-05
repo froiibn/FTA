@@ -137,5 +137,15 @@
   "gallery_saved_title": "图库保存结果",
   "gallery_result": "已将 %2$d 张照片中的 %1$d 张保存到 Pictures/FTA。失败：%3$d 张。接收的原始文件会保留。",
   "gallery_cancelled": "已取消剩余的图库保存。",
-  "view_photo": "查看照片"
+  "view_photo": "查看照片",
+  "desktop_install_title": "在电脑上安装FTA",
+  "desktop_install_intro": "电脑版免费。请在电脑浏览器中打开以下地址进行安装。",
+  "desktop_install_windows": "Windows：运行x64-setup.exe安装程序。",
+  "desktop_install_mac": "macOS：打开适用于Apple Silicon的aarch64.dmg，将FTA拖入“应用程序”文件夹。目前尚无Intel Mac安装包。",
+  "desktop_install_linux": "支持准备中",
+  "desktop_install_connect": "在电脑上启动FTA，并与手机连接同一局域网。在两台设备上将网络设为可信任，然后选择设备发送。首次传输时，接收设备需要批准一次注册。",
+  "desktop_copy_address": "复制地址",
+  "desktop_address_copied": "地址已复制",
+  "receive_alerts": "接收通知",
+  "history_unread": "%1$s (%2$s)"
 }

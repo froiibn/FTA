@@ -22,7 +22,8 @@ def tree():
    return ET.fromstring(data)
   except (ET.ParseError,subprocess.SubprocessError):time.sleep(.5)
  raise RuntimeError('No stable accessibility root')
-def find(text):return next((n for n in tree().iter('node') if n.get('text')==text or n.get('hint')==text),None)
+# Icon-only native buttons keep their localized name in content-desc rather than visible text.
+def find(text):return next((n for n in tree().iter('node') if n.get('text')==text or n.get('hint')==text or n.get('content-desc')==text),None)
 def wait(text,timeout=20):
  end=time.monotonic()+timeout
  while time.monotonic()<end:

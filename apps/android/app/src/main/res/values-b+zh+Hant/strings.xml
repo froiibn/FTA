@@ -139,6 +139,16 @@
     <string name="gallery_result">"已將 %2$d 張照片中的 %1$d 張儲存到 Pictures/FTA。失敗：%3$d 張。收到的原始檔會保留。"</string>
     <string name="gallery_cancelled">"已取消其餘相片庫儲存。"</string>
     <string name="view_photo">"檢視照片"</string>
+    <string name="desktop_install_title">"在電腦上安裝FTA"</string>
+    <string name="desktop_install_intro">"電腦版免費。請在電腦瀏覽器中開啟以下位址進行安裝。"</string>
+    <string name="desktop_install_windows">"Windows：執行x64-setup.exe安裝程式。"</string>
+    <string name="desktop_install_mac">"macOS：開啟適用於Apple Silicon的aarch64.dmg，將FTA拖入「應用程式」資料夾。目前尚無Intel Mac安裝檔。"</string>
+    <string name="desktop_install_linux">"支援準備中"</string>
+    <string name="desktop_install_connect">"在電腦上啟動FTA，並與手機連接同一區域網路。在兩台裝置上將網路設為信任，然後選擇裝置傳送。首次傳輸時，接收裝置需要核准一次註冊。"</string>
+    <string name="desktop_copy_address">"複製位址"</string>
+    <string name="desktop_address_copied">"已複製位址"</string>
+    <string name="receive_alerts">"接收通知"</string>
+    <string name="history_unread">"%1$s (%2$s)"</string>
     <plurals name="item_count">
         <item quantity="other">"%1$d 個項目"</item>
     </plurals>

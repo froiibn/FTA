@@ -137,5 +137,15 @@
   "gallery_saved_title": "Ergebnis der Galeriespeicherung",
   "gallery_result": "%1$d von %2$d Fotos in Pictures/FTA gespeichert. Fehlgeschlagen: %3$d. Empfangene Originale bleiben erhalten.",
   "gallery_cancelled": "Verbleibende Galeriekopien abgebrochen.",
-  "view_photo": "Foto ansehen"
+  "view_photo": "Foto ansehen",
+  "desktop_install_title": "FTA auf einem Computer installieren",
+  "desktop_install_intro": "Die PC-Version ist kostenlos. Öffne die folgende Adresse im Browser deines Computers zur Installation.",
+  "desktop_install_windows": "Windows: Führe das Installationsprogramm x64-setup.exe aus.",
+  "desktop_install_mac": "macOS: Öffne aarch64.dmg für Apple Silicon und ziehe FTA in den Programme-Ordner. Ein Installationsprogramm für Intel-Macs ist noch nicht verfügbar.",
+  "desktop_install_linux": "Unterstützung in Vorbereitung",
+  "desktop_install_connect": "Starte FTA auf deinem Computer und verbinde ihn mit demselben LAN wie dein Smartphone. Vertraue dem Netzwerk auf beiden Geräten und wähle ein Gerät zum Senden. Beim ersten Transfer muss das empfangende Gerät die Registrierung einmal bestätigen.",
+  "desktop_copy_address": "Adresse kopieren",
+  "desktop_address_copied": "Adresse kopiert",
+  "receive_alerts": "Empfangsbenachrichtigungen",
+  "history_unread": "%1$s (%2$s)"
 }

@@ -137,5 +137,15 @@
   "gallery_saved_title": "갤러리 저장 결과",
   "gallery_result": "사진 %2$d개 중 %1$d개를 Pictures/FTA에 저장했습니다. 실패: %3$d개. 수신 원본은 유지됩니다.",
   "gallery_cancelled": "남은 갤러리 저장을 취소했습니다.",
-  "view_photo": "사진 보기"
+  "view_photo": "사진 보기",
+  "desktop_install_title": "컴퓨터에 FTA 설치하기",
+  "desktop_install_intro": "무료 PC 버전입니다. 컴퓨터의 브라우저에서 아래 주소를 열어 설치하세요.",
+  "desktop_install_windows": "Windows: x64-setup.exe 설치 파일을 실행하세요.",
+  "desktop_install_mac": "macOS: Apple Silicon용 aarch64.dmg를 열고 FTA를 응용 프로그램 폴더로 드래그하세요. Intel Mac 설치 파일은 아직 제공하지 않습니다.",
+  "desktop_install_linux": "지원 준비 중",
+  "desktop_install_connect": "컴퓨터에서 FTA를 실행하고 모바일과 같은 LAN에 연결하세요. 양쪽에서 사용할 네트워크를 신뢰하도록 설정한 뒤 기기를 선택해 전송하세요. 최초 전송은 수신 기기에서 한 번 등록을 승인해야 합니다.",
+  "desktop_copy_address": "주소 복사",
+  "desktop_address_copied": "주소를 복사했습니다",
+  "receive_alerts": "수신 알림",
+  "history_unread": "%1$s (%2$s)"
 }

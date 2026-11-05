@@ -137,5 +137,15 @@
   "gallery_saved_title": "Résultat de l’enregistrement",
   "gallery_result": "%1$d sur %2$d photos enregistrées dans Pictures/FTA. Échecs : %3$d. Les originaux reçus sont conservés.",
   "gallery_cancelled": "Les copies restantes ont été annulées.",
-  "view_photo": "Voir la photo"
+  "view_photo": "Voir la photo",
+  "desktop_install_title": "Installer FTA sur un ordinateur",
+  "desktop_install_intro": "La version PC est gratuite. Ouvrez l’adresse ci-dessous dans le navigateur de votre ordinateur pour l’installer.",
+  "desktop_install_windows": "Windows : exécutez le programme d’installation x64-setup.exe.",
+  "desktop_install_mac": "macOS : ouvrez aarch64.dmg pour Apple Silicon et glissez FTA dans Applications. Aucun programme d’installation pour Mac Intel n’est encore disponible.",
+  "desktop_install_linux": "Prise en charge en préparation",
+  "desktop_install_connect": "Lancez FTA sur votre ordinateur et connectez-le au même réseau local que votre téléphone. Déclarez le réseau fiable sur les deux appareils, puis choisissez un appareil pour envoyer. Au premier transfert, l’appareil destinataire doit approuver l’enregistrement une seule fois.",
+  "desktop_copy_address": "Copier l’adresse",
+  "desktop_address_copied": "Adresse copiée",
+  "receive_alerts": "Alertes de réception",
+  "history_unread": "%1$s (%2$s)"
 }

@@ -139,6 +139,16 @@
     <string name="gallery_result">"写真 %2$d 枚中 %1$d 枚を Pictures/FTA に保存しました。失敗: %3$d 枚。受信した原本は保持されます。"</string>
     <string name="gallery_cancelled">"残りの保存をキャンセルしました。"</string>
     <string name="view_photo">"写真を表示"</string>
+    <string name="desktop_install_title">"パソコンにFTAをインストール"</string>
+    <string name="desktop_install_intro">"PC版は無料です。パソコンのブラウザで以下のアドレスを開いてインストールしてください。"</string>
+    <string name="desktop_install_windows">"Windows: x64-setup.exeを実行してください。"</string>
+    <string name="desktop_install_mac">"macOS: Apple Silicon用のaarch64.dmgを開き、FTAをアプリケーションフォルダへドラッグしてください。Intel Mac用はまだ提供していません。"</string>
+    <string name="desktop_install_linux">"サポート準備中"</string>
+    <string name="desktop_install_connect">"パソコンでFTAを起動し、スマートフォンと同じLANに接続してください。両方でネットワークを信頼する設定にして、送信先を選びます。初回の転送時に受信側で一度だけ登録を承認してください。"</string>
+    <string name="desktop_copy_address">"アドレスをコピー"</string>
+    <string name="desktop_address_copied">"アドレスをコピーしました"</string>
+    <string name="receive_alerts">"受信通知"</string>
+    <string name="history_unread">"%1$s (%2$s)"</string>
     <plurals name="item_count">
         <item quantity="other">"%1$d 項目"</item>
     </plurals>

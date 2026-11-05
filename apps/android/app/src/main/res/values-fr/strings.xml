@@ -139,6 +139,16 @@
     <string name="gallery_result">"%1$d sur %2$d photos enregistrées dans Pictures/FTA. Échecs : %3$d. Les originaux reçus sont conservés."</string>
     <string name="gallery_cancelled">"Les copies restantes ont été annulées."</string>
     <string name="view_photo">"Voir la photo"</string>
+    <string name="desktop_install_title">"Installer FTA sur un ordinateur"</string>
+    <string name="desktop_install_intro">"La version PC est gratuite. Ouvrez l’adresse ci-dessous dans le navigateur de votre ordinateur pour l’installer."</string>
+    <string name="desktop_install_windows">"Windows : exécutez le programme d’installation x64-setup.exe."</string>
+    <string name="desktop_install_mac">"macOS : ouvrez aarch64.dmg pour Apple Silicon et glissez FTA dans Applications. Aucun programme d’installation pour Mac Intel n’est encore disponible."</string>
+    <string name="desktop_install_linux">"Prise en charge en préparation"</string>
+    <string name="desktop_install_connect">"Lancez FTA sur votre ordinateur et connectez-le au même réseau local que votre téléphone. Déclarez le réseau fiable sur les deux appareils, puis choisissez un appareil pour envoyer. Au premier transfert, l’appareil destinataire doit approuver l’enregistrement une seule fois."</string>
+    <string name="desktop_copy_address">"Copier l’adresse"</string>
+    <string name="desktop_address_copied">"Adresse copiée"</string>
+    <string name="receive_alerts">"Alertes de réception"</string>
+    <string name="history_unread">"%1$s (%2$s)"</string>
     <plurals name="item_count">
         <item quantity="one">"%1$d élément"</item>
         <item quantity="other">"%1$d éléments"</item>

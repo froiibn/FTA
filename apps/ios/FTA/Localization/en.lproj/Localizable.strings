@@ -11,8 +11,10 @@
 "File Transfer Anything" = "File Transfer Anything";
 "LAN 연결" = "LAN connection";
 "Wi-Fi 연결 없음" = "No Wi-Fi connection";
+"Windows: x64-setup.exe 설치 파일을 실행하세요." = "Windows: Run the x64-setup.exe installer.";
 "iOS 빌드의 기존 라이브러리와 빌드 도구 고지입니다. 원문 전체는 앱에 함께 포함됩니다." = "Notices for existing iOS libraries and build tools. Full original notices are included in the app.";
 "iOS 설정 열기" = "Open iOS Settings";
+"macOS: Apple Silicon용 aarch64.dmg를 열고 FTA를 응용 프로그램 폴더로 드래그하세요. Intel Mac 설치 파일은 아직 제공하지 않습니다." = "macOS: Open aarch64.dmg for Apple Silicon and drag FTA to Applications. An Intel Mac installer is not available yet.";
 "같은 LAN에서 상대 FTA를 실행하세요." = "Run FTA on another device on the same LAN.";
 "개인정보 및 지원" = "Privacy and support";
 "개인정보 처리방침" = "Privacy Policy";
@@ -42,6 +44,7 @@
 "링크 열기" = "Open link";
 "메시지 전송" = "Send message";
 "무결성 확인 중" = "Verifying integrity";
+"무료 PC 버전입니다. 컴퓨터의 브라우저에서 아래 주소를 열어 설치하세요." = "The PC version is free. Open the address below in your computer’s browser to install it.";
 "문서를 불러오지 못했습니다." = "Could not load the document.";
 "문서를 불러오지 못했습니다. 지원 페이지에서 문의해 주세요." = "Could not load the document. Please visit the support page.";
 "미리보기" = "Preview";
@@ -113,7 +116,10 @@
 "전송 취소" = "Cancel transfer";
 "전송할 텍스트 또는 URL" = "Text or URL to send";
 "전체" = "All";
+"주소 복사" = "Copy address";
+"주소를 복사했습니다" = "Address copied";
 "지원 및 문의" = "Support and contact";
+"지원 준비 중" = "Support coming soon";
 "진행률 확인 중" = "Checking progress";
 "차단됨" = "Blocked";
 "촬영" = "Take photo";
@@ -122,6 +128,8 @@
 "취소 확인 중" = "Confirming cancellation";
 "취소됨" = "Cancelled";
 "카메라 접근이 허용되지 않았습니다. iOS 설정에서 FTA의 카메라 권한을 확인하세요." = "Camera access is not allowed. Check FTA’s camera permission in iOS Settings.";
+"컴퓨터에 FTA 설치하기" = "Install FTA on a computer";
+"컴퓨터에서 FTA를 실행하고 모바일과 같은 LAN에 연결하세요. 양쪽에서 사용할 네트워크를 신뢰하도록 설정한 뒤 기기를 선택해 전송하세요. 최초 전송은 수신 기기에서 한 번 등록을 승인해야 합니다." = "Run FTA on your computer and connect to the same LAN as your phone. Trust the network on both devices, then select a device to send. The receiving device must approve registration once on the first transfer.";
 "크기" = "Size";
 "텍스트" = "Text";
 "텍스트 또는 URL" = "Text or URL";

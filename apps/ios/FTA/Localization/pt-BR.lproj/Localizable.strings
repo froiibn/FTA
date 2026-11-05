@@ -11,8 +11,10 @@
 "File Transfer Anything" = "File Transfer Anything";
 "LAN 연결" = "Conexão LAN";
 "Wi-Fi 연결 없음" = "Sem conexão Wi-Fi";
+"Windows: x64-setup.exe 설치 파일을 실행하세요." = "Windows: execute o instalador x64-setup.exe.";
 "iOS 빌드의 기존 라이브러리와 빌드 도구 고지입니다. 원문 전체는 앱에 함께 포함됩니다." = "Avisos das bibliotecas e ferramentas de compilação iOS existentes. Os textos originais completos estão incluídos no app.";
 "iOS 설정 열기" = "Abrir Ajustes do iOS";
+"macOS: Apple Silicon용 aarch64.dmg를 열고 FTA를 응용 프로그램 폴더로 드래그하세요. Intel Mac 설치 파일은 아직 제공하지 않습니다." = "macOS: abra aarch64.dmg para Apple Silicon e arraste o FTA para Aplicativos. Ainda não há instalador para Mac Intel.";
 "같은 LAN에서 상대 FTA를 실행하세요." = "Abra o FTA em outro dispositivo na mesma rede local.";
 "개인정보 및 지원" = "Privacidade e suporte";
 "개인정보 처리방침" = "Política de privacidade";
@@ -42,6 +44,7 @@
 "링크 열기" = "Abrir link";
 "메시지 전송" = "Enviar mensagem";
 "무결성 확인 중" = "Verificando integridade";
+"무료 PC 버전입니다. 컴퓨터의 브라우저에서 아래 주소를 열어 설치하세요." = "A versão para PC é gratuita. Abra o endereço abaixo no navegador do computador para instalar.";
 "문서를 불러오지 못했습니다." = "Não foi possível carregar o documento.";
 "문서를 불러오지 못했습니다. 지원 페이지에서 문의해 주세요." = "Não foi possível carregar o documento. Acesse a página de suporte.";
 "미리보기" = "Pré-visualizar";
@@ -113,7 +116,10 @@
 "전송 취소" = "Cancelar transferência";
 "전송할 텍스트 또는 URL" = "Texto ou URL para enviar";
 "전체" = "Tudo";
+"주소 복사" = "Copiar endereço";
+"주소를 복사했습니다" = "Endereço copiado";
 "지원 및 문의" = "Suporte e contato";
+"지원 준비 중" = "Suporte em preparação";
 "진행률 확인 중" = "Conferindo progresso";
 "차단됨" = "Bloqueado";
 "촬영" = "Tirar foto";
@@ -122,6 +128,8 @@
 "취소 확인 중" = "Confirmando cancelamento";
 "취소됨" = "Cancelado";
 "카메라 접근이 허용되지 않았습니다. iOS 설정에서 FTA의 카메라 권한을 확인하세요." = "O acesso à câmera não é permitido. Verifique a permissão do FTA nos Ajustes do iOS.";
+"컴퓨터에 FTA 설치하기" = "Instalar o FTA no computador";
+"컴퓨터에서 FTA를 실행하고 모바일과 같은 LAN에 연결하세요. 양쪽에서 사용할 네트워크를 신뢰하도록 설정한 뒤 기기를 선택해 전송하세요. 최초 전송은 수신 기기에서 한 번 등록을 승인해야 합니다." = "Abra o FTA no computador e conecte-o à mesma LAN do celular. Marque a rede como confiável nos dois dispositivos e selecione um dispositivo para enviar. Na primeira transferência, o destinatário deve aprovar o registro uma única vez.";
 "크기" = "Tamanho";
 "텍스트" = "Texto";
 "텍스트 또는 URL" = "Texto ou URL";

@@ -1,6 +1,7 @@
 // Localize visible copy while preserving identifiers, user data, and existing storage folder names.
 // System controls preserve native accessibility, keyboard behavior and OS appearance across all three tabs.
 import SwiftUI
+import ImageIO
 import UniformTypeIdentifiers
 import QuickLook
 import AVFoundation
@@ -33,8 +34,29 @@ struct RootView: View {
     var body: some View {
         TabView(selection:$model.tab) {
             NavigationStack { SendView() }.tabItem { Label(String(localized:"보내기"),systemImage:"paperplane") }.tag(0)
-            NavigationStack { HistoryView() }.tabItem { Label(String(localized:"기록"),systemImage:"clock") }.tag(1)
+            NavigationStack { HistoryView() }.tabItem { Label(String(localized:"기록"),systemImage:"clock") }.badge(model.unreadCount).tag(1)
             NavigationStack { SettingsView() }.tabItem { Label(String(localized:"설정"),systemImage:"gearshape") }.tag(2)
+        }
+        // A transient material banner does not interrupt typing or require notification permission.
+        .overlay(alignment:.top) {
+            if let event = model.receiptBanner {
+                HStack(spacing:12) {
+                    Button { Task { model.tab = 1; await model.openRecord(event.transfer_id) } } label: {
+                        HStack(spacing:12) {
+                            Image(systemName:event.record.state == "completed" ? "tray.and.arrow.down.fill" : "exclamationmark.triangle")
+                            VStack(alignment:.leading,spacing:4) {
+                                Text(model.receiptTitle(event)).font(.subheadline.weight(.semibold)).lineLimit(2)
+                                Text(model.receiptSubtitle(event)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer(minLength:0)
+                        }.padding(.vertical,12).contentShape(Rectangle())
+                    }.buttonStyle(.plain)
+                    Button(String(localized:"닫기"),systemImage:"xmark") { model.dismissReceiptBanner() }.modifier(IconActionStyle())
+                }.padding(.horizontal,16).background(.regularMaterial,in:RoundedRectangle(cornerRadius:18))
+                    .overlay(RoundedRectangle(cornerRadius:18).stroke(.primary.opacity(0.12)))
+                    .shadow(color:.black.opacity(0.12),radius:12,y:4).padding(.horizontal,16).padding(.top,8)
+                    .accessibilityElement(children:.contain).accessibilityIdentifier("receipt-banner")
+            }
         }
         .sheet(item:Binding<AppSheet?>(get:{
             if let request = model.requests.first { return .registration(request) }
@@ -137,7 +159,7 @@ struct SendView: View {
                     Label(model.serviceText,systemImage:model.running ? "dot.radiowaves.left.and.right" : "pause.circle")
                         .font(.footnote).foregroundStyle(.secondary)
                     Spacer(minLength:4)
-                    if !model.running { Button(String(localized:"연결 설정")) { model.tab = 2 }.font(.footnote) }
+                    if !model.running { Button(String(localized:"연결 설정"),systemImage:"gearshape") { model.tab = 2 }.modifier(IconActionStyle()).font(.footnote) }
                 }
                 VStack(alignment:.leading,spacing:14) {
                     Text(String(localized:"연결 가능한 기기")).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
@@ -201,23 +223,32 @@ struct SendView: View {
                 }.disabled(model.sending || model.importing)
                 if model.importing { ProgressView(String(localized:"선택한 항목 준비 중")).font(.footnote) }
                 if !(model.photos + model.files).isEmpty {
-                    VStack(alignment:.leading,spacing:12) {
+                    VStack(alignment:.leading,spacing:0) {
                         ForEach(model.photos + model.files,id:\.self) { url in
-                            Label(url.lastPathComponent,systemImage:model.photos.contains(url) ? "photo" : "doc").font(.subheadline).lineLimit(2)
+                            AttachmentPreviewRow(url:url) { model.removeAttachment(url) }
+                                .disabled(model.sending || model.importing)
+                            if url != (model.photos + model.files).last { Divider().padding(.leading,72) }
                         }
-                        HStack {
-                            Button(String(localized:"선택 해제"),role:.destructive) { model.clearPhotos(); model.clearFiles() }
+                        Divider().padding(.vertical,12)
+                        HStack(spacing:12) {
+                            VStack(alignment:.leading,spacing:4) {
+                                Label("\((model.photos.count + model.files.count).formatted())",systemImage:"paperclip").font(.subheadline.weight(.semibold))
+                                Text(ByteCountFormatter.string(fromByteCount:(model.photos + model.files).reduce(Int64(0)) { $0 + Int64((try? $1.resourceValues(forKeys:[.fileSizeKey]).fileSize) ?? 0) },countStyle:.file)).font(.caption).foregroundStyle(.secondary)
+                            }
                             Spacer()
-                            Button { Task { await model.sendAttachments() } } label: { Label(String(localized:"전송"),systemImage:"arrow.up.circle.fill") }
+                            Button(String(localized:"선택 해제"),systemImage:"trash",role:.destructive) { model.clearPhotos(); model.clearFiles() }.modifier(IconActionStyle()).disabled(model.sending || model.importing)
+                            Button { Task { await model.sendAttachments() } } label: { Label(String(localized:"전송"),systemImage:"arrow.up") }
+                                .labelStyle(.iconOnly).frame(minWidth:44,minHeight:44)
+                                .buttonStyle(.borderedProminent).buttonBorderShape(.capsule)
                                 .accessibilityIdentifier("send-attachments").disabled(!model.canSend)
-                        }.disabled(model.sending || model.importing)
+                        }
                     }.padding(16).modifier(GlassSurface())
                 }
                 if model.sending {
-                    Button(String(localized:"전송 취소"),role:.destructive) { Task { await model.cancel() } }
+                    Button(String(localized:"전송 취소"),systemImage:"stop.circle",role:.destructive) { Task { await model.cancel() } }.modifier(IconActionStyle())
                 }
                 if let notice = model.notice {
-                    HStack { Text(notice).font(.footnote).foregroundStyle(.secondary); Spacer(); Button(String(localized:"닫기")) { model.notice = nil } }
+                    HStack { Text(notice).font(.footnote).foregroundStyle(.secondary); Spacer(); Button(String(localized:"닫기"),systemImage:"xmark") { model.notice = nil }.modifier(IconActionStyle()) }
                 }
             }.padding(20).frame(maxWidth:.infinity,minHeight:geometry.size.height,alignment:.top)
                 // Only unoccupied content receives this gesture; TextField and buttons retain native taps.
@@ -288,7 +319,7 @@ struct SendView: View {
         return feedback.fraction.map { String(localized:"전송 중 \(Int($0*100))%") } ?? String(localized:"전송 중")
     }
     private func mediaButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action:action) { Label(title,systemImage:symbol).font(.body.weight(.medium)).foregroundStyle(.white).frame(maxWidth:.infinity).padding(.vertical,16) }
+        Button(action:action) { Label(title,systemImage:symbol).labelStyle(.iconOnly).font(.body.weight(.medium)).foregroundStyle(.white).frame(maxWidth:.infinity).padding(.vertical,16) }
             .buttonStyle(.plain).background(Color(white:0.12).opacity(0.83),in:Capsule()).modifier(GlassSurface(radius:30))
     }
     private func openCamera() async {
@@ -344,15 +375,15 @@ struct DetailView: View {
                 LabeledContent(String(localized:"방향"),value:record.direction == "receive" ? String(localized:"받음") : String(localized:"보냄"))
                 LabeledContent(String(localized:"날짜")) { Text(Date(timeIntervalSince1970:record.created_at ?? 0),format:.dateTime) }
                 if let error = record.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-                if record.state == "unknown" { Button(String(localized:"수신 측 결과 다시 확인")) { Task { await model.reconcile(record) } } }
+                if record.state == "unknown" { Button(String(localized:"수신 측 결과 다시 확인"),systemImage:"arrow.clockwise") { Task { await model.reconcile(record) } }.modifier(IconActionStyle()) }
             }
             if let body = record.body {
                 Section(record.kind == "url" ? "URL" : String(localized:"텍스트")) {
                     Text(body).textSelection(.enabled)
-                    Button(String(localized:"복사"),systemImage:"doc.on.doc") { UIPasteboard.general.string = body }
+                    Button(String(localized:"복사"),systemImage:"doc.on.doc") { UIPasteboard.general.string = body }.modifier(IconActionStyle())
                     // Only an explicit tap opens HTTP(S); stored strings never execute automatically.
                     if record.kind == "url", let url = URL(string:body), ["http","https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil {
-                        Link(destination:url) { Label(String(localized:"링크 열기"),systemImage:"safari") }
+                        Link(destination:url) { Label(String(localized:"링크 열기"),systemImage:"safari") }.modifier(IconActionStyle())
                     }
                 }
             }
@@ -363,15 +394,15 @@ struct DetailView: View {
                     if let error = item.error { Text(error).foregroundStyle(.red) }
                     if record.direction == "receive", item.state == "completed" {
                         if let url = Sandbox.receivedURL(item.path) {
-                            Button(String(localized:"미리보기"),systemImage:"doc.text.magnifyingglass") { preview = url }
-                            ShareLink(item:url) { Label(String(localized:"공유 · 파일에 저장"),systemImage:"square.and.arrow.up") }
+                            Button(String(localized:"미리보기"),systemImage:"doc.text.magnifyingglass") { preview = url }.modifier(IconActionStyle())
+                            ShareLink(item:url) { Label(String(localized:"공유 · 파일에 저장"),systemImage:"square.and.arrow.up") }.modifier(IconActionStyle())
                         } else { Text(String(localized:"파일이 이동되었거나 삭제되었습니다.")).foregroundStyle(.secondary) }
                     }
                 }
             }
-            Section { Button(String(localized:"기록 삭제"),role:.destructive) { deleting = true } } footer:{ Text(String(localized:"기록을 삭제해도 이미 받은 파일은 유지됩니다.")) }
+            Section { Button(String(localized:"기록 삭제"),systemImage:"trash",role:.destructive) { deleting = true }.modifier(IconActionStyle()) } footer:{ Text(String(localized:"기록을 삭제해도 이미 받은 파일은 유지됩니다.")) }
         }.navigationTitle(record.title).navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement:.confirmationAction) { Button(String(localized:"닫기")) { dismiss() } } }
+            .toolbar { ToolbarItem(placement:.confirmationAction) { Button(String(localized:"닫기"),systemImage:"xmark") { dismiss() }.modifier(IconActionStyle()) } }
             .quickLookPreview($preview)
             .confirmationDialog(String(localized:"이 기록을 삭제할까요?"),isPresented:$deleting,titleVisibility:.visible) {
                 Button(String(localized:"기록 삭제"),role:.destructive) { Task { await model.deleteRecord(record) } }
@@ -408,7 +439,7 @@ struct SettingsView: View {
         Form {
             Section {
                 TextField(String(localized:"기기 이름"),text:$model.name).textContentType(.name)
-                Button(String(localized:"이름 저장")) { Task { await model.saveName() } }
+                Button(String(localized:"이름 저장"),systemImage:"checkmark.square") { Task { await model.saveName() } }.modifier(IconActionStyle())
             } header:{ Text(String(localized:"이 iPhone")) } footer:{ Text("FTA · File Transfer Anything") }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
             Section {
                 Picker(String(localized:"사용할 연결"),selection:Binding(get:{model.selectedLAN},set:{model.selectLAN($0)})) {
@@ -427,17 +458,20 @@ struct SettingsView: View {
             } header:{ Text(String(localized:"받은 파일")) }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
             Section(String(localized:"알림")) {
                 LabeledContent(String(localized:"권한"),value:model.notificationStatus)
-                Button(String(localized:"알림 허용 요청")) { Task { await model.requestNotifications() } }
-                Button(String(localized:"iOS 설정 열기")) { if let url = URL(string:UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
+                if let issue = model.notificationDeliveryIssue { Text(issue).font(.footnote).foregroundStyle(.secondary) }
+                Button(String(localized:"알림 허용 요청"),systemImage:"bell.badge") { Task { await model.requestNotifications() } }.modifier(IconActionStyle())
+                Button(String(localized:"iOS 설정 열기"),systemImage:"gearshape") { if let url = URL(string:UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }.modifier(IconActionStyle())
             }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
             Section(String(localized:"등록된 기기")) {
                 if !model.peers.contains(where:{$0.paired}) { Text(String(localized:"등록된 기기가 없습니다")).foregroundStyle(.secondary) }
                 ForEach(model.peers.filter(\.paired)) { peer in
-                    HStack { PeerIcon(mobile:peer.mobile); Text(peer.display_name); Spacer(); Button(String(localized:"해제"),role:.destructive) { removing = peer } }
+                    HStack { PeerIcon(mobile:peer.mobile); Text(peer.display_name); Spacer(); Button(String(localized:"해제"),systemImage:"minus.circle",role:.destructive) { removing = peer }.modifier(IconActionStyle()) }
                 }
             }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
             // Submission requires accessible policy/support links; preserve the existing settings controls.
             Section(String(localized:"개인정보 및 지원")) {
+                // Keep desktop onboarding alongside help without changing network or trust settings.
+                NavigationLink(String(localized:"컴퓨터에 FTA 설치하기")) { DesktopInstallView() }
                 NavigationLink(String(localized:"개인정보 처리방침")) { LegalDocumentView(title:String(localized:"개인정보 처리방침"),resource:AppLegal.privacyResource,publicURL:AppLegal.privacyURL) }
                 if let url = AppLegal.supportURL { Link(String(localized:"지원 및 문의"),destination:url) }
                 NavigationLink(String(localized:"오픈소스 고지")) { ThirdPartyNoticesView() }
@@ -446,5 +480,84 @@ struct SettingsView: View {
             .confirmationDialog(String(localized:"기기 등록을 해제할까요?"),isPresented:Binding(get:{removing != nil},set:{if !$0 {removing = nil}}),titleVisibility:.visible) {
                 if let peer = removing { Button(String(localized:"등록 해제"),role:.destructive) { Task { await model.unpair(peer); removing = nil } } }
             } message:{ Text(String(localized:"이 기기의 새 전송을 차단합니다. 다시 보내려면 수신자의 등록 승인이 필요합니다.")) }
+    }
+}
+
+// Pin the verified desktop-only release rather than offering mobile packages from a changing latest release.
+// Update this address when the next verified Windows/macOS release is published.
+private enum DesktopDistribution {
+    static let releaseAddress = "https://github.com/froiibn/FTA/releases/tag/v0.1.2"
+}
+
+struct DesktopInstallView: View {
+    @State private var copied = false
+    var body: some View {
+        Form {
+            Section { Text(String(localized:"무료 PC 버전입니다. 컴퓨터의 브라우저에서 아래 주소를 열어 설치하세요.")) }
+                .listRowBackground(Rectangle().fill(.ultraThinMaterial))
+            Section("Windows · macOS") {
+                Text(String(localized:"Windows: x64-setup.exe 설치 파일을 실행하세요."))
+                Text(String(localized:"macOS: Apple Silicon용 aarch64.dmg를 열고 FTA를 응용 프로그램 폴더로 드래그하세요. Intel Mac 설치 파일은 아직 제공하지 않습니다."))
+                address(DesktopDistribution.releaseAddress)
+            }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
+            Section("Linux") {
+                // Linux has not been tested on a real machine; do not offer an installation path yet.
+                Text(String(localized:"지원 준비 중"))
+            }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
+            Section {
+                Text(String(localized:"컴퓨터에서 FTA를 실행하고 모바일과 같은 LAN에 연결하세요. 양쪽에서 사용할 네트워크를 신뢰하도록 설정한 뒤 기기를 선택해 전송하세요. 최초 전송은 수신 기기에서 한 번 등록을 승인해야 합니다."))
+            }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
+        }.scrollContentBackground(.hidden).background(GlassBackground())
+            .navigationTitle(String(localized:"컴퓨터에 FTA 설치하기")).navigationBarTitleDisplayMode(.inline)
+            .alert(String(localized:"주소를 복사했습니다"),isPresented:$copied) { Button(String(localized:"확인"),role:.cancel) {} }
+    }
+    // Copy only on explicit action; installers are opened by the user on their computer.
+    private func address(_ value: String) -> some View {
+        VStack(alignment:.leading,spacing:12) {
+            Text(verbatim:value).font(.footnote).textSelection(.enabled)
+            Button(String(localized:"주소 복사"),systemImage:"doc.on.doc") { UIPasteboard.general.string = value; copied = true }.modifier(IconActionStyle())
+                .accessibilityLabel(String(localized:"주소 복사") + " " + value)
+        }
+    }
+}
+
+// Native labels remain the accessibility names while icon actions retain a minimum touch target.
+struct IconActionStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content.labelStyle(.iconOnly).frame(minWidth:44,minHeight:44).contentShape(Rectangle())
+    }
+}
+
+// Downsample only private staged images off the main actor; original full-size assets never enter the UI.
+private struct AttachmentPreviewRow: View {
+    let url: URL
+    let remove: () -> Void
+    @State private var thumbnail: CGImage?
+    private static let thumbnailPixels = 144
+    var body: some View {
+        HStack(spacing:12) {
+            ZStack {
+                RoundedRectangle(cornerRadius:12).fill(.secondary.opacity(0.12))
+                if let thumbnail { Image(decorative:thumbnail,scale:1).resizable().scaledToFill() }
+                else { Image(systemName:"doc.fill").font(.title2).foregroundStyle(.secondary) }
+            }.frame(width:56,height:56).clipShape(RoundedRectangle(cornerRadius:12)).accessibilityHidden(true)
+            VStack(alignment:.leading,spacing:5) {
+                Text(url.lastPathComponent).font(.subheadline.weight(.medium)).lineLimit(2).truncationMode(.middle)
+                Text(ByteCountFormatter.string(fromByteCount:Int64((try? url.resourceValues(forKeys:[.fileSizeKey]).fileSize) ?? 0),countStyle:.file) + (url.pathExtension.isEmpty ? "" : " · " + url.pathExtension.uppercased()))
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }.frame(maxWidth:.infinity,alignment:.leading)
+            Button(String(localized:"선택 해제"),systemImage:"xmark.circle") { remove() }
+                .modifier(IconActionStyle()).foregroundStyle(.secondary)
+                .accessibilityLabel(String(localized:"선택 해제") + " " + url.lastPathComponent)
+        }.padding(.vertical,8)
+        .task(id:url) {
+            guard UTType(filenameExtension:url.pathExtension)?.conforms(to:.image) == true else { return }
+            // Capture this Sendable budget before leaving the UI actor.
+            let maximumPixels = Self.thumbnailPixels
+            thumbnail = await Task.detached(priority:.utility) {
+                guard let source = CGImageSourceCreateWithURL(url as CFURL,nil) else { return nil as CGImage? }
+                return CGImageSourceCreateThumbnailAtIndex(source,0,[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceCreateThumbnailWithTransform:true,kCGImageSourceThumbnailMaxPixelSize:maximumPixels] as CFDictionary)
+            }.value
+        }
     }
 }

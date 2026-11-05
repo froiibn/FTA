@@ -17,7 +17,7 @@ const MAX_REMEMBERED_NETWORKS = 32;
 type JsonObject = Record<string, unknown>;
 // Each native window loads one view; only main owns delivery acknowledgements and engine startup.
 const requestedView = new URLSearchParams(window.location.search).get("view");
-const view = requestedView === "inbox" || requestedView === "settings" ? requestedView : "main";
+const view = requestedView === "inbox" || requestedView === "settings" || requestedView === "detail" ? requestedView : "main";
 const isMain = view === "main";
 interface Device {
   device_id: string;
@@ -66,16 +66,16 @@ root.innerHTML = `
     <section id="send-panel" class="panel send-board">
       <aside class="target-rail"><div class="section-heading"><h2>기기</h2><div class="device-tools"><button id="refresh" class="quiet icon-label" aria-label="새로고침" title="새로고침"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button></div></div><div id="devices" class="devices" role="group" aria-label="전송 대상"></div></aside>
       <div class="send-workspace">
-        <section class="file-section" aria-labelledby="file-heading"><h2 id="file-heading" class="sr-only">파일</h2><button id="choose-files" class="quiet small" aria-label="파일 선택">파일 선택</button><div id="file-selection" class="file-selection" hidden><ul id="file-list"></ul><div class="selection-actions"><button id="clear-files" class="quiet">선택 해제</button><button id="send-files" class="primary">파일 보내기</button></div></div></section>
+        <section class="file-section" aria-labelledby="file-heading"><h2 id="file-heading" class="sr-only">파일</h2><button id="choose-files" class="action-icon quiet small" aria-label="파일 선택" title="파일 선택">${icon("file").outerHTML}</button><div id="file-selection" class="file-selection" hidden><ul id="file-list"></ul><div class="selection-actions"><button id="clear-files" class="action-icon quiet" aria-label="선택 해제" title="선택 해제">${icon("close").outerHTML}</button><button id="send-files" class="action-icon primary" aria-label="파일 보내기" title="파일 보내기">${icon("send").outerHTML}</button></div></div></section>
         <section class="composer" aria-labelledby="message-heading"><h2 id="message-heading" class="sr-only">텍스트 · 링크</h2><label class="sr-only" for="message">전송할 텍스트 또는 URL</label><div class="message-input"><textarea id="message" rows="2" placeholder="텍스트 또는 URL"></textarea><button id="send-message" class="primary send-arrow" aria-label="보내기" title="보내기" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div></section>
-        <div class="transfer-progress"><div id="transfer-status" class="transfer-status" role="status" hidden></div><progress id="transfer-progress-bar" value="0" max="100" aria-label="파일 전송 진행률" hidden></progress><button id="cancel-transfer" class="quiet" hidden>전송 취소</button></div>
+        <div class="transfer-progress"><div id="transfer-status" class="transfer-status" role="status" hidden></div><progress id="transfer-progress-bar" value="0" max="100" aria-label="파일 전송 진행률" hidden></progress><button id="cancel-transfer" class="action-icon quiet" hidden aria-label="전송 취소" title="전송 취소">${icon("stop").outerHTML}</button></div>
       </div>
     </section>
-    <section id="inbox-panel" class="utility-panel" aria-labelledby="inbox-title"><div class="utility-header" data-drag-handle><h2 id="inbox-title">기록</h2><button data-close-window="inbox" class="quiet" aria-label="기록 닫기">×</button></div><button id="reload-inbox" class="quiet small">새로고침</button><div id="history"></div></section>
-    <section id="settings-panel" class="utility-panel" aria-labelledby="settings-title"><div class="utility-header" data-drag-handle><h2 id="settings-title">설정</h2><button data-close-window="settings" class="quiet" aria-label="설정 닫기">×</button></div>
+    <section id="inbox-panel" class="utility-panel" aria-labelledby="inbox-title"><div class="utility-header" data-drag-handle><h2 id="inbox-title">기록</h2><button data-close-window="inbox" class="quiet action-icon" aria-label="기록 닫기" title="기록 닫기">${icon("close").outerHTML}</button></div><button id="reload-inbox" class="action-icon quiet small" aria-label="새로고침" title="새로고침">${icon("refresh").outerHTML}</button><div id="history"></div></section>
+    <section id="settings-panel" class="utility-panel" aria-labelledby="settings-title"><div class="utility-header" data-drag-handle><h2 id="settings-title">설정</h2><button data-close-window="settings" class="quiet action-icon" aria-label="설정 닫기" title="설정 닫기">${icon("close").outerHTML}</button></div>
       <!-- Scroll only the tab content so save and restart remain reachable at the bottom of the window. -->
       <div id="settings-content">
-      <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="secondary small">재점검</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 신뢰하는 네트워크</label>
+      <section class="settings-section" aria-labelledby="network-setup-title"><div class="section-heading"><h2 id="network-setup-title">집 네트워크 연결</h2><button id="network-refresh" class="action-icon secondary small" aria-label="재점검" title="재점검">${icon("refresh").outerHTML}</button></div><p id="network-summary" class="help" aria-live="polite">연결 상태를 확인합니다.</p><label for="network-interface">사용할 연결</label><select id="network-interface"><option value="">연결 선택</option></select><p id="network-scope" class="help"></p><label class="checkbox-label"><input id="network-home" type="checkbox" /> 신뢰하는 네트워크</label>
       <!-- A lasting Windows profile change needs an explicit action, not a temporary-looking checkbox. -->
       <div id="network-profile-row" hidden><p id="network-profile-status" aria-live="polite">현재 네트워크: 연결을 선택하세요.</p><p class="help">FTA는 개인 네트워크에서만 사용할 수 있습니다.</p><div class="form-actions"><button id="network-make-private" class="secondary" disabled>개인 네트워크로 변경</button><button id="network-make-public" class="secondary" disabled>공용으로 변경…</button></div><p class="help">변경한 상태는 전송 후에도 유지되며 다른 앱에도 영향을 줍니다.</p><p class="help">공용으로 되돌리려면 Windows 설정에서 현재 연결의 네트워크 프로필을 ‘공용’으로 선택하세요. 변경 후 ‘재점검’을 눌러주세요.</p></div>
       <label class="checkbox-label"><input id="network-firewall" type="checkbox" checked /> 수신 허용</label><p id="network-permission" class="help"></p><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다.</p></section>
@@ -85,26 +85,25 @@ root.innerHTML = `
       <section class="settings-section"><div class="section-heading"><h2>등록된 기기</h2></div><p class="help">감지된 컴퓨터에 처음 보내면 상대에서 한 번만 등록을 확인합니다. 이후에는 바로 전송됩니다.</p><div id="paired-devices"></div></section>
       </div>
       <!-- The external form attribute keeps native validation and the existing submit path intact. -->
-      <footer id="settings-actions" class="settings-footer"><p class="help">저장 후 ‘서비스 재시작’을 눌러 적용하세요.</p><div class="form-actions"><button id="network-system-settings" data-settings-action="network" class="secondary">시스템 설정 열기</button><button id="restart-engine" class="secondary" type="button">서비스 재시작</button><button id="network-apply" data-settings-action="network" class="primary" disabled>연결 설정 저장</button><button id="computer-save" data-settings-action="computer" class="primary" type="submit" form="settings-form" hidden>설정 저장</button></div></footer>
+      <footer id="settings-actions" class="settings-footer"><p class="help">저장 후 ‘서비스 재시작’을 눌러 적용하세요.</p><div class="form-actions"><button id="network-system-settings" data-settings-action="network" class="action-icon secondary" aria-label="시스템 설정 열기" title="시스템 설정 열기">${icon("settings").outerHTML}</button><button id="restart-engine" class="action-icon secondary" type="button" aria-label="서비스 재시작" title="서비스 재시작">${icon("refresh").outerHTML}</button><button id="network-apply" data-settings-action="network" class="action-icon primary" disabled aria-label="연결 설정 저장" title="연결 설정 저장">${icon("save").outerHTML}</button><button id="computer-save" data-settings-action="computer" class="action-icon primary" type="submit" form="settings-form" hidden aria-label="설정 저장" title="설정 저장">${icon("save").outerHTML}</button></div></footer>
       <!-- Native settings calls have no measurable percentage, so feedback stays indeterminate. -->
       <div id="settings-progress" class="settings-progress" role="status" aria-live="polite" hidden><div class="settings-progress-label"><span class="settings-donut" aria-hidden="true"></span><span>처리 중…</span></div></div>
     </section>
   </main>
   <button id="expand-window" class="expand-widget" aria-label="펼치기" title="펼치기" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V5h4m6 0h4v4m0 6v4h-4M9 19H5v-4"/></svg></button>
-  <dialog id="detail-dialog"><div class="detail-header"><h2 id="detail-title">수신 내용</h2><button id="close-detail" class="quiet">닫기</button></div><p id="detail-meta" class="help"></p><pre id="detail-body" class="detail-body"></pre><div id="detail-items"></div><div class="detail-actions"><button id="copy-detail" class="secondary">복사</button><button id="open-detail" class="primary" hidden>링크 열기</button><button id="reveal-detail" class="secondary" hidden>저장 위치 열기</button></div></dialog>
+  <section id="detail-panel" aria-labelledby="detail-title"><div class="detail-header utility-header" data-drag-handle><h2 id="detail-title">수신 내용</h2><button id="close-detail" class="action-icon quiet" aria-label="닫기" title="닫기">${icon("close").outerHTML}</button></div><p id="detail-meta" class="help"></p><div class="detail-content"><pre id="detail-body" class="detail-body"></pre><div id="detail-items"></div></div><div class="detail-actions"><button id="copy-detail" class="action-icon secondary" aria-label="복사" title="복사">${icon("copy").outerHTML}</button><button id="open-detail" class="action-icon primary" hidden aria-label="링크 열기" title="링크 열기">${icon("link").outerHTML}</button><button id="reveal-detail" class="action-icon secondary" hidden aria-label="저장 위치 열기" title="저장 위치 열기">${icon("folder").outerHTML}</button></div></section>
 `;
 // Detach unused view content rather than leaving another window's controls hidden and active.
 const utilityPanel = root.querySelector<HTMLElement>(`#${view}-panel`);
 if (isMain) {
   root.querySelector("#inbox-panel")?.remove();
   root.querySelector("#settings-panel")?.remove();
+  root.querySelector("#detail-panel")?.remove();
 } else if (utilityPanel) {
   const notice = root.querySelector<HTMLElement>("#notice");
-  const detail = view === "inbox" ? root.querySelector<HTMLDialogElement>("#detail-dialog") : null;
   root.replaceChildren(utilityPanel);
   utilityPanel.classList.add("utility-window");
   if (notice) utilityPanel.querySelector(".utility-header")?.after(notice);
-  if (detail) root.append(detail);
 }
 // Shared handlers bind only to controls belonging to this native view.
 function on(id: string, type: string, handler: EventListener): void {
@@ -215,10 +214,9 @@ function showNotice(message: string, error = false, source = "action"): void {
   positionNotice();
 }
 
-// Keep feedback in the current native view, or above an open received-record detail sheet.
+// Each native window owns its feedback; receipt details no longer use a nested modal.
 function positionNotice(): void {
-  const dialog = [...document.querySelectorAll<HTMLDialogElement>("dialog[open]")].at(-1);
-  const anchor = dialog?.querySelector(".detail-header") ?? document.querySelector(".utility-header, .app-header");
+  const anchor = document.querySelector(".detail-header, .utility-header, .app-header");
   anchor?.after(element("notice"));
 }
 
@@ -288,7 +286,7 @@ function updateActions(): void {
 }
 
 // Only application-owned SVG paths enter the DOM; received names remain text nodes.
-function icon(name: "computer" | "phone" | "file" | "text" | "link" | "delete"): SVGSVGElement {
+function icon(name: "computer" | "phone" | "file" | "text" | "link" | "delete" | "close" | "stop" | "send" | "refresh" | "settings" | "save" | "copy" | "folder" | "unpair"): SVGSVGElement {
   const paths = {
     computer: ["M3 4h18v12H3z", "M8 21h8m-4-5v5"],
     // Mobile peers must not inherit the desktop glyph; OS metadata comes from the engine.
@@ -296,6 +294,16 @@ function icon(name: "computer" | "phone" | "file" | "text" | "link" | "delete"):
     file: ["M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6"],
     text: ["M4 5h16M4 10h16M4 15h10M4 20h7"],
     link: ["M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"],
+    // Application-authored action glyphs share the existing SVG renderer and never contain received content.
+    close: ["M6 6l12 12M18 6 6 18"],
+    stop: ["M6 6h12v12H6z"],
+    send: ["M5 12h14m-6-6 6 6-6 6"],
+    refresh: ["M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"],
+    settings: ["M9 3h6l1 4 4 2v6l-4 2-1 4H9l-1-4-4-2V9l4-2 1-4Z", "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0"],
+    save: ["M5 3h12l4 4v14H3V3h2Z", "M7 3v6h10V3M7 21v-8h10v8"],
+    copy: ["M8 8h13v13H8zM16 8V3H3v13h5"],
+    folder: ["M3 6h7l2 3h9v11H3z"],
+    unpair: ["M9 8H7a4 4 0 0 0 0 8h2m6-8h2a4 4 0 0 1 0 8h-2M3 3l18 18"],
     delete: ["M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6m4-6v6"],
   };
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -369,7 +377,7 @@ let dragPoint: DropPoint | undefined;
 
 // Native coordinates identify the tile under the cursor even when its icon/name is the hit element.
 function dropTarget(point: DropPoint): Device | undefined {
-  if (!connected || !networkReady || sending || document.querySelector("dialog[open]") !== null) return undefined;
+  if (!connected || !networkReady || sending) return undefined;
   const tile = document.elementFromPoint(point.x, point.y)?.closest<HTMLButtonElement>(".device-tile");
   if (!tile || tile.disabled) return undefined;
   return devices.find((device) => device.device_id === tile.dataset.deviceId && (!device.paired || device.online));
@@ -442,10 +450,14 @@ function renderHistory(): void {
   }
 }
 
-// Query by stable ID so notification clicks resolve the current persisted record.
+// History and notification activation share an independent native window, never the small sender viewport.
 async function showDetail(id: string): Promise<void> {
+  await invoke("open_transfer_window", { transferId: id });
+}
+
+// Read persisted data by ID inside the viewer; bodies and local paths never enter the window URL.
+async function loadDetail(id: string): Promise<void> {
   const record = await rpc<TransferRecord>("inbox.get", { transfer_id: id });
-  await invoke("show_window");
   currentDetail = record;
   element("detail-title").textContent = record.kind === "files" ? "파일 전송 내용" : record.kind === "url" ? "받은 링크" : "텍스트 내용";
   element("detail-meta").textContent = `${record.peer_id} · ${new Date(record.created_at * 1000).toLocaleString()} · ${stateLabel(record.state)}`;
@@ -458,8 +470,7 @@ async function showDetail(id: string): Promise<void> {
   element("copy-detail").hidden = record.kind === "files";
   element("open-detail").hidden = record.kind !== "url";
   element("reveal-detail").hidden = record.kind !== "files" || !record.items.some((item) => item.path);
-  const dialog = element<HTMLDialogElement>("detail-dialog");
-  if (!dialog.open) dialog.showModal();
+  element("detail-body").hidden = !record.body;
   positionNotice();
 }
 
@@ -706,7 +717,11 @@ async function loadSettings(): Promise<void> {
     name.textContent = device.display_name;
     const button = document.createElement("button");
     button.className = "quiet";
-    button.textContent = "등록 해제";
+    // Keep the target in the accessible name when removing the visible action text.
+    button.classList.add("action-icon");
+    button.title = "등록 해제";
+    button.setAttribute("aria-label", `${device.display_name} 등록 해제`);
+    button.append(icon("unpair"));
     button.addEventListener("click", () => { void act(async () => {
       await rpc("devices.unpair", { device_id: device.device_id });
       await refresh();
@@ -806,7 +821,6 @@ async function quit(): Promise<void> {
 // Bind each handler once; rerenders replace only dynamic lists and preserve drafts/focus.
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-window]")) button.addEventListener("click", () => navigate(button.dataset.window ?? "send"));
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-close-window]")) button.addEventListener("click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }, { settingsFeedback: false }); });
-for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) dialog.addEventListener("close", positionNotice);
 on("refresh", "click", () => { void act(refresh); });
 on("reload-inbox", "click", () => { void act(refreshHistory); });
 on("message", "input", updateActions);
@@ -827,7 +841,7 @@ on("cancel-transfer", "click", () => { void act(async () => {
   element<HTMLButtonElement>("cancel-transfer").disabled = true;
   showNotice("취소를 요청했어요. 이미 저장된 항목은 보존됩니다.");
 }); });
-on("close-detail", "click", () => element<HTMLDialogElement>("detail-dialog").close());
+on("close-detail", "click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }); });
 on("copy-detail", "click", () => { void act(async () => { await invoke("copy_text", { value: currentDetail?.body ?? "" }); showNotice("복사했어요."); }); });
 on("open-detail", "click", () => { void act(async () => { if (currentDetail?.body) await invoke("open_link", { value: currentDetail.body }); }); });
 on("reveal-detail", "click", () => { void act(async () => { if (currentDetail) await invoke("reveal_transfer", { transferId: currentDetail.transfer_id }); }); });
@@ -840,7 +854,6 @@ on("restart-engine", "click", () => { void act(async () => {
 // Keep the DOM and draft alive while the native window changes size; only confirmed native state hides the surface.
 function applyFolded(folded: boolean): void {
   if (!isMain) return;
-  if (folded) element<HTMLDialogElement>("detail-dialog").close();
   document.body.classList.toggle("folded", folded);
   element("expand-window").hidden = !folded;
   dragPoint = undefined;
@@ -1109,10 +1122,23 @@ let settingsLoaded = false;
 // Retry initial IPC readiness without replacing a settings draft on each subsequent status refresh.
 async function refreshUtility(): Promise<void> {
   try {
+    // Persisted history does not depend on discovery/status readiness; a failed or slow
+    // device query must never prevent the first list load or require a manual refresh.
+    if (view === "inbox") {
+      await refreshHistory();
+      if (element("notice").dataset.source === "utility-refresh") element("notice").hidden = true;
+      try {
+        // Resolve peer display names after rendering saved records, never before it.
+        devices = await rpc<Device[]>("devices.list", { available_only: false });
+        renderHistory();
+      } catch {
+        // Discovery failure leaves the saved list and its existing peer labels usable.
+      }
+      return;
+    }
     await refresh();
     if (!connected) return;
-    if (view === "inbox") await refreshHistory();
-    else if (!settingsLoaded) { await loadSettings(); await refreshNetworkSetup(); settingsLoaded = true; }
+    if (!settingsLoaded) { await loadSettings(); await refreshNetworkSetup(); settingsLoaded = true; }
     // A recovered background query must clear only its own error; a failed user transfer,
     // settings save or permission action must remain visible after an unrelated status poll.
     if (element("notice").dataset.source === "utility-refresh") element("notice").hidden = true;
@@ -1139,10 +1165,24 @@ async function initialize(): Promise<void> {
   renderHistory();
   if (!desktop) {
     showNotice("미리보기 · 전송 불가");
-    for (const button of document.querySelectorAll<HTMLButtonElement>("#settings-panel button:not([data-close-window]), #pin, #fold-window, #expand-window, #close-app-window")) button.disabled = true;
+    for (const button of document.querySelectorAll<HTMLButtonElement>("#settings-panel button:not([data-close-window]), #detail-panel button, #pin, #fold-window, #expand-window, #close-app-window")) button.disabled = true;
+    return;
+  }
+  if (view === "detail") {
+    const id = new URLSearchParams(window.location.search).get("transfer");
+    if (!id) { showNotice("수신 항목을 찾을 수 없습니다.", true); return; }
+    // Retry an unavailable engine without resetting selection/scroll after a successful read.
+    const read = async (): Promise<void> => { if (!currentDetail) await loadDetail(id); };
+    window.setInterval(() => { void act(read); }, REFRESH_INTERVAL_MS);
+    await act(read);
     return;
   }
   if (!isMain) {
+    // A reused history window may have been hidden while new receipts arrived;
+    // refresh on activation instead of waiting for the polling interval or a click.
+    if (view === "inbox") window.addEventListener("focus", () => {
+      void act(refreshUtility, { settingsFeedback: false });
+    });
     // Passive status polling never flashes progress or a completion toast over the user's work.
     window.setInterval(() => {
       if (view === "settings" && settingsActionCount > 0) return;

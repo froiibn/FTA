@@ -7,7 +7,8 @@ import Network
 final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     var open: ((String) -> Void)?
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .sound])
+        // The app owns its visible banner; retain native sound without showing a duplicate system banner.
+        completionHandler([.sound, .list])
     }
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         if let id = response.notification.request.content.userInfo["transfer_id"] as? String {
@@ -42,6 +43,16 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     @Published var detail: Transfer?
     @Published var activeID: String?
     @Published var deciding = false
+    @Published var unreadCount = 0
+    @Published var receiptBanner: Receipt?
+    private let receiptState = ReceiptState()
+    private var consumingEvents = false
+    private var requestingNotificationPermission = false
+    private var bannerDismissal: Task<Void, Never>?
+    private var lastReceiptFeedback: TimeInterval = -.infinity
+    private static let receiptBannerSeconds: Double = 6
+    private static let receiptFeedbackSeconds: TimeInterval = 2
+    @Published var notificationDeliveryIssue: String?
     @Published var notificationStatus = String(localized:"확인 중")
     private let preferences = NetworkPreferences()
     private var serviceBlocked = false
@@ -56,6 +67,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     private let consumer = "ios-notifications-v1"
 
     init() {
+        unreadCount = receiptState.count
         receiveEnabled = preferences.receiveEnabled
         restoreConnections(lans)
         UNUserNotificationCenter.current().delegate = notifications
@@ -80,6 +92,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
                 try Sandbox.prepare()
                 _ = try await Engine.call("host.prepare",["container_dir":Sandbox.container.path,"state_dir":Sandbox.state.path,"receive_dir":Sandbox.received.path])
                 await refreshLocalHistory()
+                try await consumeEvents()
             } catch { self.error = error.localizedDescription }
             await refreshNotificationStatus()
         }
@@ -125,10 +138,12 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         preferences.setTrusted(trusted,scope:lan.trustScope)
         preferences.selectedScope = lan.trustScope
         confirmed = trusted; serviceBlocked = false; updateLifecycle()
+        if trusted { Task { await requestNotificationsIfNeeded() } }
     }
     func setReceiveEnabled(_ enabled: Bool) {
         receiveEnabled = enabled; preferences.receiveEnabled = enabled
         serviceBlocked = false; updateLifecycle()
+        if enabled && confirmed { Task { await requestNotificationsIfNeeded() } }
     }
     // NWPath gates stale interface addresses so cellular/VPN paths never restore LAN trust.
     private var usableConnections: [LAN] {
@@ -162,6 +177,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
                 _ = try await Engine.call("host.stop"); return
             }
             activeLAN = lan; running = true
+            Task { await requestNotificationsIfNeeded() }
             bonjour.start(); bonjour.advertise(data, name: name)
             polling = Task { [weak self] in
                 while !Task.isCancelled, let self, self.running {
@@ -228,23 +244,67 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
             try await consumeEvents()
         } catch { if running { self.error = error.localizedDescription } }
     }
+    // Serialize across refresh reentrancy so a send completion cannot replay the same receive alert.
     private func consumeEvents() async throws {
+        guard !consumingEvents else { return }; consumingEvents = true; defer { consumingEvents = false }
         let cursor = try await Engine.decode(Cursor.self,"events.cursor",["consumer":consumer])
         let page = try await Engine.decode(EventPage.self,"events.list",["after":cursor.sequence,"limit":100])
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         for event in page.events {
-            if event.record.direction == "receive", [.authorized,.provisional,.ephemeral].contains(settings.authorizationStatus) {
-                let content = UNMutableNotificationContent()
-                content.title = event.record.state == "completed" ? String(localized:"FTA 수신 완료") : String(localized:"FTA 수신 결과")
-                content.body = "\(event.record.title) · \(event.record.status)"
-                content.sound = .default
-                content.userInfo = ["transfer_id":event.transfer_id]
-                // Stable request IDs limit duplicates after a crash between submission and acknowledgement.
-                try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:"fta.receipt.\(event.sequence)",content:content,trigger:nil))
+            let record = event.record
+            if record.direction == "receive", ["completed","partial","failed","cancelled","unknown"].contains(record.state), receiptState.needsDelivery(event.sequence) {
+                let alreadyOpen = foreground && detail?.id == record.id
+                receiptState.track(record.id,sequence:event.sequence,alreadyOpen:alreadyOpen)
+                unreadCount = receiptState.count
+                if !alreadyOpen, [.authorized,.provisional,.ephemeral].contains(settings.authorizationStatus) {
+                    let content = UNMutableNotificationContent()
+                    content.title = receiptTitle(event)
+                    content.body = receiptSubtitle(event)
+                    content.sound = .default
+                    content.userInfo = ["transfer_id":event.transfer_id]
+                    // Stable IDs replace retries, while the durable delivery marker handles failed engine acknowledgements.
+                    do {
+                        try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:"fta.receipt.\(event.transfer_id)",content:content,trigger:nil))
+                        notificationDeliveryIssue = nil
+                    } catch {
+                        // Native submission failure must not hide the in-app banner or unread record.
+                        notificationDeliveryIssue = error.localizedDescription
+                    }
+                }
+                receiptState.delivered(event.sequence)
+                if foreground && !alreadyOpen {
+                    receiptBanner = event; bannerDismissal?.cancel()
+                    if ProcessInfo.processInfo.systemUptime - lastReceiptFeedback > Self.receiptFeedbackSeconds {
+                        UINotificationFeedbackGenerator().notificationOccurred(record.state == "completed" ? .success : .warning)
+                        lastReceiptFeedback = ProcessInfo.processInfo.systemUptime
+                    }
+                    bannerDismissal = Task { [weak self] in
+                        try? await Task.sleep(for:.seconds(Self.receiptBannerSeconds))
+                        guard !Task.isCancelled, self?.receiptBanner?.sequence == event.sequence else { return }
+                        self?.receiptBanner = nil
+                    }
+                }
             }
-            // Denied notifications are deliberately suppressed; the receipt remains in history.
             _ = try await Engine.call("events.ack",["consumer":consumer,"sequence":event.sequence])
         }
+    }
+    func receiptTitle(_ event: Receipt) -> String {
+        let count = event.record.items.filter { $0.state == "completed" }.count
+        let kind = event.record.kind == "files" ? String(localized:"파일") : event.record.kind == "url" ? "URL" : String(localized:"텍스트")
+        return kind + (count > 0 ? " · \(count.formatted())" : "") + " · " + event.record.status
+    }
+    func receiptSubtitle(_ event: Receipt) -> String {
+        peers.first { $0.id == event.record.peer_id }?.display_name ?? "FTA"
+    }
+    func dismissReceiptBanner() { bannerDismissal?.cancel(); receiptBanner = nil }
+    func isUnread(_ id: String) -> Bool { receiptState.isUnread(id) }
+    private func markReceiptRead(_ id: String) {
+        receiptState.read(id); unreadCount = receiptState.count
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers:["fta.receipt." + id])
+        if receiptBanner?.transfer_id == id { dismissReceiptBanner() }
+    }
+    private func requestNotificationsIfNeeded() async {
+        if await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined { await requestNotifications() }
     }
     func decide(_ request: Registration, accept: Bool) async {
         guard !deciding else { return }; deciding = true; defer { deciding = false }
@@ -355,6 +415,13 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
             clearPhotos(); photos = [photo]
         } catch { self.error = error.localizedDescription }
     }
+    // Remove just the selected private copy; sibling files in the same picker session must survive.
+    func removeAttachment(_ url: URL) {
+        guard !sending, !importing, (photos + files).contains(url) else { return }
+        photos.removeAll { $0 == url }; files.removeAll { $0 == url }
+        let root = Sandbox.outgoing.resolvingSymlinksInPath().path + "/"
+        if url.resolvingSymlinksInPath().path.hasPrefix(root) { try? FileManager.default.removeItem(at:url) }
+    }
     func clearFiles() { removeSelection(files); files = [] }
     func clearPhotos() { removeSelection(photos); photos = [] }
     private func removeSelection(_ urls: [URL]) {
@@ -367,7 +434,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     }
     func openRecord(_ id: String) async {
         await lifecycle?.value
-        do { detail = try await Engine.decode(Transfer.self,"inbox.get",["transfer_id":id]) }
+        do { detail = try await Engine.decode(Transfer.self,"inbox.get",["transfer_id":id]); markReceiptRead(id) }
         catch { self.error = error.localizedDescription }
     }
     func reconcile(_ record: Transfer) async {
@@ -375,7 +442,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         catch { self.error = error.localizedDescription }
     }
     func deleteRecord(_ record: Transfer) async {
-        do { _ = try await Engine.call("inbox.delete",["transfer_id":record.id]); detail = nil; await refreshActivity() }
+        do { _ = try await Engine.call("inbox.delete",["transfer_id":record.id]); detail = nil; markReceiptRead(record.id); await refreshActivity() }
         catch { self.error = error.localizedDescription }
     }
     func unpair(_ peer: Peer) async {
@@ -393,6 +460,8 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         } catch { self.error = error.localizedDescription }
     }
     func requestNotifications() async {
+        guard !requestingNotificationPermission else { return }; requestingNotificationPermission = true
+        defer { requestingNotificationPermission = false }
         do { _ = try await UNUserNotificationCenter.current().requestAuthorization(options:[.alert,.sound,.badge]); await refreshNotificationStatus() }
         catch { self.error = error.localizedDescription }
     }

@@ -560,7 +560,7 @@ fn fold_state(
 #[tauri::command]
 fn start_window_drag(window: tauri::WebviewWindow) -> Result<(), String> {
     if window.label() != WINDOW_LABEL {
-        utility_label(window.label())?;
+        require_utility_or_transfer_window(window.label())?;
     }
     window.start_dragging().map_err(|error| error.to_string())
 }
@@ -597,12 +597,6 @@ fn autostart_status(app: tauri::AppHandle) -> Result<bool, String> {
     app.autolaunch()
         .is_enabled()
         .map_err(|error| error.to_string())
-}
-
-/// Notifications may arrive while the panel is hidden, so opening detail must first reveal it.
-#[tauri::command]
-fn show_window(app: tauri::AppHandle) {
-    show_main(&app);
 }
 
 /// The UI confirms interrupted work before asking the host to stop its owned engine.
@@ -1009,6 +1003,61 @@ async fn open_utility_window(app: tauri::AppHandle, kind: String) -> Result<(), 
     window.set_focus().map_err(|error| error.to_string())
 }
 
+/// Canonical UUIDs keep receipt windows local and prevent IDs from becoming paths or arbitrary labels.
+fn transfer_window_label(transfer_id: &str) -> Result<String, String> {
+    let id = uuid::Uuid::parse_str(transfer_id).map_err(|_| "올바른 전송 ID가 아닙니다")?;
+    Ok(format!("detail-{id}"))
+}
+
+/// Native drag and close accept only existing utility roles or a UUID-scoped receipt viewer.
+fn require_utility_or_transfer_window(label: &str) -> Result<(), String> {
+    if let Some(id) = label.strip_prefix("detail-") {
+        transfer_window_label(id).map(|_| ())
+    } else {
+        utility_label(label).map(|_| ())
+    }
+}
+
+/// A dedicated viewport avoids constraining received content to the compact sender window.
+#[tauri::command]
+async fn open_transfer_window(app: tauri::AppHandle, transfer_id: String) -> Result<(), String> {
+    let label = transfer_window_label(&transfer_id)?;
+    let id = label.strip_prefix("detail-").ok_or("수신 창 ID 오류")?;
+    // Check the current persisted record before acknowledging a notification activation.
+    request("inbox.get", json!({ "transfer_id": id })).await?;
+    if let Some(window) = app.get_webview_window(&label) {
+        return window
+            .unminimize()
+            .and_then(|_| window.show())
+            .and_then(|_| window.set_focus())
+            .map_err(|error| error.to_string());
+    }
+    let config = app.config();
+    let mut window_config = config
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "detail")
+        .ok_or("수신 창 설정을 찾을 수 없습니다")?
+        .clone();
+    window_config.label = label.clone();
+    // Only the validated locator crosses the URL boundary, never message bodies or received paths.
+    window_config.url = tauri::WebviewUrl::App(PathBuf::from(format!(
+        "index.html?view=detail&transfer={id}"
+    )));
+    let result = tauri::WebviewWindowBuilder::from_config(&app, &window_config)
+        .map_err(|error| error.to_string())?
+        .build();
+    let window = match result {
+        Ok(window) => window,
+        // A history click and notification can race to open the same item; focus the winner.
+        Err(error) => app
+            .get_webview_window(&label)
+            .ok_or_else(|| error.to_string())?,
+    };
+    window.set_focus().map_err(|error| error.to_string())
+}
+
 /// Recipient consent is a native user decision; generic WebView RPC cannot accept a peer.
 #[tauri::command]
 async fn prompt_registration(
@@ -1073,7 +1122,8 @@ async fn prompt_registration(
 // A child close must destroy only its own window, never hide the transfer panel or stop its engine.
 #[tauri::command]
 fn close_utility_window(window: tauri::WebviewWindow) -> Result<(), String> {
-    utility_label(window.label())?;
+    // Receipt viewers close independently; the main sender still uses its existing hide behavior.
+    require_utility_or_transfer_window(window.label())?;
     window.close().map_err(|error| error.to_string())
 }
 
@@ -1159,6 +1209,7 @@ fn main() {
             start_window_drag,
             close_app_window,
             open_utility_window,
+            open_transfer_window,
             prompt_registration,
             close_utility_window,
             set_autostart,
@@ -1166,7 +1217,6 @@ fn main() {
             start_engine,
             restart_engine,
             exit_app,
-            show_window,
             notifications_ready,
             ack_receipt,
             notify_receipt,
@@ -1342,6 +1392,30 @@ mod tests {
         ] {
             assert!(utility_label(label).is_err());
         }
+    }
+
+    // Receipt URLs/labels must stay UUID-scoped even when requested from history or a protocol activation.
+    #[test]
+    fn transfer_windows_accept_only_canonical_record_locators() {
+        let id = "b5a9470b-32d5-4e3f-b53a-ce3c2d520d31";
+        assert_eq!(transfer_window_label(id).unwrap(), format!("detail-{id}"));
+        assert_eq!(
+            transfer_window_label(&id.to_uppercase()).unwrap(),
+            format!("detail-{id}")
+        );
+        for invalid in [
+            "",
+            "main",
+            "../inbox",
+            "https://example.com",
+            "id?view=main",
+        ] {
+            assert!(transfer_window_label(invalid).is_err());
+        }
+        assert!(require_utility_or_transfer_window(&format!("detail-{id}")).is_ok());
+        assert!(require_utility_or_transfer_window("inbox").is_ok());
+        assert!(require_utility_or_transfer_window("detail-main").is_err());
+        assert!(require_utility_or_transfer_window("main").is_err());
     }
 
     // A received URL must never gain local-file or script execution privileges.

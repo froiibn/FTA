@@ -27,7 +27,7 @@ struct LegalDocumentView: View {
             .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("legal-document")
             // The reviewed offline policy remains available even if its public GitHub page is unreachable.
-            .toolbar { if let publicURL { Link(String(localized:"웹에서 보기"),destination:publicURL) } }
+            .toolbar { if let publicURL { Link(destination:publicURL) { Label(String(localized:"웹에서 보기"),systemImage:"safari") }.modifier(IconActionStyle()) } }
     }
 }
 

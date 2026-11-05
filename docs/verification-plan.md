@@ -2,6 +2,16 @@
 
 현재 구현 범위와 검증 결과는 [구현 현황](implementation-status.md)을 따른다. 이 문서의 설계 목표 전체가 구현됐다는 의미는 아니다.
 
+## 2026-11-06 모바일 수신 알림·전송 목록
+
+### 데스크톱 기록 최초 조회 보완 (0.1.3)
+
+기록 조회가 `status`·`devices.list` 성공 뒤에만 실행되던 의존성을 제거했다. 기록을 먼저 표시하고 기기 이름은 후속 조회로 보완하며, 기록창 focus 시에도 같은 조회를 실행한다. `node --test apps/desktop/scripts/check-history-load.mjs`는 실제 TypeScript 조회 함수를 실행해 기기 조회 지연·실패 중 최초 기록 표시, 엔진 준비 실패 후 재시도, 재조회 시 새 기록·기기 이름 반영의 4개 검사를 통과했다. Mac에서 `npm --prefix apps/desktop run build`도 통과했다. 0.1.3 배포 준비에서는 같은 소스를 별도 앱 식별자로 빌드해 실제 Rust 엔진 두 개가 TLS로 저장한 텍스트·URL·25개 파일을 표시했고, 새로고침 없이 기록창 최초 열기·닫고 재열기와 아이콘 버튼을 가진 독립 수신 내용 창을 네이티브 UI에서 확인했다. Windows 실행은 미검증이다.
+
+실제 사용자 소유 Mac에서 iOS·Android 로컬 빌드, workspace fmt/headless test/clippy, iOS 검증 fixture clippy와 양 앱 10개 언어 리소스 검사를 수행했다. Android lint는 오류 0·기존 경고 19다. 실제 iOS 시뮬레이터에 Bonjour로 연결한 Mac fixture가 최초 수신자 승인 후 파일·텍스트·URL을 TLS 전송했고 완료 응답과 앱 내부 배너/기록 열기를 확인했다. iOS 알림 상태의 재시작/읽음/중복/재시도 검사와 실제 Photos 선택·개별 제거 UI 2개도 통과했다.
+
+Android API 37 에뮬레이터에서는 실제 Mac TLS의 32 MiB 양방향·잠금/Home/Activity 재생성·Wi-Fi 복귀 검사에 실제 배너·채널·미확인 개수·알림 PendingIntent로 기록 열기/읽음 처리를 더한 36개가 통과했다. JNI/키 보관/파일 provider/설정·UI 및 기존 무음/차단 채널 보존 검사 48개도 통과했다. 실제 Photos/Files picker로 이미지 두 개와 문서 한 개를 선택해 캡처했고 문서만 제거한 뒤 나머지 이미지 바이트 유지를 확인했다. [화면/알림 설계와 기록 위치](ui-design.md)를 따른다. 실기 소리·진동·OS 집중 모드 및 제조사별 절전은 미검증이며 실기 설치와 스토어 업로드는 수행하지 않았다.
+
 사용자 지정 운영 원칙: 예산을 사용하는 GitHub Actions 빌드·테스트는 실행하지 않는다. 빌드·검증·패키징은 사용자 소유 Windows·Mac·Linux 기기에서 해당 OS별로 수행하고, GitHub Releases에는 로컬 검증을 마친 최종 설치 파일과 해시·빌드 정보를 게시한다. 기존 `push`·`pull_request` 자동 검사 워크플로는 비활성화하고 삭제했다. 아래 원격 CI 실패 기록은 이전 실행의 원인과 테스트 보완을 남긴 이력이며 재실행 요구가 아니다.
 
 ## 2026-10-25 릴리즈 전 검사
