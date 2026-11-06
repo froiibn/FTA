@@ -57,6 +57,8 @@ def main():
         print(f"Passed {name}", flush=True)
 
     commands = [
+        ["cargo", "fetch", "--locked"],
+        [sys.executable, "apps/desktop/scripts/generate-notices.py", "--check"],
         ["cargo", "fmt", "--all", "--check"], ["cargo", "test", "--locked"],
         ["cargo", "clippy", "--locked", "--all-targets", "--", "-D", "warnings"],
         ["npm", "--prefix", "apps/desktop", "run", "build"],

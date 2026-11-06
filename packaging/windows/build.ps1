@@ -40,7 +40,7 @@ function Assert-X64Executable {
 if ($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem) {
     throw 'Run this script on Windows x64 with the MSVC Rust toolchain.'
 }
-foreach ($Tool in @('cargo', 'rustc', 'node', 'npm.cmd')) {
+foreach ($Tool in @('cargo', 'rustc', 'node', 'npm.cmd', 'python')) {
     if (-not (Get-Command $Tool -ErrorAction SilentlyContinue)) { throw "Required tool not found: $Tool" }
 }
 # A target override changes Cargo output layout and would diverge from the native sidecar wrapper.
@@ -66,6 +66,10 @@ try {
     if ($LASTEXITCODE -ne 0 -or $NodeVersion -notmatch "^v$ExpectedNodeMajor\." -or $NodeArch -ne 'x64') {
         throw "Install Node.js $ExpectedNodeMajor x64 before building."
     }
+    # Fetch the pinned sources before the offline notice check on a fresh clone.
+    Invoke-Checked cargo @('fetch', '--locked')
+    # The same unchanged license texts ship on both targets; no third-party implementation source is copied.
+    Invoke-Checked python @('apps/desktop/scripts/generate-notices.py', '--check')
     Invoke-Checked cargo @('fmt', '--all', '--check')
     Invoke-Checked cargo @('test', '--locked')
     Invoke-Checked cargo @('clippy', '--locked', '--all-targets', '--', '-D', 'warnings')

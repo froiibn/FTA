@@ -6,7 +6,7 @@
 
 Windows·Mac 공통 호스트에 자동 업데이트를 구현했다. 최초 0.1.5는 NSIS로 직접 업데이트하고 이후 새 버전은 앱에서 확인·서명 검증·설치·재시작한다. Program Files/사용자 지정 설치 경로와 기존 사용자 데이터를 유지하며 passive 설치의 UAC는 OS 승인을 따른다. [공통 업데이트 설계](../../docs/desktop-updates.md).
 
-Windows PC에서 `v0.1.5` 소스를 받아 `packaging/windows/build.ps1`을 실행한다. 스크립트는 해당 OS의 검사와 NSIS를 만들고 소스 커밋·타깃·정확한 파일 해시를 포함한 `build-info-windows-x86_64-0.1.5.json`을 생성한다. Mac 서명 키를 Windows에 복사하지 않도록 updater 번들 자동 서명만 로컬 override에서 끄며 앱의 서명 검증은 끄지 않는다. 실제 설치·실행·자동 업데이트/UAC·취소/복구는 이 Windows에서 확인하고 검사 범위를 기록한다.
+Python 3.9 이상과 기존 Rust·Node·MSVC 도구를 준비한 Windows PC에서 `v0.1.5` 소스를 받아 `packaging/windows/build.ps1`을 실행한다. 스크립트는 해당 OS의 검사와 NSIS를 만들고 소스 커밋·타깃·정확한 파일 해시를 포함한 `build-info-windows-x86_64-0.1.5.json`을 생성한다. Mac 서명 키를 Windows에 복사하지 않도록 updater 번들 자동 서명만 로컬 override에서 끄며 앱의 서명 검증은 끄지 않는다. 실제 설치·실행·자동 업데이트/UAC·취소/복구는 이 Windows에서 확인하고 검사 범위를 기록한다.
 
 검증한 NSIS와 build-info를 게시 Mac으로 전달한 뒤 아래 도구로 서명·게시한다. 설치 파일은 artifact와 installer에 같은 경로를 사용한다. 출력·노트 경로를 실제 파일로 지정한다.
 

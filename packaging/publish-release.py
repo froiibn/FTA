@@ -81,6 +81,9 @@ def main():
     if args.key.resolve().is_relative_to(ROOT):
         raise ValueError("The updater private key must remain outside the repository")
     signing_env = dict(os.environ)
+    # Tauri treats environment key contents and an explicit key-file argument as conflicting inputs.
+    signing_env.pop("TAURI_SIGNING_PRIVATE_KEY", None)
+    signing_env.pop("TAURI_SIGNING_PRIVATE_KEY_PATH", None)
     signing_env.setdefault("TAURI_SIGNING_PRIVATE_KEY_PASSWORD", "")
     run(["npm", "--prefix", "apps/desktop", "run", "tauri", "--", "signer", "sign",
          "--private-key-path", str(args.key.resolve()), "--app-version", version,

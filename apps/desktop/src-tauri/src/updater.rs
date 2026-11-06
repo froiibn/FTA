@@ -288,6 +288,11 @@ mod tests {
         assert!(bundle.join("Contents/MacOS/fta-engine").is_file());
         assert!(bundle.join("Contents/MacOS/fta-mcp").is_file());
         assert!(
+            bundle
+                .join("Contents/Resources/THIRD_PARTY_NOTICES.txt")
+                .is_file()
+        );
+        assert!(
             std::process::Command::new("codesign")
                 .args(["--verify", "--deep", "--strict"])
                 .arg(&bundle)

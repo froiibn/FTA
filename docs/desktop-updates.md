@@ -33,3 +33,7 @@ Windows·macOS의 0.1.5부터 Tauri 공식 Rust updater 2.14.1을 사용한다. 
 Windows는 사용자 Windows PC에서 `packaging/windows/build.ps1`로 빌드·검사한다. 서명은 게시 컴퓨터에서 처리할 수 있어 개인키 없이 NSIS를 패키징한다. 다른 OS의 실행·설치/UAC 검증을 Mac에서 통과로 보고하지 않는다.
 
 공식 API/형식: [Tauri updater](https://v2.tauri.app/plugin/updater/).
+
+## 배포 고지
+
+공식 updater를 포함한 데스크톱의 잠긴 Mac/Windows normal·build 의존성과 Rust 런타임의 원문 고지를 `THIRD_PARTY_NOTICES.txt`로 번들에 동봉한다. 빌드 도구·선택적 원본 고지가 포함될 수 있어 나열된 모든 패키지가 앱에 링크됐다는 뜻은 아니다. 패키지 원본 아카이브 주소를 제공하며 구현 소스를 앱에 복사하지 않는다. Cargo 패키지에 원문 고지가 누락된 경우 같은 upstream 커밋의 고지 또는 표준 라이선스 원문만 `apps/desktop/LegalSources`에 URL·해시와 보존한다. 기존 iOS·Android 고지나 앱 구현은 변경하지 않는다. `apps/desktop/scripts/generate-notices.py --check`가 두 타깃 그래프와 원문 해시의 일치를 검사한다.

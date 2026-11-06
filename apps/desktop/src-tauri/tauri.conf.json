@@ -103,6 +103,9 @@
       "infoPlist": "Info.plist",
       "minimumSystemVersion": "11.0"
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "resources": {
+      "resources/THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
+    }
   }
 }
