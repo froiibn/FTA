@@ -80,7 +80,7 @@ root.innerHTML = `
       <label class="checkbox-label"><input id="network-firewall" type="checkbox" checked /> 수신 허용</label><p id="network-permission" class="help"></p><p class="help">OS 변경에는 관리자 인증이 필요할 수 있습니다.</p></section>
       <form id="settings-form" class="settings-section"><div class="section-heading"><h2>이 컴퓨터</h2><span class="section-caption">파일 수신 및 연결</span></div><div class="settings-grid"><div><label for="setting-name">기기 이름</label><input id="setting-name" autocomplete="off" required /></div><div><label for="setting-folder">파일 수신 폴더</label><input id="setting-folder" autocomplete="off" required /></div><div><label for="setting-listen">수신 주소</label><input id="setting-listen" autocomplete="off" placeholder="IP:포트" required /></div><div><label for="setting-networks">허용 네트워크</label><input id="setting-networks" autocomplete="off" placeholder="CIDR, 쉼표로 구분" /></div></div><label class="checkbox-label"><input id="setting-discovery" type="checkbox" /> 같은 네트워크에서 기기 자동 발견</label></form>
       <!-- These switches represent saved preferences; unknown native state stays disabled until read. -->
-      <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong id="autostart-label">로그인 시 실행</strong><p id="autostart-status">설정 상태를 확인합니다.</p></div><label class="settings-toggle"><input id="autostart" type="checkbox" role="switch" aria-labelledby="autostart-label" aria-describedby="autostart-status" disabled /><span class="toggle-track" aria-hidden="true"></span></label></div><div class="settings-row"><div><strong id="notification-label">수신 알림</strong><p id="notification-status">설정 상태를 확인합니다.</p></div><label class="settings-toggle"><input id="notification-permission" type="checkbox" role="switch" aria-labelledby="notification-label" aria-describedby="notification-status" disabled /><span class="toggle-track" aria-hidden="true"></span></label></div></section>
+      <section class="settings-section" aria-label="앱 동작"><div class="settings-row"><div><strong id="autostart-label">로그인 시 실행</strong><p id="autostart-status">설정 상태를 확인합니다.</p></div><label class="settings-toggle"><input id="autostart" type="checkbox" role="switch" aria-labelledby="autostart-label" aria-describedby="autostart-status" disabled /><span class="toggle-track" aria-hidden="true"></span></label></div><div class="settings-row"><div><strong id="notification-label">수신 알림</strong><p id="notification-status">설정 상태를 확인합니다.</p></div><label class="settings-toggle"><input id="notification-permission" type="checkbox" role="switch" aria-labelledby="notification-label" aria-describedby="notification-status" disabled /><span class="toggle-track" aria-hidden="true"></span></label></div><div class="settings-row"><div><strong>FTA 업데이트</strong><p id="update-status" aria-live="polite">새 버전을 자동으로 확인합니다.</p></div><button id="check-update" class="icon-button" type="button" aria-label="업데이트 확인" title="업데이트 확인">${icon("refresh").outerHTML}</button></div></section>
       <section class="settings-section"><div class="section-heading"><h2>등록된 기기</h2></div><p class="help">감지된 컴퓨터에 처음 보내면 상대에서 한 번만 등록을 확인합니다. 이후에는 바로 전송됩니다.</p><div id="paired-devices"></div></section>
       </div>
       <!-- The external form attribute keeps native validation and the existing submit path intact. -->
@@ -977,6 +977,7 @@ on("settings-form", "submit", (event) => {
 async function initializeSettingsControls(): Promise<void> {
   await act(refreshAutostartToggle);
   await act(refreshNotificationToggle);
+  await refreshUpdateStatus();
 }
 
 type NetworkInterface = { id: string; name: string; address: string; prefix: number; network: string; profile: "unknown" | "public" | "private" | "domain" };
@@ -1257,3 +1258,15 @@ async function initialize(): Promise<void> {
 }
 
 void act(initialize);
+
+// Reuse the existing settings row and transient feedback; no persistent banner is added to the sender.
+async function refreshUpdateStatus(): Promise<void> {
+  if (!desktop || view !== "settings") return;
+  const status = await invoke<{ phase: string; message: string }>("update_status");
+  element("update-status").textContent = status.message;
+  element<HTMLButtonElement>("check-update").disabled = ["checking", "downloading", "installing"].includes(status.phase);
+}
+on("check-update", "click", () => { void act(async () => {
+  try { await invoke("check_update"); } finally { await refreshUpdateStatus(); }
+}); });
+if (desktop && view === "settings") window.setInterval(() => { void refreshUpdateStatus().catch(() => {}); }, 1000);

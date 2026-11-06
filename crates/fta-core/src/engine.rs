@@ -45,6 +45,8 @@ pub struct Engine {
     /// Per-transfer serialization prevents concurrent requests from overwriting one record.
     pub operations: Mutex<HashMap<String, std::sync::Weak<tokio::sync::Mutex<()>>>>,
     settings_updates: Mutex<()>,
+    // An exclusive maintenance gate prevents a receive/send from starting between idle check and shutdown.
+    pub(crate) update_gate: tokio::sync::RwLock<()>,
 }
 impl Engine {
     /// Production opens protected identity storage; tests may supply a generated in-memory identity.
@@ -80,6 +82,7 @@ impl Engine {
             active: Mutex::new(Default::default()),
             operations: Mutex::new(Default::default()),
             settings_updates: Mutex::new(()),
+            update_gate: tokio::sync::RwLock::new(()),
         }))
     }
     /// A changed home interface remains paused until configuration is confirmed and the engine restarts.
@@ -87,7 +90,9 @@ impl Engine {
         self.network_available.load(Ordering::Acquire)
     }
     pub fn ensure_network(&self) -> Result<()> {
-        if self.network_available() {
+        if self.shutdown_token.is_cancelled() {
+            Err(Error::new("STOPPING", "engine is stopping"))
+        } else if self.network_available() {
             Ok(())
         } else {
             Err(Error::new(
@@ -214,6 +219,19 @@ impl Engine {
     /// Dispatch uses an explicit allowlist; arbitrary method names never reach a shell or filesystem.
     pub async fn dispatch(self: &Arc<Self>, method: &str, p: Value) -> Result<Value> {
         match method {
+            // Update shutdown never cancels active work. Keep the gate until shutdown is signalled,
+            // then ensure_network rejects every new operation even after this guard is released.
+            "engine.update_shutdown" => {
+                let _gate = self
+                    .update_gate
+                    .try_write()
+                    .map_err(|_| Error::new("BUSY", "a network operation is in progress"))?;
+                if self.store.has_unfinished_transfers()? {
+                    return Err(Error::new("BUSY", "transfers must finish before updating"));
+                }
+                self.shutdown_token.cancel();
+                Ok(json!({"stopping":true}))
+            }
             "engine.shutdown" => {
                 self.shutdown_token.cancel();
                 Ok(json!({"stopping":true}))
@@ -721,5 +739,40 @@ async fn watch_home_interface(engine: Arc<Engine>) -> Result<()> {
             engine.suspend_network()?;
             return Ok(());
         }
+    }
+}
+
+#[cfg(test)]
+mod update_tests {
+    use super::*;
+
+    // The admission guard is held through network work, not just the history/idle snapshot.
+    #[tokio::test]
+    async fn update_shutdown_refuses_an_inflight_operation() {
+        let directory = tempfile::tempdir().unwrap();
+        let paths = AppPaths {
+            config_dir: directory.path().join("config"),
+            state_dir: directory.path().join("state"),
+            runtime_dir: directory.path().join("run"),
+            default_receive_dir: directory.path().join("inbox"),
+        };
+        let engine =
+            Engine::open_with_identity(paths, Identity::generate_ephemeral().unwrap()).unwrap();
+        let operation = engine.update_gate.read().await;
+        assert_eq!(
+            engine
+                .dispatch("engine.update_shutdown", json!({}))
+                .await
+                .unwrap_err()
+                .code,
+            "BUSY"
+        );
+        assert!(engine.ensure_network().is_ok());
+        drop(operation);
+        engine
+            .dispatch("engine.update_shutdown", json!({}))
+            .await
+            .unwrap();
+        assert_eq!(engine.ensure_network().unwrap_err().code, "STOPPING");
     }
 }

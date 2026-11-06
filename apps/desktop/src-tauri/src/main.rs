@@ -28,6 +28,7 @@ use tauri_plugin_opener::OpenerExt;
 
 mod drop_coordinates;
 mod notification_preference;
+mod updater;
 
 #[cfg(target_os = "macos")]
 mod native_notification;
@@ -1168,6 +1169,8 @@ fn main() {
     let context = mac_window_style(context);
     let app = tauri::Builder::default()
         .manage(DesktopState::default())
+        .manage(updater::UpdateState::default())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             for argument in args {
                 queue_activation(app, &argument);
@@ -1194,6 +1197,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             engine_request,
             desktop_platform,
+            updater::check_update,
+            updater::update_status,
             network_setup_status,
             open_network_settings,
             network_setup_apply,
@@ -1227,6 +1232,8 @@ fn main() {
             ack_activation
         ])
         .setup(|app| {
+            // The native timer is shared by all windows and cannot create duplicate update prompts.
+            updater::start(app.handle().clone());
             // Restore only main position; child windows keep full geometry restoration through the plugin.
             if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
                 use tauri_plugin_window_state::WindowExt;

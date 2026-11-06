@@ -464,3 +464,52 @@ async fn discovered_targets_require_reachability_without_starting_registration()
             .is_empty()
     );
 }
+
+// An old pending transfer must block updates even when it is beyond the UI's latest history page.
+#[tokio::test]
+async fn update_shutdown_checks_all_history_and_never_admits_new_sends() {
+    let (_directory, engine) = engine();
+    let id = uuid::Uuid::new_v4().to_string();
+    engine
+        .store
+        .save_transfer(&transfer(&id, "receiving"))
+        .unwrap();
+    for _ in 0..1001 {
+        engine
+            .store
+            .save_transfer(&transfer(&uuid::Uuid::new_v4().to_string(), "completed"))
+            .unwrap();
+    }
+    assert!(
+        engine
+            .store
+            .history(1000)
+            .unwrap()
+            .iter()
+            .all(|t| t.state == "completed")
+    );
+    assert_eq!(
+        engine
+            .dispatch("engine.update_shutdown", json!({}))
+            .await
+            .unwrap_err()
+            .code,
+        "BUSY"
+    );
+    assert!(engine.ensure_network().is_ok());
+    engine
+        .store
+        .save_transfer(&transfer(&id, "completed"))
+        .unwrap();
+    assert_eq!(
+        engine
+            .dispatch("engine.update_shutdown", json!({}))
+            .await
+            .unwrap()["stopping"],
+        true
+    );
+    assert_eq!(
+        network::send(&engine, json!({})).await.unwrap_err().code,
+        "STOPPING"
+    );
+}

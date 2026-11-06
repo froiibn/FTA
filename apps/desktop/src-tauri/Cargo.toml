@@ -1,7 +1,7 @@
 [package]
 name = "fta-desktop"
 # Keep local release executables aligned with the installer version.
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 publish = false
 
@@ -23,6 +23,8 @@ tauri-plugin-deep-link = "2"
 tokio = { version = "1", features = ["sync", "time"] }
 url = "2"
 uuid = "1"
+# Official Tauri updater keeps authenticated installation in the native host, outside WebView permissions.
+tauri-plugin-updater = "=2.14.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Transparent WebViews are required only by the Mac vibrancy surface; Windows stays opaque.
@@ -38,4 +40,8 @@ fta-platform = { path = "../../../crates/fta-platform" }
 windows-sys = { version = "0.61", features = ["Win32_System_Threading"] }
 
 [dev-dependencies]
+# The real installer is tested against an isolated app directory without launching or replacing the user's app.
+tauri = { version = "2", features = ["test"] }
+base64 = "0.22"
+minisign-verify = "=0.3.0"
 tempfile = "3"

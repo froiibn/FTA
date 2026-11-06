@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "FTA",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "app.fta.local-transfer",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "FTA · 내 기기로 보내기",
+        "title": "FTA \u00b7 \ub0b4 \uae30\uae30\ub85c \ubcf4\ub0b4\uae30",
         "width": 280,
         "height": 260,
         "minWidth": 240,
@@ -25,7 +25,7 @@
       },
       {
         "label": "inbox",
-        "title": "FTA · 기록",
+        "title": "FTA \u00b7 \uae30\ub85d",
         "url": "index.html?view=inbox",
         "create": false,
         "width": 600,
@@ -39,7 +39,7 @@
       },
       {
         "label": "settings",
-        "title": "FTA · 설정",
+        "title": "FTA \u00b7 \uc124\uc815",
         "url": "index.html?view=settings",
         "create": false,
         "width": 520,
@@ -53,7 +53,7 @@
       },
       {
         "label": "detail",
-        "title": "FTA · 수신 내용",
+        "title": "FTA \u00b7 \uc218\uc2e0 \ub0b4\uc6a9",
         "url": "index.html?view=detail",
         "create": false,
         "width": 640,
@@ -79,6 +79,16 @@
           "fta"
         ]
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc0QzhCMUY5MjY5NDdDOTIKUldTU2ZKUW0rYkhJZE1pWnJRRlVZUmZyTGhEUHBCdzFiV1UyemV1YXVuZ1BUd251MVlqQmNDSlIK",
+      "endpoints": [
+        "https://github.com/froiibn/FTA/releases/latest/download/latest-{{target}}-{{arch}}.json"
+      ],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
     }
   },
   "bundle": {
@@ -92,6 +102,7 @@
     "macOS": {
       "infoPlist": "Info.plist",
       "minimumSystemVersion": "11.0"
-    }
+    },
+    "createUpdaterArtifacts": true
   }
 }

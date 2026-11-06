@@ -80,7 +80,11 @@ try {
     Invoke-Checked cargo @('clippy', '--locked', '-p', 'fta-desktop', '--all-targets', '--', '-D', 'warnings')
     Invoke-Checked cargo @('build', '--locked', '--release', '-p', 'fta-cli')
     $PackageStarted = [DateTime]::UtcNow
-    Invoke-Checked npm.cmd @('--prefix', 'apps/desktop', 'run', 'bundle', '--', '--bundles', 'nsis')
+    # Build the NSIS natively without copying the publishing Mac's private updater key.
+    # The release publisher signs these exact verified bytes and uploads the target feed last.
+    $UnsignedUpdaterConfig = Join-Path $Output 'updater-signing-on-publisher.json'
+    '{"bundle":{"createUpdaterArtifacts":false}}' | Set-Content -Encoding ASCII $UnsignedUpdaterConfig
+    Invoke-Checked npm.cmd @('--prefix', 'apps/desktop', 'run', 'bundle', '--', '--bundles', 'nsis', '--config', $UnsignedUpdaterConfig)
 
     # Respect Cargo target_directory instead of assuming a drive, user folder or target path.
     $MetadataJson = & cargo metadata --no-deps --format-version 1 --locked
@@ -102,6 +106,12 @@ try {
     [ordered]@{
         product = $Config.productName
         version = $Config.version
+        source_commit = (& git rev-parse HEAD)
+        target = 'windows-x86_64'
+        native_checks_passed = $true
+        built_at = [DateTime]::UtcNow.ToString('o')
+        artifact_sha256 = (Get-FileHash -LiteralPath $Installers[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        installer_sha256 = (Get-FileHash -LiteralPath $Installers[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         host = $ExpectedHost
         built_at_utc = [DateTime]::UtcNow.ToString('o')
         rust = $RustVersion
@@ -110,7 +120,7 @@ try {
         installer = $Installers[0].Name
         checks = 'fmt, headless test/clippy, Windows helper clippy, desktop check/test/clippy, TypeScript/Vite build'
         runtime_verification = 'Not performed by this build script; follow packaging/windows/README.md.'
-    } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $Output 'build-info.json')
+    } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $Output "build-info-windows-x86_64-$($Config.version).json")
     Get-ChildItem -LiteralPath $Output -File | Where-Object { $_.Extension -eq '.exe' } |
         Sort-Object Name | ForEach-Object {
             $Hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256

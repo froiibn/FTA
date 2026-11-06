@@ -2,6 +2,23 @@
 
 대상: Windows 11 / AMD Ryzen 5 5600X(x86-64). 이 문서는 Windows PC에서 직접 빌드하는 절차다. Windows 네이티브 검사·설치 파일 생성·설치·첫 실행·트레이 유지와 종료·재실행, Mac 한 대와의 실제 LAN 양방향 파일·해시·동일 이름 보존을 확인했다. GUI 드롭과 나머지 OS 통합 검증은 별도다. [검증 기록](../../docs/implementation-status.md)을 따른다.
 
+## 0.1.5 자동 업데이트
+
+Windows·Mac 공통 호스트에 자동 업데이트를 구현했다. 최초 0.1.5는 NSIS로 직접 업데이트하고 이후 새 버전은 앱에서 확인·서명 검증·설치·재시작한다. Program Files/사용자 지정 설치 경로와 기존 사용자 데이터를 유지하며 passive 설치의 UAC는 OS 승인을 따른다. [공통 업데이트 설계](../../docs/desktop-updates.md).
+
+Windows PC에서 `v0.1.5` 소스를 받아 `packaging/windows/build.ps1`을 실행한다. 스크립트는 해당 OS의 검사와 NSIS를 만들고 소스 커밋·타깃·정확한 파일 해시를 포함한 `build-info-windows-x86_64-0.1.5.json`을 생성한다. Mac 서명 키를 Windows에 복사하지 않도록 updater 번들 자동 서명만 로컬 override에서 끄며 앱의 서명 검증은 끄지 않는다. 실제 설치·실행·자동 업데이트/UAC·취소/복구는 이 Windows에서 확인하고 검사 범위를 기록한다.
+
+검증한 NSIS와 build-info를 게시 Mac으로 전달한 뒤 아래 도구로 서명·게시한다. 설치 파일은 artifact와 installer에 같은 경로를 사용한다. 출력·노트 경로를 실제 파일로 지정한다.
+
+```sh
+python3 packaging/publish-release.py --target windows-x86_64 \
+  --artifact "$FTA_WINDOWS_INSTALLER" --installer "$FTA_WINDOWS_INSTALLER" \
+  --build-info "$FTA_WINDOWS_BUILD_INFO" --notes docs/releases/0.1.5.md \
+  --output output/release-windows-0.1.5 --publish
+```
+
+이미 공개된 Mac 자산은 덮어쓰지 않는다. 새 Windows 자산·서명·해시를 업로드하고 다운로드 대조한 뒤 Windows 업데이트 feed를 마지막에 추가한다. Mac 네이티브 결과로 Windows 배포/실행을 완료했다고 보고하지 않는다.
+
 ## 0.1.4 후속 빌드
 
 Mac에서 Windows 설치 파일을 만들거나 Windows 검사 통과를 주장하지 않는다. 0.1.4 공개 후 Windows 담당자는 `v0.1.4` 태그의 동일 소스를 새 폴더에 받아 아래 로컬 빌드 스크립트를 실행한다. 기존 작업 폴더를 강제로 초기화하지 않는다.

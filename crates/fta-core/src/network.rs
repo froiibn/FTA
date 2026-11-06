@@ -600,6 +600,8 @@ async fn route(
     pairing: bool,
     address: SocketAddr,
 ) -> Result<Value> {
+    // Hold through final receipt/commit so update shutdown cannot race an authenticated request.
+    let _update_guard = e.update_gate.read().await;
     e.ensure_network()?;
     let path = request.uri().path().to_string();
     let method = request.method().clone();
@@ -1108,6 +1110,8 @@ struct OpenedSource {
     before: std::fs::Metadata,
 }
 pub async fn send(e: &Arc<Engine>, params: Value) -> Result<Value> {
+    // Include outbound streaming and final receipt in the same idle-install barrier.
+    let _update_guard = e.update_gate.read().await;
     e.ensure_network()?;
     let _permit = e
         .outgoing

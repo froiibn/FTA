@@ -402,6 +402,15 @@ impl Store {
             .ok_or_else(|| Error::new("NOT_FOUND", "transfer record not found"))
     }
     /// UI pagination is bounded independently of recovery, which must inspect all active rows.
+    /// Maintenance must consider all rows, not only the newest page displayed by the UI.
+    pub fn has_unfinished_transfers(&self) -> Result<bool> {
+        let db = self.lock()?;
+        Ok(db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM transfers WHERE state NOT IN ('completed','partial','failed','cancelled','unknown'))",
+            [], |row| row.get(0),
+        )?)
+    }
+
     pub fn history(&self, limit: usize) -> Result<Vec<Transfer>> {
         let db = self.lock()?;
         let mut query = db.prepare("SELECT data FROM transfers ORDER BY rowid DESC LIMIT ?1")?;
