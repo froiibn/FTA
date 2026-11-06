@@ -1,6 +1,6 @@
 # Android Google Play preparation
 
-Latest checkpoint: **2026-11-06, 0.1.4 (9), submission 2 — In review**. The signed production update and 10 localized screenshot sets (phone / 7-inch / 10-inch) were submitted as 31 changes. Automated pre-review checks completed; approval/public availability is pending. Managed publishing remains disabled for automatic release after approval. Build hashes, validation and limits: [mobile 0.1.4](../../../docs/releases/mobile-0.1.4.md).
+Latest checkpoint: **2026-11-06, 0.1.4 (9), submission 2 — Released**. The signed production update and 10 localized screenshot sets (phone / 7-inch / 10-inch) were submitted as 31 changes. A later fresh submission-details view confirms Released at 2026-11-06 06:01 and an app-update-published notice. Store cache propagation and actual user installation were not verified. Managed publishing remains disabled for automatic release after approval. Build hashes, validation and limits: [mobile 0.1.4](../../../docs/releases/mobile-0.1.4.md).
 
 The following 0.1.0 (8) entries are historical preparation records; that version was subsequently released.
 
