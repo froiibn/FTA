@@ -4,6 +4,8 @@
 
 ## 0.1.5 자동 업데이트·로컬 자동 배포
 
+[공개된 0.1.5 릴리스](https://github.com/froiibn/FTA/releases/tag/v0.1.5)의 `FTA_0.1.5_aarch64.dmg`를 사용한다. Developer ID·Apple 공증·업데이트 실제 설치 검증은 [배포 기록](../../docs/releases/0.1.5.md)에 남겼다.
+
 0.1.4 이하에서는 0.1.5 DMG를 한 번 직접 설치한다. 이후 버전은 앱 자동 확인·네이티브 확인·서명 검증 설치를 사용한다. [자동 업데이트 경계](../../docs/desktop-updates.md). 기존 글래스 화면·설정·등록·수신 파일은 유지한다.
 
 깨끗한 커밋에서 아래 명령 하나로 로컬 필수 검사·서명 패키징·Apple 공증·티켓·Gatekeeper·업데이트 서명/변조 검사·GitHub draft 업로드/해시 대조·공개·임시 앱 업데이트 설치 검사를 실행한다. `--publish`를 빼면 공개하지 않는다. `FTA_NOTARY_PROFILE`과 `APPLE_SIGNING_IDENTITY`는 기존 사용자 키체인 설정을 사용한다. 개인 업데이트 키는 저장소 밖 `~/.config/fta/update-signing/desktop.key`에 유지하며 `--key`로 같은 키의 다른 안전한 파일 경로를 제공할 수도 있다.
