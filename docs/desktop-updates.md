@@ -28,7 +28,7 @@ Windows·macOS의 0.1.5부터 Tauri 공식 Rust updater 2.14.1을 사용한다. 
 
 `packaging/macos/build-release.py`는 깨끗한 커밋에서 로컬 필수 검사, 앱/DMG 빌드·서명·공증 승인·앱/DMG 티켓·Gatekeeper·이미지 검증 후 최종 `.app.tar.gz`를 만든다. `packaging/publish-release.py`는 실제 바이트의 빌드 정보·해시·버전·번들 구성 확인, 버전 결합 서명과 변조 거부 검사를 거쳐 타깃별 JSON·SHA-256·빌드 정보를 준비한다. `--publish`에서만 게시한다.
 
-첫 공개는 draft에 모든 자산을 올리고 재다운로드 해시를 대조한 뒤 latest로 공개한다. Windows를 나중에 같은 버전에 추가할 때는 공개 Mac 자산을 덮어쓰지 않고 새 설치 파일·서명·증빙을 먼저 올려 대조한 뒤 Windows feed를 마지막에 게시한다. 새 버전에서 다른 OS의 feed가 있으면 기존 버전 결합 서명을 유지해 복사한다. Actions 워크플로·계정 예산·보호 설정은 변경하지 않는다.
+첫 공개는 draft에 모든 자산을 올리고 재다운로드 해시를 대조한 뒤 latest로 공개한다. Windows를 나중에 같은 버전에 추가할 때는 공개 Mac 자산을 덮어쓰지 않고 설치 파일·서명·증빙을 먼저 올려 대조한 뒤 Windows feed를 마지막에 게시한다. 네이티브 빌더가 설치 파일·증빙을 먼저 올린 경우 재다운로드 해시가 정확히 같은 파일만 재사용한다. 다른 바이트의 동명 공개 파일 또는 이미 공개된 해당 타깃 feed는 덮어쓰지 않고 거부한다. 새 버전에서 다른 OS의 feed가 있으면 기존 버전 결합 서명을 유지해 복사한다. Actions 워크플로·계정 예산·보호 설정은 변경하지 않는다.
 
 Windows는 사용자 Windows PC에서 `packaging/windows/build.ps1`로 빌드·검사한다. 서명은 게시 컴퓨터에서 처리할 수 있어 개인키 없이 NSIS를 패키징한다. 다른 OS의 실행·설치/UAC 검증을 Mac에서 통과로 보고하지 않는다.
 
