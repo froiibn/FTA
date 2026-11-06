@@ -122,10 +122,21 @@ def main():
     # Never overwrite a public installer/tag. Build all assets into a draft, then expose them together.
     check = subprocess.run(gh + ["release", "view", tag, "--json", "isDraft,assets"], cwd=ROOT, capture_output=True, text=True)
     public = check.returncode == 0 and not json.loads(check.stdout)["isDraft"]
+    reused = set()
     if public:
         existing_names = {asset["name"] for asset in json.loads(check.stdout)["assets"]}
-        if any(file.name in existing_names for file in assets):
-            raise ValueError("Never overwrite public assets; only a new native target may be added")
+        if manifest.name in existing_names:
+            raise ValueError("This target feed is already public; never replace an advertised update")
+        # The native builder may have uploaded its installer/evidence before handing signing to this Mac.
+        # Reuse only byte-identical public assets after downloading them; never clobber a public binary.
+        existing = args.output / "existing-public-verification"
+        existing.mkdir(exist_ok=True)
+        for file in assets:
+            if file.name in existing_names:
+                run(gh + ["release", "download", tag, "--pattern", file.name, "--dir", str(existing.resolve()), "--clobber"], stdout=subprocess.DEVNULL)
+                if digest(file) != digest(existing / file.name):
+                    raise ValueError(f"Existing public asset differs; refusing replacement: {file.name}")
+                reused.add(file.name)
     if check.returncode != 0:
         run(gh + ["release", "create", tag, "--draft", "--target", source,
                   "--title", f"FTA {version}", "--notes-file", str(args.notes.resolve())])
@@ -146,12 +157,13 @@ def main():
                 assets.append(carried)
     hashes.write_text("".join(f"{digest(f)}  {f.name}\n" for f in assets if f != hashes))
     # Adding Windows later must not change the already published Mac files. Expose its feed last.
-    upload = [file for file in assets if not public or file != manifest]
-    run(gh + ["release", "upload", tag, *[str(f.resolve()) for f in upload]] + ([] if public else ["--clobber"]))
+    upload = [file for file in assets if (not public or file != manifest) and file.name not in reused]
+    if upload:
+        run(gh + ["release", "upload", tag, *[str(f.resolve()) for f in upload]] + ([] if public else ["--clobber"]))
     # Verify every staged asset over GitHub before making this draft the app's latest feed.
     verify = args.output / "github-verification"
     verify.mkdir(exist_ok=True)
-    for file in upload:
+    for file in [f for f in assets if not public or f != manifest]:
         run(gh + ["release", "download", tag, "--pattern", file.name, "--dir", str(verify.resolve()), "--clobber"], stdout=subprocess.DEVNULL)
         if digest(file) != digest(verify / file.name):
             raise ValueError(f"GitHub asset hash mismatch: {file.name}")
