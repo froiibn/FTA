@@ -25,9 +25,8 @@ public final class MainActivity extends Activity {
     static final int WHITE=Color.WHITE;
     private static final int PICK_PHOTOS=101,PICK_FILES=102,CAPTURE=103,LAN_PERMISSION=104,NOTIFICATIONS=105,OPEN_RECEIVED=106;
     private static final int MAX_ATTACHMENTS=100,ATTACHMENT_THUMBNAIL_PIXELS=144;
-    // Offer the verified desktop-only release, not a changing latest release that may include mobile packages.
-    // Advance this address only after a new Windows/macOS release has been verified.
-    private static final String DESKTOP_RELEASE_ADDRESS="https://github.com/froiibn/FTA/releases/tag/v0.1.2";
+    // Keep the mobile link stable while the download page tracks each desktop platform separately.
+    private static final String DESKTOP_RELEASE_ADDRESS="https://github.com/froiibn/FTA#다운로드와-플랫폼";
     private static final long COMPLETION_MS=1500, BLINK_CYCLE_MS=600;
     // Lifecycle controls are serialized globally, so recreation cannot stop a newer listener from an old worker.
     private static final ExecutorService CONTROL=TransferService.CONTROL;

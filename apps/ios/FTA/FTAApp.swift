@@ -483,10 +483,9 @@ struct SettingsView: View {
     }
 }
 
-// Pin the verified desktop-only release rather than offering mobile packages from a changing latest release.
-// Update this address when the next verified Windows/macOS release is published.
+// Keep the mobile link stable while the download page tracks each desktop platform separately.
 private enum DesktopDistribution {
-    static let releaseAddress = "https://github.com/froiibn/FTA/releases/tag/v0.1.2"
+    static let releaseAddress = "https://github.com/froiibn/FTA#다운로드와-플랫폼"
 }
 
 struct DesktopInstallView: View {
