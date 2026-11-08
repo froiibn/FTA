@@ -117,7 +117,7 @@
     <string name="text">"テキスト"</string>
     <string name="text_or_url">"テキストまたはURL"</string>
     <string name="files">"ファイル"</string>
-    <string name="files_permissions">"ファイルと権限"</string>
+    <string name="notifications_section">"通知"</string>
     <string name="open_file">"ファイルを開く"</string>
     <string name="import_interrupted">"ファイルの準備が中断されました"</string>
     <string name="not_allowed">"未許可"</string>

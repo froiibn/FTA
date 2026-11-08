@@ -8,8 +8,8 @@ android {
         minSdk = 29
         targetSdk = 37
         // Continue the existing Play version-code sequence so this update preserves installed app data.
-        versionCode = 9
-        versionName = "0.1.4"
+        versionCode = 10
+        versionName = "0.1.6"
         testInstrumentationRunner = "app.fta.android.FtaChecks"
         ndk { abiFilters += "arm64-v8a" }
     }

@@ -116,7 +116,7 @@
   "text": "テキスト",
   "text_or_url": "テキストまたはURL",
   "files": "ファイル",
-  "files_permissions": "ファイルと権限",
+  "notifications_section": "通知",
   "open_file": "ファイルを開く",
   "import_interrupted": "ファイルの準備が中断されました",
   "not_allowed": "未許可",

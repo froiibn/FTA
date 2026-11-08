@@ -1,11 +1,12 @@
 <resources>
     <!-- A real configuration change selects the platform dark theme, including dialogs, inputs and switches. -->
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
-        <!-- Settings-like group contrast gives rows and actions visible boundaries in each system appearance. -->
-        <item name="android:colorBackground">#17171C</item>
-        <item name="android:colorBackgroundFloating">#27262E</item>
+        <!-- Use the selected ink navy behind the separate navy card surface. -->
+        <item name="android:colorBackground">#080C14</item>
+        <item name="android:colorBackgroundFloating">#151F30</item>
+        <item name="android:windowBackground">?android:attr/colorBackground</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#AAC9EE</item>
+        <item name="android:colorAccent">#A6C8FF</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>

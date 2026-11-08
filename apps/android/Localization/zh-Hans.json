@@ -116,7 +116,7 @@
   "text": "文本",
   "text_or_url": "文本或 URL",
   "files": "文件",
-  "files_permissions": "文件和权限",
+  "notifications_section": "通知",
   "open_file": "打开文件",
   "import_interrupted": "文件准备已中断",
   "not_allowed": "未允许",

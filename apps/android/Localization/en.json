@@ -116,7 +116,7 @@
   "text": "Text",
   "text_or_url": "Text or URL",
   "files": "Files",
-  "files_permissions": "Files and permissions",
+  "notifications_section": "Notifications",
   "open_file": "Open file",
   "import_interrupted": "File preparation was interrupted",
   "not_allowed": "Not allowed",

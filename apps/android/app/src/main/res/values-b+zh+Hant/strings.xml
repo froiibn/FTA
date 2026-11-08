@@ -117,7 +117,7 @@
     <string name="text">"文字"</string>
     <string name="text_or_url">"文字或 URL"</string>
     <string name="files">"檔案"</string>
-    <string name="files_permissions">"檔案與權限"</string>
+    <string name="notifications_section">"通知"</string>
     <string name="open_file">"開啟檔案"</string>
     <string name="import_interrupted">"檔案準備已中斷"</string>
     <string name="not_allowed">"未允許"</string>

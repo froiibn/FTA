@@ -117,7 +117,7 @@
     <string name="text">"텍스트"</string>
     <string name="text_or_url">"텍스트 또는 URL"</string>
     <string name="files">"파일"</string>
-    <string name="files_permissions">"파일 및 권한"</string>
+    <string name="notifications_section">"알림"</string>
     <string name="open_file">"파일 열기"</string>
     <string name="import_interrupted">"파일 준비가 중단됐습니다"</string>
     <string name="not_allowed">"허용 안됨"</string>

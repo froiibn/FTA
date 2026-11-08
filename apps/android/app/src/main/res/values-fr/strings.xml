@@ -117,7 +117,7 @@
     <string name="text">"Texte"</string>
     <string name="text_or_url">"Texte ou URL"</string>
     <string name="files">"Fichiers"</string>
-    <string name="files_permissions">"Fichiers et autorisations"</string>
+    <string name="notifications_section">"Notifications"</string>
     <string name="open_file">"Ouvrir le fichier"</string>
     <string name="import_interrupted">"Préparation des fichiers interrompue"</string>
     <string name="not_allowed">"Non autorisé"</string>

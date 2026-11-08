@@ -201,21 +201,106 @@ public final class MainActivity extends Activity {
     }
     private void dismissReceiptBanner(){if(hideReceiptBanner!=null)main.removeCallbacks(hideReceiptBanner);hideReceiptBanner=null;if(receiptBanner!=null){stage.removeView(receiptBanner);receiptBanner=null;}}
     private void buildSettings(){
-        LinearLayout c=column();status=label("",14);status.setTextColor(textSecondary);c.addView(status);c.addView(section(getString(R.string.network_section)));LinearLayout networkGroup=group(c);
+        LinearLayout content=column();
+        // Keep service status, trust and Android's LAN permission together so connection issues are easier to find.
+        content.addView(section(getString(R.string.network_section)));
+        LinearLayout network=group(content);
+        status=label("",14);
+        status.setTextColor(textSecondary);
+        status.setPadding(dp(16),dp(14),dp(16),dp(14));
+        network.addView(status,new LinearLayout.LayoutParams(-1,-2));
+        network.addView(divider());
+
         LanDiscovery.Lan lan=LanDiscovery.current(this);
-        Switch trust=new Switch(this);trust.setText(getString(R.string.i_trust_this_home_network));trust.setTextSize(16);trust.setMinHeight(dp(48));trust.setChecked(trusted(lan));trust.setEnabled(lan!=null);trust.setOnCheckedChangeListener((b,on)->{Set<String> scopes=new HashSet<>(preferences.getStringSet("trustedScopes",Collections.emptySet()));if(lan!=null){if(on)scopes.add(lan.scope);else scopes.remove(lan.scope);}preferences.edit().putStringSet("trustedScopes",scopes).apply();if(on&&!permitted())requestPermissions(new String[]{"android.permission.ACCESS_LOCAL_NETWORK"},LAN_PERMISSION);else if(on)requestReceiptPermission();updateLifecycle();});
-        switchRow(networkGroup,trust,lan==null?getString(R.string.connect_lan):lan.interfaceName+" · "+lan.cidr);networkGroup.addView(divider());
-        Switch receive=new Switch(this);receive.setText(getString(R.string.enable_sending_and_receiving));receive.setTextSize(16);receive.setMinHeight(dp(48));receive.setChecked(preferences.getBoolean("receiveEnabled",true));receive.setOnCheckedChangeListener((b,on)->{preferences.edit().putBoolean("receiveEnabled",on).apply();updateLifecycle();});switchRow(networkGroup,receive,getString(R.string.background_summary));
-        c.addView(section(getString(R.string.devices_section)));LinearLayout deviceGroup=group(c);
-        deviceGroup.addView(settingsRow(getString(R.string.device_name),name(),R.drawable.ic_info,this::editDeviceName));deviceGroup.addView(divider());deviceGroup.addView(settingsRow(getString(R.string.manage_devices),getString(R.string.unregister_summary),R.drawable.ic_network,this::manageDevices));
-        c.addView(section(getString(R.string.files_permissions)));LinearLayout files=group(c);files.addView(settingsRow(getString(R.string.open_received),getString(R.string.files_app_summary),R.drawable.ic_file,()->{try{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE).putExtra(DocumentsContract.EXTRA_INITIAL_URI,DocumentsContract.buildRootUri("app.fta.android.documents","received"));startActivityForResult(intent,OPEN_RECEIVED);}catch(Exception e){fail(e);}}));files.addView(divider());
-        files.addView(settingsRow(getString(R.string.allow_notifications),(getSystemService(NotificationManager.class).areNotificationsEnabled()?getString(R.string.allowed):getString(R.string.not_allowed))+getString(R.string.notification_suffix),R.drawable.ic_notifications,()->{if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));}));files.addView(divider());
-        files.addView(settingsRow(getString(R.string.receive_alerts),null,R.drawable.ic_notifications,()->startActivity(new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()).putExtra(Settings.EXTRA_CHANNEL_ID,receiptAlerts.backgroundChannel()))));files.addView(divider());
-        files.addView(settingsRow(getString(R.string.lan_permission_settings),(Build.VERSION.SDK_INT<37?getString(R.string.permission_not_required):permitted()?getString(R.string.allowed):getString(R.string.not_allowed))+getString(R.string.app_permission_suffix),R.drawable.ic_network,()->startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())))));
-        c.addView(section(getString(R.string.about_section)));LinearLayout info=group(c);
-        // Desktop help belongs in the existing Settings group and must not alter transfer preferences.
-        info.addView(settingsRow(getString(R.string.desktop_install_title),null,R.drawable.ic_info,this::showDesktopInstall));info.addView(divider());
-        info.addView(settingsRow(getString(R.string.privacy_policy),null,R.drawable.ic_info,()->showLegal("PrivacyPolicy.txt")));info.addView(divider());info.addView(settingsRow(getString(R.string.open_source_notices),null,R.drawable.ic_info,()->showLegal("ThirdPartyNotices.txt")));TextView version=label(getString(R.string.app_version,BuildConfig.VERSION_NAME),12);version.setTextColor(textSecondary);version.setPadding(dp(16),dp(16),0,0);c.addView(version);body.addView(scroll(c),new LinearLayout.LayoutParams(-1,-1));
+        Switch trust=new Switch(this);
+        trust.setText(getString(R.string.i_trust_this_home_network));
+        trust.setTextSize(16);
+        trust.setMinHeight(dp(48));
+        trust.setChecked(trusted(lan));
+        trust.setEnabled(lan!=null);
+        trust.setOnCheckedChangeListener((button,on)->{
+            Set<String> scopes=new HashSet<>(preferences.getStringSet("trustedScopes",Collections.emptySet()));
+            if(lan!=null){
+                if(on)scopes.add(lan.scope);
+                else scopes.remove(lan.scope);
+            }
+            preferences.edit().putStringSet("trustedScopes",scopes).apply();
+            if(on&&!permitted())requestPermissions(new String[]{"android.permission.ACCESS_LOCAL_NETWORK"},LAN_PERMISSION);
+            else if(on)requestReceiptPermission();
+            updateLifecycle();
+        });
+        switchRow(network,trust,lan==null?getString(R.string.connect_lan):lan.interfaceName+" · "+lan.cidr);
+        network.addView(divider());
+
+        Switch receive=new Switch(this);
+        receive.setText(getString(R.string.enable_sending_and_receiving));
+        receive.setTextSize(16);
+        receive.setMinHeight(dp(48));
+        receive.setChecked(preferences.getBoolean("receiveEnabled",true));
+        receive.setOnCheckedChangeListener((button,on)->{
+            preferences.edit().putBoolean("receiveEnabled",on).apply();
+            updateLifecycle();
+        });
+        switchRow(network,receive,getString(R.string.background_summary));
+        network.addView(divider());
+        String lanPermission=getString(Build.VERSION.SDK_INT<37?R.string.permission_not_required:
+                permitted()?R.string.allowed:R.string.not_allowed);
+        network.addView(settingsRow(getString(R.string.lan_permission_settings),
+                lanPermission+getString(R.string.app_permission_suffix),R.drawable.ic_network,
+                ()->startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())))));
+
+        content.addView(section(getString(R.string.devices_section)));
+        LinearLayout devices=group(content);
+        devices.addView(settingsRow(getString(R.string.device_name),name(),R.drawable.ic_info,this::editDeviceName));
+        devices.addView(divider());
+        devices.addView(settingsRow(getString(R.string.manage_devices),getString(R.string.unregister_summary),
+                R.drawable.ic_network,this::manageDevices));
+
+        // Separate app-wide notification permission from the delivery channel while keeping both in one group.
+        content.addView(section(getString(R.string.notifications_section)));
+        LinearLayout alerts=group(content);
+        boolean notificationsEnabled=getSystemService(NotificationManager.class).areNotificationsEnabled();
+        String notificationPermission=getString(notificationsEnabled?R.string.allowed:R.string.not_allowed);
+        alerts.addView(settingsRow(getString(R.string.allow_notifications),
+                notificationPermission+getString(R.string.notification_suffix),R.drawable.ic_notifications,()->{
+                    if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+                        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);
+                    }else{
+                        startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));
+                    }
+                }));
+        alerts.addView(divider());
+        alerts.addView(settingsRow(getString(R.string.receive_alerts),null,R.drawable.ic_settings,
+                ()->startActivity(new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName())
+                        .putExtra(Settings.EXTRA_CHANNEL_ID,receiptAlerts.backgroundChannel()))));
+
+        content.addView(section(getString(R.string.files)));
+        LinearLayout files=group(content);
+        files.addView(settingsRow(getString(R.string.open_received),getString(R.string.files_app_summary),R.drawable.ic_file,()->{
+            try{
+                Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*")
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .putExtra(DocumentsContract.EXTRA_INITIAL_URI,DocumentsContract.buildRootUri("app.fta.android.documents","received"));
+                startActivityForResult(intent,OPEN_RECEIVED);
+            }catch(Exception error){
+                fail(error);
+            }
+        }));
+
+        content.addView(section(getString(R.string.about_section)));
+        LinearLayout info=group(content);
+        info.addView(settingsRow(getString(R.string.desktop_install_title),null,R.drawable.ic_info,this::showDesktopInstall));
+        info.addView(divider());
+        info.addView(settingsRow(getString(R.string.privacy_policy),null,R.drawable.ic_info,()->showLegal("PrivacyPolicy.txt")));
+        info.addView(divider());
+        info.addView(settingsRow(getString(R.string.open_source_notices),null,R.drawable.ic_info,()->showLegal("ThirdPartyNotices.txt")));
+        TextView version=label(getString(R.string.app_version,BuildConfig.VERSION_NAME),12);
+        version.setTextColor(textSecondary);
+        version.setPadding(dp(16),dp(16),0,0);
+        content.addView(version);
+        body.addView(scroll(content),new LinearLayout.LayoutParams(-1,-1));
     }
     // Native scrollable help works offline and at large font sizes; the user opens installers on their PC.
     private void showDesktopInstall(){
@@ -273,7 +358,7 @@ public final class MainActivity extends Activity {
     private void render(){if(destroyed)return;renderStatus();if(tab==0){renderPeers();renderActions();renderAttachments();}else if(tab==1)renderHistory();}
     private void renderStatus(){if(status!=null){status.setText(session==null?getString(R.string.binding_service):session.status());
         // Green means the real LAN transfer service is running, not merely that Wi-Fi is enabled.
-        if(tab==0){Drawable radio=getDrawable(R.drawable.ic_radio_status);radio.setTint(running?transferGreen:textSecondary);radio.setBounds(0,0,dp(20),dp(20));status.setCompoundDrawablesRelative(radio,null,null,null);status.setCompoundDrawablePadding(dp(6));status.setGravity(Gravity.CENTER_VERTICAL);}
+        Drawable radio=getDrawable(R.drawable.ic_radio_status);radio.setTint(running?transferGreen:textSecondary);radio.setBounds(0,0,dp(20),dp(20));status.setCompoundDrawablesRelative(radio,null,null,null);status.setCompoundDrawablePadding(dp(6));status.setGravity(Gravity.CENTER_VERTICAL);
     }}
     private void renderPeers(){if(deviceRow==null)return;
         // Stable rows preserve native accessibility focus; polling identical engine data must not recreate controls.
@@ -353,7 +438,14 @@ public final class MainActivity extends Activity {
     private void renderHistory(){if(historyRows==null)return;
         // Native list rows retain stable accessibility focus when engine polling returns unchanged records.
         String snapshot=history.toString();if(snapshot.equals(renderedHistory))return;renderedHistory=snapshot;historyRows.removeAllViews();
-        if(history.length()==0){TextView hint=label(getString(R.string.no_history),16);hint.setTextColor(textSecondary);hint.setPadding(0,dp(24),0,dp(24));historyRows.addView(hint);}
+        if(history.length()==0){
+            TextView hint=label(getString(R.string.no_history),16);
+            hint.setTextColor(textSecondary);
+            // Center the message across the whole card, including when the translation wraps.
+            hint.setGravity(Gravity.CENTER);
+            hint.setPadding(dp(16),dp(24),dp(16),dp(24));
+            historyRows.addView(hint,new LinearLayout.LayoutParams(-1,-2));
+        }
         for(int i=0;i<history.length();i++){JSONObject record=history.optJSONObject(i);if(record==null)continue;
             String summary=("receive".equals(record.optString("direction"))?getString(R.string.received):getString(R.string.sent))+" · "+stateText(record.optString("state"))+"\n"+android.text.format.DateUtils.formatDateTime(this,record.optLong("created_at")*1000,android.text.format.DateUtils.FORMAT_SHOW_DATE|android.text.format.DateUtils.FORMAT_SHOW_TIME);
             View row=settingsRow(title(record),summary,"files".equals(record.optString("kind"))?R.drawable.ic_file:R.drawable.ic_history,()->openReceipt(record.optString("transfer_id")));
