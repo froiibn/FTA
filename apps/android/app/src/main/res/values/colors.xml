@@ -1,4 +1,4 @@
 <resources>
     <!-- Match the desktop brand while letting Android, rather than the bitmap, own the outer mask. -->
-    <color name="launcher_background">#24466B</color>
+    <color name="launcher_background">#08090D</color>
 </resources>

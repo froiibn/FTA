@@ -1,15 +1,12 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
-    android:viewportWidth="1024" android:viewportHeight="1024">
-    <!-- Reuse the desktop arrow geometry, reduced around its center to stay inside
-         Android's 66dp safe zone even with round launcher masks and motion. -->
-    <group android:pivotX="512" android:pivotY="512"
-        android:scaleX="0.875" android:scaleY="0.875">
-        <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFF"
-            android:strokeWidth="58" android:strokeLineCap="round" android:strokeLineJoin="round"
-            android:pathData="M264,352H760M632,224l128,128 -128,128" />
-        <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFF"
-            android:strokeWidth="58" android:strokeLineCap="round" android:strokeLineJoin="round"
-            android:pathData="M760,672H264M392,544L264,672l128,128" />
+    android:viewportWidth="1254" android:viewportHeight="1254">
+    <!-- Keep the shared silhouette inside the round 66dp safe zone during launcher motion. -->
+    <group android:pivotX="627" android:pivotY="627"
+        android:scaleX="0.84" android:scaleY="0.84">
+        <path android:fillColor="#395987"
+            android:pathData="M394 286H780Q787 286 792 291L855 353Q860 358 855 363L770 448Q766 452 760 452H467C450 452 435 467 435 484V602H608Q614 602 610 606L420 798Q415 803 408 803H310C283 803 262 782 262 755V420C262 404 269 390 280 379L354 304C365 293 378 286 394 286Z" />
+        <path android:fillColor="#7D96BE"
+            android:pathData="M843 454H944C971 454 992 475 992 502V837C992 853 986 867 974 879L899 952C888 963 875 968 859 968H474Q467 968 462 963L400 903Q395 898 400 893L486 808Q491 804 497 804H787C804 804 819 789 819 772V650H651Q645 650 649 646L836 458Q839 454 843 454Z" />
     </group>
 </vector>

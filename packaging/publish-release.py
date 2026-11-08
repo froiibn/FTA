@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -123,10 +124,9 @@ def main():
     check = subprocess.run(gh + ["release", "view", tag, "--json", "isDraft,assets"], cwd=ROOT, capture_output=True, text=True)
     public = check.returncode == 0 and not json.loads(check.stdout)["isDraft"]
     reused = set()
+    replacing_carried_feed = False
     if public:
         existing_names = {asset["name"] for asset in json.loads(check.stdout)["assets"]}
-        if manifest.name in existing_names:
-            raise ValueError("This target feed is already public; never replace an advertised update")
         # The native builder may have uploaded its installer/evidence before handing signing to this Mac.
         # Reuse only byte-identical public assets after downloading them; never clobber a public binary.
         existing = args.output / "existing-public-verification"
@@ -134,6 +134,20 @@ def main():
         for file in assets:
             if file.name in existing_names:
                 run(gh + ["release", "download", tag, "--pattern", file.name, "--dir", str(existing.resolve()), "--clobber"], stdout=subprocess.DEVNULL)
+                if file == manifest:
+                    # An earlier target's release carries the previous feed until this target is ready.
+                    # Only replace a feed pointing at an older tag; a feed already released here is immutable.
+                    carried = json.loads((existing / file.name).read_text())
+                    old_version = carried.get("version", "")
+                    version_parts = lambda value: tuple(map(int, value.split(".")))
+                    if (not isinstance(old_version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", old_version)
+                            or version_parts(old_version) >= version_parts(version)
+                            or not carried.get("signature")
+                            or not carried.get("url", "").startswith(
+                                f"https://github.com/{REPOSITORY}/releases/download/v{old_version}/")):
+                        raise ValueError("This target feed is already public or is not a valid older feed")
+                    replacing_carried_feed = True
+                    continue
                 if digest(file) != digest(existing / file.name):
                     raise ValueError(f"Existing public asset differs; refusing replacement: {file.name}")
                 reused.add(file.name)
@@ -155,7 +169,7 @@ def main():
                 if not data.get("signature") or not data.get("url", "").startswith(f"https://github.com/{REPOSITORY}/releases/download/"):
                     raise ValueError("Previous target feed is invalid")
                 assets.append(carried)
-    hashes.write_text("".join(f"{digest(f)}  {f.name}\n" for f in assets if f != hashes))
+    # Other targets can advance independently, so their carried feeds are verified but not in this target's checksum file.
     # Adding Windows later must not change the already published Mac files. Expose its feed last.
     upload = [file for file in assets if (not public or file != manifest) and file.name not in reused]
     if upload:
@@ -168,7 +182,7 @@ def main():
         if digest(file) != digest(verify / file.name):
             raise ValueError(f"GitHub asset hash mismatch: {file.name}")
     if public:
-        run(gh + ["release", "upload", tag, str(manifest.resolve())])
+        run(gh + ["release", "upload", tag, str(manifest.resolve())] + (["--clobber"] if replacing_carried_feed else []))
         run(gh + ["release", "download", tag, "--pattern", manifest.name, "--dir", str(verify.resolve()), "--clobber"])
         if digest(manifest) != digest(verify / manifest.name):
             raise ValueError("Published target feed hash mismatch")

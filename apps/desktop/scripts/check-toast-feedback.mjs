@@ -22,6 +22,10 @@ function fixture(view = "main") {
     toggle(name, on) { if (on) classes.add(name); else classes.delete(name); },
   } };
   const progress = { hidden: false };
+  const progressElements = {
+    "transfer-progress-bar": progress, "transfer-status": { hidden: false }, "cancel-transfer": { hidden: false },
+    "expand-window": { hidden: true },
+  };
   const context = vm.createContext({
     view, isMain: view === "main", toast, toastMessage: {}, toastTimer: undefined,
     passiveNotices: new Map(), settingsActionCount: 0, settingsActionResult: undefined,
@@ -33,14 +37,17 @@ function fixture(view = "main") {
       setTimeout(fn, delay) { timers.set(++nextTimer, { fn, due: now + delay }); return nextTimer; },
       clearTimeout(id) { timers.delete(id); }, clearInterval() {},
     },
-    setSettingsWorking() {}, element: () => progress,
-    progressTimer: undefined, inFlightId: "test-transfer", async updateProgress() {},
+    setSettingsWorking() {}, element: (id) => progressElements[id],
+    progressTimer: undefined, progressDismissTimer: undefined, inFlightId: "test-transfer",
+    crypto: { randomUUID: () => "new-transfer" }, stateLabel: (state) => state,
     dragPoint: undefined, highlightDropTarget() {},
   });
   const names = ["showToast", "hideToast", "showNotice", "clearPassiveNotice", "rememberSettingsResult",
-    "beginSettingsAction", "finishSettingsAction", "finishProgress", "applyFolded"];
-  vm.runInContext(`${source.match(/const TOAST_DURATION_MS = \d+;/)[0]}\n${names.map(declaration).join("\n")}`, context);
-  return { context, toast, classes, progress, timers,
+    "beginSettingsAction", "finishSettingsAction", "beginProgress", "finishProgress", "hideTransferProgress",
+    "updateProgress", "renderTransferProgress", "byteCount", "formatBytes", "applyFolded"];
+  const constants = source.match(/const (?:TOAST_DURATION_MS|COMPLETED_FILE_PROGRESS_MS|PROGRESS_INTERVAL_MS) = [\d_]+;/g);
+  vm.runInContext(`${constants.join("\n")}\n${names.map(declaration).join("\n")}`, context);
+  return { context, toast, classes, progress, progressElements, timers,
     advance(ms) {
       now += ms;
       for (const [id, timer] of [...timers]) if (timer.due <= now) { timers.delete(id); timer.fn(); }
@@ -113,11 +120,40 @@ test("nested settings batches defer feedback and keep an earlier error over clea
   assert.equal(f.toast.hidden, true);
 });
 
-test("terminal progress is cleared after its last persisted-state query", async () => {
+test("failed or cancelled transfers clear progress immediately", () => {
   const f = fixture();
-  await f.context.finishProgress();
+  f.context.finishProgress();
   assert.equal(f.progress.hidden, true);
   assert.equal(f.context.inFlightId, "");
+});
+
+// Simulate a poll returning after final storage to catch the race with the dismissal timer.
+test("confirmed file progress shows 100% for three seconds and ignores a late poll", async () => {
+  const f = fixture();
+  let reply;
+  f.context.rpc = () => new Promise((resolve) => { reply = resolve; });
+  const poll = f.context.updateProgress();
+  f.context.finishProgress({ kind: "files", state: "completed", items: [{ state: "completed", size: "0" }] });
+  assert.equal(f.progress.value, 100);
+  assert.equal(f.progressElements["cancel-transfer"].hidden, true);
+  f.advance(2999);
+  assert.equal(f.progress.hidden, false);
+  f.advance(1);
+  reply({ kind: "files", state: "sending", items: [{ size: "100", bytes_transferred: "30" }] });
+  await poll;
+  assert.equal(f.progress.hidden, true);
+  assert.equal(f.progressElements["transfer-status"].hidden, true);
+});
+
+test("starting another transfer cancels the previous completion timer", () => {
+  const f = fixture();
+  f.context.window.setInterval = () => 123;
+  f.context.finishProgress({ kind: "files", state: "completed", items: [] });
+  f.context.beginProgress({ paired: true });
+  f.context.renderTransferProgress({ kind: "files", state: "sending", items: [{ size: "100", bytes_transferred: "30" }] });
+  f.advance(3000);
+  assert.equal(f.progress.hidden, false);
+  assert.equal(f.progress.value, 30);
 });
 
 // Both an already-visible result and a newly arriving result must stay off the

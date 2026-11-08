@@ -21,13 +21,13 @@ FTA는 **File Transfer Anything**의 약자다.
 
 | 플랫폼 | 제공 파일 | 설치·사용 안내 |
 |---|---|---|
-| macOS · Apple Silicon | [서명·공증 DMG · v0.1.5](https://github.com/froiibn/FTA/releases/download/v0.1.5/FTA_0.1.5_aarch64.dmg) | [앱 설치·메뉴 막대·빌드](packaging/macos/README.md) |
-| Windows · x64 | [설치 프로그램 · v0.1.5](https://github.com/froiibn/FTA/releases/download/v0.1.5/FTA_0.1.5_x64-setup.exe) | [앱 설치·트레이·빌드](packaging/windows/README.md) |
+| macOS · Apple Silicon | 서명·공증 DMG (`aarch64.dmg`) | [앱 설치·메뉴 막대·빌드](packaging/macos/README.md) |
+| Windows · x64 | 설치 프로그램 (`x64-setup.exe`) | [앱 설치·트레이·빌드](packaging/windows/README.md) |
 | Linux | 소스에서 CLI·엔진 빌드 | [서버 설치·systemd 서비스](packaging/linux/README.md) |
 
 macOS는 DMG에서 `FTA.app`을 Applications로 옮겨 설치하고, Windows는 설치 마법사에서 설치 폴더를 선택한다. 설정·등록 정보는 사용자별 데이터 폴더에, 수신 파일은 사용자가 지정한 수신 폴더에 저장한다.
 
-0.1.4 이하에서는 0.1.5를 한 번 직접 설치한다. 이후에는 앱의 자동 업데이트를 사용할 수 있다. 이 다운로드 표는 플랫폼별 설치 파일이 공개된 뒤 해당 행을 갱신한다. 모바일 앱도 이 섹션의 고정 주소를 안내한다.
+설치 파일은 Releases에서 해당 플랫폼의 가장 최근 공개 릴리스를 선택한다. 모바일 PC 설치 안내와 데스크톱 자동 업데이트는 플랫폼별 공개 JSON에서 버전을 조회한다. 자동 업데이트를 지원하지 않는 기존 앱은 설치 파일로 한 번 직접 업데이트한다.
 
 ## 처음 사용하기
 

@@ -483,22 +483,66 @@ struct SettingsView: View {
     }
 }
 
-// Keep the mobile link stable while the download page tracks each desktop platform separately.
-private enum DesktopDistribution {
-    static let releaseAddress = "https://github.com/froiibn/FTA#다운로드와-플랫폼"
+private enum DesktopDistribution: String {
+    case windows = "windows-x86_64"
+    case mac = "darwin-aarch64"
+
+    static let releases = "https://github.com/froiibn/FTA/releases"
+    private static let manifestLimit = 64 * 1024
+
+    private struct Manifest: Decodable {
+        let version: String
+        let url: String
+        let signature: String
+    }
+
+    func installerAddress() async -> String? {
+        let endpoint = URL(string: "\(Self.releases)/latest/download/latest-\(rawValue).json")!
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForResource = 8
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        do {
+            let (bytes, response) = try await session.bytes(from: endpoint)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            var data = Data()
+            for try await byte in bytes {
+                guard data.count < Self.manifestLimit else { return nil }
+                data.append(byte)
+            }
+            let manifest = try JSONDecoder().decode(Manifest.self, from: data)
+            let version = manifest.version
+            guard version.range(of: #"^[0-9]+\.[0-9]+\.[0-9]+$"#, options: .regularExpression) == (version.startIndex..<version.endIndex),
+                  !manifest.signature.isEmpty else { return nil }
+            // Accept only the published target asset for this tag. Mac updates use a
+            // tarball, but the release publisher ships a DMG alongside it for new installs.
+            let prefix = "\(Self.releases)/download/v\(version)/FTA_\(version)_"
+            let updateAsset = self == .windows ? "x64-setup.exe" : "aarch64.app.tar.gz"
+            guard manifest.url == prefix + updateAsset else { return nil }
+            return prefix + (self == .windows ? updateAsset : "aarch64.dmg")
+        } catch {
+            // The guide always exposes the releases list when the live lookup is unavailable.
+            return nil
+        }
+    }
 }
 
 struct DesktopInstallView: View {
     @State private var copied = false
+    @State private var windowsAddress: String?
+    @State private var macAddress: String?
     var body: some View {
         Form {
             Section { Text(String(localized:"무료 PC 버전입니다. 컴퓨터의 브라우저에서 아래 주소를 열어 설치하세요.")) }
                 .listRowBackground(Rectangle().fill(.ultraThinMaterial))
             Section("Windows · macOS") {
                 Text(String(localized:"Windows: x64-setup.exe 설치 파일을 실행하세요."))
+                if let windowsAddress { address(windowsAddress) }
                 Text(String(localized:"macOS: Apple Silicon용 aarch64.dmg를 열고 FTA를 응용 프로그램 폴더로 드래그하세요. Intel Mac 설치 파일은 아직 제공하지 않습니다."))
-                address(DesktopDistribution.releaseAddress)
+                if let macAddress { address(macAddress) }
             }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
+            Section("GitHub Releases") { address(DesktopDistribution.releases) }
+                .listRowBackground(Rectangle().fill(.ultraThinMaterial))
             Section("Linux") {
                 // Linux has not been tested on a real machine; do not offer an installation path yet.
                 Text(String(localized:"지원 준비 중"))
@@ -507,6 +551,8 @@ struct DesktopInstallView: View {
                 Text(String(localized:"컴퓨터에서 FTA를 실행하고 모바일과 같은 LAN에 연결하세요. 양쪽에서 사용할 네트워크를 신뢰하도록 설정한 뒤 기기를 선택해 전송하세요. 최초 전송은 수신 기기에서 한 번 등록을 승인해야 합니다."))
             }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
         }.scrollContentBackground(.hidden).background(GlassBackground())
+            .task { windowsAddress = await DesktopDistribution.windows.installerAddress() }
+            .task { macAddress = await DesktopDistribution.mac.installerAddress() }
             .navigationTitle(String(localized:"컴퓨터에 FTA 설치하기")).navigationBarTitleDisplayMode(.inline)
             .alert(String(localized:"주소를 복사했습니다"),isPresented:$copied) { Button(String(localized:"확인"),role:.cancel) {} }
     }

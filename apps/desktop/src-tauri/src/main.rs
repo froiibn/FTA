@@ -15,7 +15,8 @@ use std::{
 use fta_core::{config::AppPaths, ipc};
 use serde_json::{Value, json};
 use tauri::{
-    DragDropEvent, Emitter, Manager, State, WindowEvent,
+    DragDropEvent, Emitter, Manager, PhysicalPosition, PhysicalRect, PhysicalSize, State,
+    WindowEvent,
     image::Image,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -471,6 +472,26 @@ fn copy_text(app: tauri::AppHandle, value: String) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+// Compare in physical pixels so negative monitor origins and HiDPI work areas share one coordinate space.
+fn fit_expanded_window(
+    origin: PhysicalPosition<i32>,
+    size: PhysicalSize<u32>,
+    work: &PhysicalRect<i32, u32>,
+) -> (PhysicalPosition<i32>, PhysicalSize<u32>) {
+    let fit_axis = |origin: i32, start: i32, available: u32, requested: u32| {
+        let size = requested.min(available);
+        let last = i64::from(start) + i64::from(available - size);
+        let origin = i64::from(origin).clamp(i64::from(start), last);
+        (origin as i32, size)
+    };
+    let (x, width) = fit_axis(origin.x, work.position.x, work.size.width, size.width);
+    let (y, height) = fit_axis(origin.y, work.position.y, work.size.height, size.height);
+    (
+        PhysicalPosition::new(x, y),
+        PhysicalSize::new(width, height),
+    )
+}
+
 // Native size and UI visibility change as one operation; a failed resize must not leave an invisible panel.
 fn apply_fold_state(window: &tauri::WebviewWindow, folded: bool) -> Result<bool, String> {
     require_main_window(window.label())?;
@@ -494,37 +515,58 @@ fn apply_fold_state(window: &tauri::WebviewWindow, folded: bool) -> Result<bool,
     let expanded = fold
         .expanded_size
         .unwrap_or(tauri::LogicalSize::new(defaults.width, defaults.height));
-    let target = if folded {
-        tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE)
-    } else {
-        expanded
-    };
+    let compact = tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE);
+    let mut target = if folded { compact } else { expanded };
     let expanded_min = tauri::LogicalSize::new(
         defaults.min_width.unwrap_or(defaults.width),
         defaults.min_height.unwrap_or(defaults.height),
     );
-    window
-        .set_min_size(Some(if folded {
-            tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE)
-        } else {
-            expanded_min
-        }))
-        .map_err(|error| error.to_string())?;
-    if let Err(error) = window.set_size(target) {
-        let _ = window.set_min_size(Some(if fold.collapsed {
-            tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE)
-        } else {
-            expanded_min
-        }));
-        return Err(error.to_string());
+    let mut minimum = if folded { compact } else { expanded_min };
+    let mut placement = None;
+    if !folded {
+        // Resolve the monitor before growing, while the small button still identifies the intended display.
+        let origin = window.outer_position().map_err(|error| error.to_string())?;
+        let monitor = match window
+            .current_monitor()
+            .map_err(|error| error.to_string())?
+        {
+            Some(monitor) => Some(monitor),
+            None => window
+                .primary_monitor()
+                .map_err(|error| error.to_string())?,
+        };
+        if let Some(monitor) = monitor {
+            let scale = monitor.scale_factor();
+            let (position, size) =
+                fit_expanded_window(origin, target.to_physical(scale), monitor.work_area());
+            target = size.to_logical(scale);
+            minimum.width = minimum.width.min(target.width);
+            minimum.height = minimum.height.min(target.height);
+            // AppKit uses logical desktop coordinates, even if growing crosses a backing-scale boundary.
+            #[cfg(target_os = "macos")]
+            let (origin, position) = (
+                origin.to_logical::<f64>(window.scale_factor().map_err(|error| error.to_string())?),
+                position.to_logical::<f64>(scale),
+            );
+            placement = Some((origin, position));
+        }
     }
-    if let Err(error) = window.set_resizable(!folded) {
-        let _ = window.set_min_size(Some(if fold.collapsed {
-            tauri::LogicalSize::new(FOLDED_WINDOW_SIDE, FOLDED_WINDOW_SIDE)
-        } else {
-            expanded_min
-        }));
+    window
+        .set_min_size(Some(minimum))
+        .map_err(|error| error.to_string())?;
+    // Apply the final origin after sizing so native resize anchoring cannot undo the correction.
+    let result = window.set_size(target).and_then(|_| {
+        if let Some((_, position)) = placement {
+            window.set_position(position)?;
+        }
+        window.set_resizable(!folded)
+    });
+    if let Err(error) = result {
+        let _ = window.set_min_size(Some(if folded { expanded_min } else { compact }));
         let _ = window.set_size(current);
+        if let Some((origin, _)) = placement {
+            let _ = window.set_position(origin);
+        }
         return Err(error.to_string());
     }
     if folded {
@@ -1375,6 +1417,34 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Expanding from a corner must stay on that display, including a monitor left of the primary.
+    #[test]
+    fn expansion_fits_the_monitor_work_area() {
+        let work = PhysicalRect {
+            position: PhysicalPosition::new(-1920, 40),
+            size: PhysicalSize::new(1920, 1000),
+        };
+        let size = PhysicalSize::new(560, 520);
+        for (origin, expected) in [
+            ((-88, 952), (-560, 520)),
+            ((-2000, 0), (-1920, 40)),
+            ((-1200, 240), (-1200, 240)),
+        ] {
+            assert_eq!(
+                fit_expanded_window(PhysicalPosition::from(origin), size, &work),
+                (PhysicalPosition::from(expected), size)
+            );
+        }
+        assert_eq!(
+            fit_expanded_window(
+                PhysicalPosition::new(-88, 952),
+                PhysicalSize::new(2560, 1440),
+                &work,
+            ),
+            (work.position, work.size)
+        );
+    }
 
     // History/settings cannot borrow the native receiver consent action.
     #[test]

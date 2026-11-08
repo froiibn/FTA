@@ -26,7 +26,7 @@ npm run bundle
 
 macOS 최소 배포 타깃은 UserNotifications의 Banner/List 표시를 기준으로 11.0이다. 이 값은 최소 OS의 실기 통과를 의미하지 않는다. MCP 클라이언트는 macOS의 `FTA.app/Contents/MacOS/fta-mcp` 또는 Windows 앱 옆의 `fta-mcp.exe`를 stdio 서버로 실행하도록 사용자가 등록한다. 데스크톱 앱은 이 서버를 자동 실행하거나 Codex·Claude 등의 전역 설정을 수정하지 않는다.
 
-네이티브 아이콘 원본은 `src-tauri/icons/source.svg`이며 Tauri `icon` CLI로 PNG·ICO·ICNS를 생성한다. 네이비 컬러와 양방향 전송 표식을 툴바·앱 아이콘·favicon에서 함께 사용한다.
+네이티브 아이콘 원본은 `src-tauri/icons/source.svg`이며 Tauri `icon` CLI로 PNG·ICO·ICNS를 생성한다. 블랙 바탕과 맞물린 두 네이비 조각을 툴바·앱 아이콘·favicon에서 함께 사용한다. iOS와 Android의 앱 내부 마크에도 같은 PNG를 사용하며 Android 런처의 벡터는 같은 경로를 66dp 안전 영역에 맞춰 배치한다.
 
 ## 구현된 연결과 현재 한계
 

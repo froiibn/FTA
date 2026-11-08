@@ -1458,7 +1458,7 @@ dependencies = [
 
 [[package]]
 name = "fta-cli"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "clap",
  "fta-core",
@@ -1470,7 +1470,7 @@ dependencies = [
 
 [[package]]
 name = "fta-core"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bytes",
  "cap-primitives",
@@ -1506,7 +1506,7 @@ dependencies = [
 
 [[package]]
 name = "fta-desktop"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "base64 0.22.1",
  "block2",
@@ -1537,7 +1537,7 @@ dependencies = [
 
 [[package]]
 name = "fta-engine"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "fta-core",
  "tokio",
@@ -1558,7 +1558,7 @@ dependencies = [
 
 [[package]]
 name = "fta-mcp"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "clap",
  "fta-core",
@@ -1574,14 +1574,14 @@ dependencies = [
 
 [[package]]
 name = "fta-network-helper"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "fta-platform",
 ]
 
 [[package]]
 name = "fta-platform"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "dirs 6.0.0",
  "dunce",

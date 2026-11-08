@@ -1,8 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- Two explicit transfer directions keep the native icon aligned with the utility toolbar. -->
-  <rect x="64" y="64" width="896" height="896" rx="180" fill="#24466B"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M264 352H760M632 224l128 128-128 128"/>
-    <path d="M760 672H264M392 544 264 672l128 128"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1254 1254">
+  <!-- The desktop tile leaves a transparent inset; mobile launchers supply their own mask. -->
+  <rect x="64" y="64" width="1126" height="1126" rx="225" fill="#08090D"/>
+  <path fill="#395987" d="M394 286H780Q787 286 792 291L855 353Q860 358 855 363L770 448Q766 452 760 452H467C450 452 435 467 435 484V602H608Q614 602 610 606L420 798Q415 803 408 803H310C283 803 262 782 262 755V420C262 404 269 390 280 379L354 304C365 293 378 286 394 286Z"/>
+  <path fill="#7D96BE" d="M843 454H944C971 454 992 475 992 502V837C992 853 986 867 974 879L899 952C888 963 875 968 859 968H474Q467 968 462 963L400 903Q395 898 400 893L486 808Q491 804 497 804H787C804 804 819 789 819 772V650H651Q645 650 649 646L836 458Q839 454 843 454Z"/>
 </svg>

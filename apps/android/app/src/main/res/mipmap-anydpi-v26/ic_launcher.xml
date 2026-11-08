@@ -1,5 +1,5 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- A launcher masks and enlarges these layers; the full desktop bitmap clips its arrows. -->
+    <!-- A launcher masks and enlarges these layers; separate layers keep the symbol in the launcher safe zone. -->
     <background android:drawable="@color/launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>

@@ -14,7 +14,7 @@ final class FTAFlowTests: XCTestCase {
             XCTAssertTrue(entry.isHittable); entry.tap()
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout:5))
             capture("desktop-guide-\(locale)-top",app)
-            let copyRelease = app.buttons[copy + " https://github.com/froiibn/FTA#다운로드와-플랫폼"]
+            let copyRelease = app.buttons[copy + " https://github.com/froiibn/FTA/releases"]
             for _ in 0..<5 { if copyRelease.isHittable { break }; app.swipeUp() }
             XCTAssertTrue(copyRelease.isHittable); copyRelease.tap()
             XCTAssertTrue(app.alerts[confirmation].waitForExistence(timeout:3)); app.alerts.buttons[done].tap()

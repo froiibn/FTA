@@ -28,7 +28,7 @@ html.platform-windows {
 .platform-windows h1 { font-size: 14px; font-weight: 600; letter-spacing: 0; }
 .platform-windows h2 { font-weight: 600; }
 .platform-windows .brand { gap: 6px; }
-.platform-windows .brand-mark svg { width: 19px; height: 19px; }
+.platform-windows .brand-mark img { width: 19px; height: 19px; }
 .platform-windows .utility-header { min-height: 40px; background: var(--surface); border-color: var(--line); }
 .platform-windows .utility-header h2 { font-size: 13px; }
 .platform-windows .window-actions .quiet { width: 26px; min-height: 28px; padding: 4px; }
@@ -98,5 +98,4 @@ html.platform-windows {
   .platform-windows .composer { display: flex; flex-direction: column; flex: 1; min-height: 58px; }
   .platform-windows .message-input { display: flex; flex: 1; min-height: 0; }
   .platform-windows .message-input textarea { flex: 1; height: 100%; min-height: 0; }
-  .platform-windows .transfer-progress:not(:has(> :not([hidden]))) { display: none; }
 }

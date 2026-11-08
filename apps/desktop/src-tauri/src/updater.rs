@@ -284,7 +284,8 @@ mod tests {
         );
         update.install(bytes).unwrap();
         let plist = std::fs::read_to_string(bundle.join("Contents/Info.plist")).unwrap();
-        assert!(plist.contains("0.1.5"));
+        // The downloaded bundle must match the requested release, including future versions.
+        assert!(plist.contains(&format!("<string>{}</string>", update.version)));
         assert!(bundle.join("Contents/MacOS/fta-engine").is_file());
         assert!(bundle.join("Contents/MacOS/fta-mcp").is_file());
         assert!(

@@ -25,7 +25,7 @@ You can delete transfer records in the app without deleting files already receiv
 Transfer copies are cleaned up after successful transfer, selection replacement or clearing, or the next app start. Copies from unsuccessful transfers may remain temporarily for retry. Deleting the app removes its local storage and files, but content already sent to another device and OS backups must be managed separately. iOS may retain Keychain items after app deletion. A new installation does not automatically replace the recipient's device registration approval.
 
 External services and your choices
-The support link opens GitHub, whose privacy policy applies there. After you choose to open a received URL or share a file to another app, that website's or app's policies apply. FTA connects to these external services when you choose the relevant action.
+Opening the PC installation guide requests public version metadata from GitHub Releases to show the current installer addresses. The support link opens GitHub, whose privacy policy applies there. After you choose to open a received URL or share a file to another app, that website's or app's policies apply. FTA connects to these external services when you choose the relevant action.
 
 Policy updates
 This document will be updated if data handling changes. The in-app and public policies are maintained to describe the same actual behavior.

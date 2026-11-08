@@ -25,8 +25,6 @@ public final class MainActivity extends Activity {
     static final int WHITE=Color.WHITE;
     private static final int PICK_PHOTOS=101,PICK_FILES=102,CAPTURE=103,LAN_PERMISSION=104,NOTIFICATIONS=105,OPEN_RECEIVED=106;
     private static final int MAX_ATTACHMENTS=100,ATTACHMENT_THUMBNAIL_PIXELS=144;
-    // Keep the mobile link stable while the download page tracks each desktop platform separately.
-    private static final String DESKTOP_RELEASE_ADDRESS="https://github.com/froiibn/FTA#다운로드와-플랫폼";
     private static final long COMPLETION_MS=1500, BLINK_CYCLE_MS=600;
     // Lifecycle controls are serialized globally, so recreation cannot stop a newer listener from an old worker.
     private static final ExecutorService CONTROL=TransferService.CONTROL;
@@ -225,14 +223,31 @@ public final class MainActivity extends Activity {
         content.addView(label(getString(R.string.desktop_install_intro),16));
         content.addView(section("Windows · macOS"));
         content.addView(label(getString(R.string.desktop_install_windows),16));
+        LinearLayout windowsAddress=column();
+        content.addView(windowsAddress);
         content.addView(label(getString(R.string.desktop_install_mac),16));
-        desktopAddress(content,DESKTOP_RELEASE_ADDRESS);
+        LinearLayout macAddress=column();
+        content.addView(macAddress);
+        content.addView(section("GitHub Releases"));
+        desktopAddress(content,DesktopDistribution.RELEASES);
         // Linux has not been tested on a real machine; show readiness without an installation path.
         content.addView(section("Linux"));content.addView(label(getString(R.string.desktop_install_linux),16));
         TextView connection=label(getString(R.string.desktop_install_connect),16);connection.setPadding(0,dp(16),0,0);content.addView(connection);
         ScrollView guide=new ScrollView(this);guide.setFillViewport(true);guide.addView(content);
         showActionDialog(new AlertDialog.Builder(this).setTitle(getString(R.string.desktop_install_title)).setView(guide).setPositiveButton(getString(R.string.close),null),R.drawable.ic_close,0,0);
+        loadDesktopAddress(windowsAddress, DesktopDistribution.WINDOWS);
+        loadDesktopAddress(macAddress, DesktopDistribution.MAC);
     }
+    // Resolve each platform independently so a missing feed never hides the other installer.
+    private void loadDesktopAddress(LinearLayout row, DesktopDistribution platform) {
+        WORK.execute(() -> {
+            String address = platform.installerAddress();
+            if (address != null) main.post(() -> {
+                if (!destroyed && row.isAttachedToWindow()) desktopAddress(row, address);
+            });
+        });
+    }
+
     // Clipboard writes happen only after a tap; there is no installer download or execution on Android.
     private void desktopAddress(LinearLayout content,String address){
         TextView text=label(address,14);text.setTextIsSelectable(true);text.setPadding(0,dp(12),0,dp(4));content.addView(text);

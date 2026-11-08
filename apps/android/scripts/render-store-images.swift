@@ -25,7 +25,7 @@ func color(_ value:UInt32)->NSColor {NSColor(red:CGFloat((value>>16)&255)/255,gr
    (value as NSString).draw(in:rect,withAttributes:[.font:NSFont.systemFont(ofSize:point,weight:weight),.foregroundColor:tint,.paragraphStyle:paragraph])
   }
   // The Play icon is an opaque square; Google supplies its own external mask instead of receiving premasked corners.
-  try image(512,512,out.appendingPathComponent("icon-512.png")){color(0x24466B).setFill();NSRect(x:0,y:0,width:512,height:512).fill();mark.draw(in:NSRect(x:0,y:0,width:512,height:512))}
+  try image(512,512,out.appendingPathComponent("icon-512.png")){color(0x08090D).setFill();NSRect(x:0,y:0,width:512,height:512).fill();mark.draw(in:NSRect(x:0,y:0,width:512,height:512))}
   let families=Array(CommandLine.arguments.dropFirst()).isEmpty ? ["phone","tablet10"]:Array(CommandLine.arguments.dropFirst())
   let scenes=["send","photos","history","settings"]
   for(locale,copy) in metadata.sorted(by:{$0.key<$1.key}){

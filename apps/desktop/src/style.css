@@ -35,7 +35,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .window-actions { display: flex; align-items: center; gap: 2px; }
 .brand { justify-content: flex-start; gap: 10px; }
 .brand-mark { display: grid; place-items: center; color: var(--navy); }
-.brand-mark svg { width: 24px; height: 24px; stroke-width: 1.8; }
+.brand-mark img { width: 24px; height: 24px; }
 h1 { margin: 0; font-size: 18px; line-height: 1.2; letter-spacing: -.35px; font-weight: 700; }
 h2 { margin: 0; font-size: 14px; line-height: 1.4; font-weight: 650; }
 h3 { margin: 0; font-size: 13px; line-height: 1.5; font-weight: 600; }
@@ -75,6 +75,8 @@ textarea, input { width: 100%; background: var(--paper); border: 1px solid #4452
 textarea { display: block; min-height: 114px; resize: vertical; line-height: 1.65; }
 textarea::placeholder, input::placeholder { color: #8c9aaa; }
 .transfer-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; margin-top: 15px; }
+/* A dismissed transfer should leave no empty row at any window width. */
+.transfer-progress:not(:has(> :not([hidden]))) { display: none; }
 .transfer-status { color: #bfd1e3; font-size: 12px; overflow-wrap: anywhere; }
 #transfer-progress-bar { grid-row: 2; width: 100%; height: 5px; border: none; border-radius: 3px; accent-color: var(--navy); }
 #transfer-progress-bar::-webkit-progress-bar { background: #343d48; border-radius: 3px; }
@@ -135,7 +137,7 @@ label { display: block; margin: 13px 0 5px; font-size: 12px; color: #bdcad8; }
 @media (max-width: 600px) {
   .app-header { padding: 2px 8px; gap: 4px; }
   .brand { gap: 7px; }
-  .brand-mark svg { width: 20px; height: 20px; }
+  .brand-mark img { width: 20px; height: 20px; }
   h1 { font-size: 16px; }
   .window-actions .quiet { padding: 4px 5px; min-height: 28px; }
   .panel { padding: 7px 8px 9px; }
@@ -236,7 +238,8 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 /* One red close control keeps existing hide/close semantics; the collapsed badge still has only expand. */
 .platform-macos #close-app-window, .platform-macos .utility-header [data-close-window] { position: relative; flex: none; display: block; width: 12px; min-width: 12px; height: 12px; min-height: 12px; padding: 0; border: 1px solid #e34a43; border-radius: 50%; background: #ff5f57; color: transparent; font-size: 0; }
 .platform-macos .utility-header [data-close-window] { position: absolute; left: 18px; top: 14px; }
-.platform-macos #close-app-window svg { display: none; }
+/* The compact Mac close glyph is drawn on hover, so keep the shared Windows SVG out of the circle. */
+.platform-macos #close-app-window svg, .platform-macos .utility-header [data-close-window] svg { display: none; }
 .platform-macos #close-app-window:hover::after, .platform-macos .utility-header [data-close-window]:hover::after { content: "×"; position: absolute; inset: -1px; color: #651b15; font: 12px/12px -apple-system, sans-serif; text-align: center; }
 .platform-macos body.folded { background: rgb(20 20 20 / 90%); }
 .platform-macos .expand-widget { background: transparent; border-radius: 14px; border-color: #ffffff25; }
@@ -267,7 +270,6 @@ html.platform-macos { --surface: #101010; --paper: #1b1b1b; --ink: #f0f0f0; --mu
 .platform-macos .composer { display: flex; flex-direction: column; flex: 1; min-height: 58px; }
 .platform-macos .message-input { display: flex; flex: 1; min-height: 0; }
 .platform-macos .message-input textarea { flex: 1; height: 100%; min-height: 0; }
-.platform-macos .transfer-progress:not(:has(> :not([hidden]))) { display: none; }
 
 /* Icon-only actions retain a visible focus target and inherit each platform’s existing colors. */
 button.action-icon { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; padding: 8px; }

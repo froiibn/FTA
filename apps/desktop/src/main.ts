@@ -7,6 +7,7 @@ import "./windows.css";
 // Keep limits named and aligned with the engine instead of spreading magic values through handlers.
 const REFRESH_INTERVAL_MS = 3_000;
 const PROGRESS_INTERVAL_MS = 500;
+const COMPLETED_FILE_PROGRESS_MS = 3_000;
 const MAX_MESSAGE_BYTES = 1024 * 1024;
 const HISTORY_LIMIT = 100;
 const LAST_DEVICE_KEY = "fta:last-device";
@@ -59,7 +60,8 @@ if (!root) throw new Error("앱 화면을 찾을 수 없습니다");
 root.innerHTML = `
   <main class="shell">
     <header class="app-header" data-drag-handle>
-      <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4 4-4-4 4-4"/></svg></span><h1>FTA</h1></div>
+      <!-- Reuse the packaged mark so the title bar and launcher stay in sync. -->
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><img src="/favicon.png" alt="" width="24" height="24"></span><h1>FTA</h1></div>
       <div class="window-actions"><button data-window="inbox" class="quiet icon-label" aria-label="기록" title="기록"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6M12 7v5l3 2"/></svg></button><button data-window="settings" class="quiet icon-label" aria-label="설정" title="설정"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 1-1h4l1 3 2 1 3-1 2 4-2 2v2l2 2-2 4-3-1-2 1-1 3h-4l-1-3-2-1-3 1-2-4 2-2v-2L2 9l2-4 3 1 2-1Z"/><circle cx="12" cy="12" r="3"/></svg></button><button id="fold-window" class="quiet icon-label" aria-label="접기" title="접기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button><button id="pin" class="quiet icon-label" aria-pressed="false" title="항상 위에 표시" aria-label="항상 위에 표시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 6 0-1 6 4 4H6l4-4-1-6Zm3 10v8"/></svg></button><button id="close-app-window" class="quiet icon-label" aria-label="창 닫기" title="창 닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     </header>
     <section id="send-panel" class="panel send-board">
@@ -90,7 +92,8 @@ root.innerHTML = `
     </section>
   </main>
   <button id="expand-window" class="expand-widget" aria-label="펼치기" title="펼치기" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V5h4m6 0h4v4m0 6v4h-4M9 19H5v-4"/></svg></button>
-  <section id="detail-panel" aria-labelledby="detail-title"><div class="detail-header utility-header" data-drag-handle><h2 id="detail-title">수신 내용</h2><button id="close-detail" class="action-icon quiet" aria-label="닫기" title="닫기">${icon("close").outerHTML}</button></div><p id="detail-meta" class="help"></p><div class="detail-content"><pre id="detail-body" class="detail-body"></pre><div id="detail-items"></div></div><div class="detail-actions"><button id="copy-detail" class="action-icon secondary" aria-label="복사" title="복사">${icon("copy").outerHTML}</button><button id="open-detail" class="action-icon primary" hidden aria-label="링크 열기" title="링크 열기">${icon("link").outerHTML}</button><button id="reveal-detail" class="action-icon secondary" hidden aria-label="저장 위치 열기" title="저장 위치 열기">${icon("folder").outerHTML}</button></div></section>
+  <!-- Share utility close chrome so each desktop platform applies its own placement. -->
+  <section id="detail-panel" aria-labelledby="detail-title"><div class="detail-header utility-header" data-drag-handle><h2 id="detail-title">수신 내용</h2><button data-close-window="detail" class="action-icon quiet" aria-label="수신 내용 닫기" title="수신 내용 닫기">${icon("close").outerHTML}</button></div><p id="detail-meta" class="help"></p><div class="detail-content"><pre id="detail-body" class="detail-body"></pre><div id="detail-items"></div></div><div class="detail-actions"><button id="copy-detail" class="action-icon secondary" aria-label="복사" title="복사">${icon("copy").outerHTML}</button><button id="open-detail" class="action-icon primary" hidden aria-label="링크 열기" title="링크 열기">${icon("link").outerHTML}</button><button id="reveal-detail" class="action-icon secondary" hidden aria-label="저장 위치 열기" title="저장 위치 열기">${icon("folder").outerHTML}</button></div></section>
 `;
 // Detach unused view content rather than leaving another window's controls hidden and active.
 const utilityPanel = root.querySelector<HTMLElement>(`#${view}-panel`);
@@ -131,6 +134,7 @@ let currentDetail: TransferRecord | undefined;
 let registrationPrompting = false;
 let inFlightId = "";
 let progressTimer: number | undefined;
+let progressDismissTimer: number | undefined;
 let activationProcessing = false;
 const receiptInFlight = new Set<number>();
 
@@ -577,20 +581,22 @@ async function sendFiles(): Promise<void> {
   updateActions();
   element("transfer-status").hidden = false;
   element("transfer-status").textContent = target.paired ? `${target.display_name}에 파일을 전송하고 있어요…` : `${target.display_name}에서 처음 한 번 등록을 허용해주세요.`;
+  let completed: TransferRecord | undefined;
   try {
     const result = await invoke<TransferRecord>("send_files", { to: target.device_id, paths: selectedPaths, transferId: inFlightId });
     if (result.state === "completed") {
+      completed = result;
       selectedPaths = [];
       showNotice(`파일 전송 ${stateLabel(result.state)}`);
     }
     else showNotice(transferFailureMessage(result), true);
-    await refreshHistory();
   } finally {
-    await finishProgress();
+    finishProgress(completed);
     sending = false;
     renderFiles();
     renderDevices();
   }
+  await refreshHistory();
 }
 
 // A URL is recognized only when the entire input is one HTTP(S) address.
@@ -617,7 +623,7 @@ async function sendMessage(): Promise<void> {
     } else showNotice(transferFailureMessage(result), true);
     await refreshHistory();
   } finally {
-    await finishProgress();
+    finishProgress();
     sending = false;
     updateActions();
   }
@@ -634,6 +640,9 @@ function transferFailureMessage(record: TransferRecord): string {
 
 // Caller-generated IDs make cancellation possible before the long-running send IPC returns.
 function beginProgress(target: Device): void {
+  // A completed send's timer must never hide a newer transfer.
+  window.clearTimeout(progressDismissTimer);
+  progressDismissTimer = undefined;
   inFlightId = crypto.randomUUID();
   element("cancel-transfer").hidden = false;
   element<HTMLButtonElement>("cancel-transfer").disabled = false;
@@ -664,34 +673,50 @@ async function updateProgress(): Promise<void> {
   try {
     const record = await rpc<TransferRecord>("transfers.get", { transfer_id: id });
     if (inFlightId !== id) return;
-    // Consent waiting has no transferred bytes; do not show an invented percentage.
-    if (record.state === "awaiting_registration") {
-      element("transfer-progress-bar").hidden = true;
-      element("transfer-status").textContent = "상대 기기의 등록 승인 대기 중… 상대에서 등록 허용을 눌러주세요.";
-      return;
-    }
-    const count = record.items.filter((item) => item.state === "completed").length;
-    const total = record.items.reduce((sum, item) => sum + byteCount(item.size), 0n);
-    const transferred = record.items.reduce((sum, item) => sum + byteCount(item.bytes_transferred ?? (item.state === "completed" ? item.size : "0")), 0n);
-    const bounded = transferred > total ? total : transferred;
-    const progress = element<HTMLProgressElement>("transfer-progress-bar");
-    progress.hidden = record.kind !== "files" || total === 0n;
-    progress.value = total > 0n ? Number(bounded * 10000n / total) / 100 : 0;
-    element("transfer-status").textContent = record.kind === "files"
-      ? `${stateLabel(record.state)}  ${formatBytes(bounded)} / ${formatBytes(total)}  ·  ${count}/${record.items.length}개 저장`
-      : `메시지 ${stateLabel(record.state)}`;
+    renderTransferProgress(record);
   } catch {
     // A transfer may not exist until source validation finishes; final send errors are shown separately.
   }
 }
 
-// Query persisted state even after a send error so partial success is not hidden by a rejected IPC call.
-async function finishProgress(): Promise<void> {
-  if (progressTimer !== undefined) window.clearInterval(progressTimer);
-  await updateProgress();
+// Polls and the final storage response share the same progress display.
+function renderTransferProgress(record: TransferRecord): void {
+  // Consent waiting has no transferred bytes; do not show an invented percentage.
+  if (record.state === "awaiting_registration") {
+    element("transfer-progress-bar").hidden = true;
+    element("transfer-status").textContent = "상대 기기의 등록 승인 대기 중… 상대에서 등록 허용을 눌러주세요.";
+    return;
+  }
+  const count = record.items.filter((item) => item.state === "completed").length;
+  const total = record.items.reduce((sum, item) => sum + byteCount(item.size), 0n);
+  const transferred = record.items.reduce((sum, item) => sum + byteCount(item.bytes_transferred ?? (item.state === "completed" ? item.size : "0")), 0n);
+  const bounded = transferred > total ? total : transferred;
+  const progress = element<HTMLProgressElement>("transfer-progress-bar");
+  const completed = record.state === "completed";
+  progress.hidden = record.kind !== "files" || (total === 0n && !completed);
+  progress.value = completed ? 100 : total > 0n ? Number(bounded * 10000n / total) / 100 : 0;
+  element("transfer-status").textContent = record.kind === "files"
+    ? `${stateLabel(record.state)}  ${formatBytes(bounded)} / ${formatBytes(total)}  ·  ${count}/${record.items.length}개 저장`
+    : `메시지 ${stateLabel(record.state)}`;
+}
+
+// Invalidate outstanding polls before showing the confirmed result, even if history refresh stalls.
+function finishProgress(completedFile?: TransferRecord): void {
+  window.clearInterval(progressTimer);
+  progressTimer = undefined;
   inFlightId = "";
   element("cancel-transfer").hidden = true;
-  // Terminal results belong to the expiring toast/history, never a leftover progress caption.
+  if (completedFile) {
+    renderTransferProgress(completedFile);
+    progressDismissTimer = window.setTimeout(hideTransferProgress, COMPLETED_FILE_PROGRESS_MS);
+  } else {
+    hideTransferProgress();
+  }
+}
+
+// Clear the caption and bar together so the progress area can collapse after the delay.
+function hideTransferProgress(): void {
+  progressDismissTimer = undefined;
   element("transfer-status").hidden = true;
   element("transfer-progress-bar").hidden = true;
 }
@@ -837,7 +862,6 @@ on("cancel-transfer", "click", () => { void act(async () => {
   element<HTMLButtonElement>("cancel-transfer").disabled = true;
   showNotice("취소를 요청했어요. 이미 저장된 항목은 보존됩니다.");
 }); });
-on("close-detail", "click", () => { void act(async () => { if (desktop) await invoke("close_utility_window"); }); });
 on("copy-detail", "click", () => { void act(async () => { await invoke("copy_text", { value: currentDetail?.body ?? "" }); showNotice("복사했어요."); }); });
 on("open-detail", "click", () => { void act(async () => { if (currentDetail?.body) await invoke("open_link", { value: currentDetail.body }); }); });
 on("reveal-detail", "click", () => { void act(async () => { if (currentDetail) await invoke("reveal_transfer", { transferId: currentDetail.transfer_id }); }); });
