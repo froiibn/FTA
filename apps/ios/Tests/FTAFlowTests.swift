@@ -132,16 +132,65 @@ final class FTAFlowTests: XCTestCase {
         XCTAssertFalse(app.buttons["send-message"].isEnabled)
         capture("send-glass",app)
         app.tabBars.buttons["기록"].tap()
-        XCTAssertTrue(app.navigationBars["기록"].waitForExistence(timeout:5))
+        let scrollingTitle = app.staticTexts["scrolling-tab-title"]
+        XCTAssertTrue(scrollingTitle.waitForExistence(timeout:5))
+        XCTAssertEqual(scrollingTitle.label,"기록")
+        XCTAssertFalse(app.navigationBars["기록"].exists)
         capture("history-glass",app)
         app.tabBars.buttons["설정"].tap()
         XCTAssertTrue(app.switches["신뢰하는 집 네트워크입니다"].waitForExistence(timeout:5))
         XCTAssertTrue(app.textFields["기기 이름"].exists)
+        XCTAssertEqual(scrollingTitle.label,"설정")
         capture("settings-glass",app)
+        // The title must leave the viewport with the first rows, even after the bar would have collapsed.
+        app.swipeUp()
+        XCTAssertFalse(scrollingTitle.isHittable)
+        XCTAssertFalse(app.navigationBars["설정"].exists)
+        capture("settings-scrolled",app)
         app.tabBars.buttons["보내기"].tap(); app.buttons["파일"].tap()
         XCTAssertTrue(app.navigationBars["둘러보기"].waitForExistence(timeout:5) || app.buttons["취소"].exists || app.buttons["Cancel"].exists)
         capture("file-picker",app)
     }
+    func testDeviceNameSaveButtonTracksTheDraft() {
+        let app = makeApp(); app.launch()
+        app.tabBars.buttons["설정"].tap()
+        let field = app.textFields["기기 이름"]
+        let save = app.buttons["이름 저장"]
+        XCTAssertTrue(field.waitForExistence(timeout:5))
+        XCTAssertTrue(save.exists)
+        XCTAssertGreaterThan(save.frame.midX,field.frame.midX)
+        XCTAssertEqual(save.frame.midY,field.frame.midY,accuracy:2)
+        XCTAssertFalse(save.isEnabled)
+        capture("name-save-disabled",app)
+
+        // Reverting the edit must disable the same control without committing a change.
+        field.tap()
+        field.typeText("X")
+        XCTAssertTrue(save.isEnabled)
+        capture("name-save-enabled",app)
+        field.typeText(XCUIKeyboardKey.delete.rawValue)
+        XCTAssertFalse(save.isEnabled)
+    }
+
+    func testNotificationSettingsShowsTheRelevantPermissionAction() {
+        let app = makeApp(); app.launch()
+        app.tabBars.buttons["설정"].tap()
+        let status = app.staticTexts["notification-permission-status"]
+        for _ in 0..<5 {
+            if status.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(status.isHittable)
+        // Read the real simulator authorization without accepting or denying a system prompt.
+        let pending = status.label == "설정 전"
+        XCTAssertTrue(["설정 전","허용됨","차단됨"].contains(status.label))
+        let action = app.buttons[pending ? "알림 허용 요청" : "iOS 설정 열기"]
+        XCTAssertTrue(action.isHittable)
+        XCTAssertGreaterThan(action.frame.midX,status.frame.midX)
+        XCTAssertFalse(app.buttons[pending ? "iOS 설정 열기" : "알림 허용 요청"].exists)
+        capture("notification-permission-row",app)
+    }
+
     func testBottomComposerRemainsInPlaceWhileContentScrolls() {
         let app = makeApp(); app.launch()
         let input = app.descendants(matching:.any).matching(identifier:"message-input").firstMatch

@@ -37,7 +37,11 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     @Published var receiveEnabled = true
     @Published var lans: [LAN] = LAN.available()
     @Published var selectedLAN = ""
-    @Published var name = UserDefaults.standard.string(forKey: "deviceName") ?? UIDevice.current.name
+    @Published var name: String
+    // Discovery uses the committed name while the Settings field holds a draft.
+    @Published private var savedName: String
+    @Published private var savingName = false
+    var canSaveName: Bool { !savingName && name != savedName }
     @Published var notice: String?
     @Published var error: String?
     @Published var detail: Transfer?
@@ -47,13 +51,26 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     @Published var receiptBanner: Receipt?
     private let receiptState = ReceiptState()
     private var consumingEvents = false
-    private var requestingNotificationPermission = false
+    @Published private var requestingNotificationPermission = false
     private var bannerDismissal: Task<Void, Never>?
     private var lastReceiptFeedback: TimeInterval = -.infinity
     private static let receiptBannerSeconds: Double = 6
     private static let receiptFeedbackSeconds: TimeInterval = 2
     @Published var notificationDeliveryIssue: String?
-    @Published var notificationStatus = String(localized:"확인 중")
+    // Use the OS authorization state to decide which action is meaningful, independent of localization.
+    @Published private var notificationAuthorization: UNAuthorizationStatus?
+    var notificationPermissionUndecided: Bool { notificationAuthorization == .notDetermined }
+    var canRequestNotificationPermission: Bool {
+        notificationPermissionUndecided && !requestingNotificationPermission
+    }
+    var notificationStatus: String {
+        switch notificationAuthorization {
+        case nil: String(localized:"확인 중")
+        case .notDetermined: String(localized:"설정 전")
+        case .authorized, .provisional, .ephemeral: String(localized:"허용됨")
+        default: String(localized:"차단됨")
+        }
+    }
     private let preferences = NetworkPreferences()
     private var serviceBlocked = false
     private let bonjour = Bonjour()
@@ -67,6 +84,9 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     private let consumer = "ios-notifications-v1"
 
     init() {
+        let initialName = UserDefaults.standard.string(forKey:"deviceName") ?? UIDevice.current.name
+        name = initialName
+        savedName = initialName
         unreadCount = receiptState.count
         receiveEnabled = preferences.receiveEnabled
         restoreConnections(lans)
@@ -171,14 +191,14 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         starting = true; defer { starting = false }
         do {
             try Sandbox.prepare()
-            let data = try await Engine.call("host.start", ["container_dir":Sandbox.container.path,"state_dir":Sandbox.state.path,"receive_dir":Sandbox.received.path,"display_name":name,"listen_addr":"\(lan.address):0","allowed_networks":[lan.network]]) as? [String:Any] ?? [:]
+            let data = try await Engine.call("host.start", ["container_dir":Sandbox.container.path,"state_dir":Sandbox.state.path,"receive_dir":Sandbox.received.path,"display_name":savedName,"listen_addr":"\(lan.address):0","allowed_networks":[lan.network]]) as? [String:Any] ?? [:]
             // A path/scene change can arrive while Rust binds; never advertise a stale listener.
             guard foreground, confirmed, receiveEnabled, !serviceBlocked, self.lan == lan, usableConnections.contains(lan) else {
                 _ = try await Engine.call("host.stop"); return
             }
             activeLAN = lan; running = true
             Task { await requestNotificationsIfNeeded() }
-            bonjour.start(); bonjour.advertise(data, name: name)
+            bonjour.start(); bonjour.advertise(data, name: savedName)
             polling = Task { [weak self] in
                 while !Task.isCancelled, let self, self.running {
                     await self.refreshActivity()
@@ -232,7 +252,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
             let records = try await Engine.decode([Transfer].self, "inbox.list", ["limit":100])
             let advert = try await Engine.call("host.advertisement") as? [String:Any] ?? [:]
             guard running else { return }
-            requests = incoming; history = records; bonjour.advertise(advert, name:name)
+            requests = incoming; history = records; bonjour.advertise(advert, name:savedName)
             if let id = activeID {
                 do {
                     let result = try await Engine.decode(Transfer.self,"transfers.get",["transfer_id":id])
@@ -450,23 +470,29 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         catch { self.error = error.localizedDescription }
     }
     func saveName() async {
+        guard canSaveName else { return }
+        // Commit the value actually sent to the engine even if the draft changes while awaiting it.
+        let candidate = name
+        savingName = true
+        defer { savingName = false }
         do {
-            guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty, name.utf8.count <= 128 else { throw EngineFailure(code:"INVALID_REQUEST",message:String(localized:"이름을 1~128바이트로 입력하세요")) }
-            if running { _ = try await Engine.call("settings.update",["values":["display_name":name]]) }
-            UserDefaults.standard.set(name,forKey:"deviceName")
+            guard !candidate.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty, candidate.utf8.count <= 128 else { throw EngineFailure(code:"INVALID_REQUEST",message:String(localized:"이름을 1~128바이트로 입력하세요")) }
+            if running { _ = try await Engine.call("settings.update",["values":["display_name":candidate]]) }
+            UserDefaults.standard.set(candidate,forKey:"deviceName")
+            savedName = candidate
             // Republish with new TXT metadata instead of leaving a stale discovery name.
             if running { bonjour.start(); await refreshActivity() }
             notice = String(localized:"기기 이름을 저장했습니다")
         } catch { self.error = error.localizedDescription }
     }
     func requestNotifications() async {
-        guard !requestingNotificationPermission else { return }; requestingNotificationPermission = true
+        guard canRequestNotificationPermission else { return }; requestingNotificationPermission = true
         defer { requestingNotificationPermission = false }
         do { _ = try await UNUserNotificationCenter.current().requestAuthorization(options:[.alert,.sound,.badge]); await refreshNotificationStatus() }
         catch { self.error = error.localizedDescription }
     }
     func refreshNotificationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
-        notificationStatus = [.authorized,.provisional,.ephemeral].contains(settings.authorizationStatus) ? String(localized:"허용됨") : (settings.authorizationStatus == .notDetermined ? String(localized:"설정 전") : String(localized:"차단됨"))
+        notificationAuthorization = settings.authorizationStatus
     }
 }

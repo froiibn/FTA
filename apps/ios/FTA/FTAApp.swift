@@ -343,6 +343,7 @@ struct HistoryView: View {
     @State private var filter = "all"
     var body: some View {
         List {
+            ScrollingTabTitle(title:String(localized:"기록"))
             Picker(String(localized:"표시"),selection:$filter) { Text(String(localized:"전체")).tag("all");Text(String(localized:"받음")).tag("receive");Text(String(localized:"보냄")).tag("send") }.pickerStyle(.segmented)
             if model.history.isEmpty { ContentUnavailableView { Label(String(localized:"아직 전송 기록이 없습니다"),systemImage:"tray").foregroundStyle(.white) } description: { Text(String(localized:"파일·텍스트·URL의 송수신 결과가 여기에 표시됩니다.")).foregroundStyle(.white.opacity(0.7)) } }
             ForEach(model.history.filter { filter == "all" || $0.direction == filter }) { record in
@@ -358,7 +359,8 @@ struct HistoryView: View {
                     }
                 }
             }
-        }.scrollContentBackground(.hidden).background(GlassBackground()).navigationTitle(String(localized:"기록")).refreshable { await model.refreshActivity() }
+        }.scrollContentBackground(.hidden).background(GlassBackground()).toolbar(.hidden,for:.navigationBar)
+            .refreshable { await model.refreshActivity() }
     }
 }
 
@@ -437,9 +439,22 @@ struct SettingsView: View {
     @State private var removing: Peer?
     var body: some View {
         Form {
+            ScrollingTabTitle(title:String(localized:"설정"))
             Section {
-                TextField(String(localized:"기기 이름"),text:$model.name).textContentType(.name)
-                Button(String(localized:"이름 저장"),systemImage:"checkmark.square") { Task { await model.saveName() } }.modifier(IconActionStyle())
+                HStack {
+                    TextField(String(localized:"기기 이름"),text:$model.name).textContentType(.name)
+                    // An explicit button style keeps the Form row from handling the save tap.
+                    Button { Task { await model.saveName() } } label: {
+                        Label(String(localized:"이름 저장"),systemImage:"checkmark")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(model.canSaveName ? Color.accentColor : Color.secondary)
+                            .frame(width:34,height:34)
+                            .background(.thinMaterial,in:Circle())
+                            .modifier(IconActionStyle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!model.canSaveName)
+                }
             } header:{ Text(String(localized:"이 iPhone")) } footer:{ Text("FTA · File Transfer Anything") }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
             Section {
                 Picker(String(localized:"사용할 연결"),selection:Binding(get:{model.selectedLAN},set:{model.selectLAN($0)})) {
@@ -457,10 +472,43 @@ struct SettingsView: View {
                 Text(String(localized:"파일 앱에서 받은 파일을 확인하거나 이동할 수 있습니다. 앱을 삭제하면 앱 안의 파일도 삭제됩니다.")).font(.footnote).foregroundStyle(.secondary)
             } header:{ Text(String(localized:"받은 파일")) }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
             Section(String(localized:"알림")) {
-                LabeledContent(String(localized:"권한"),value:model.notificationStatus)
-                if let issue = model.notificationDeliveryIssue { Text(issue).font(.footnote).foregroundStyle(.secondary) }
-                Button(String(localized:"알림 허용 요청"),systemImage:"bell.badge") { Task { await model.requestNotifications() } }.modifier(IconActionStyle())
-                Button(String(localized:"iOS 설정 열기"),systemImage:"gearshape") { if let url = URL(string:UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }.modifier(IconActionStyle())
+                VStack(alignment:.leading,spacing:8) {
+                    HStack(spacing:12) {
+                        Image(systemName:"bell.fill")
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width:34,height:34)
+                            .background(.thinMaterial,in:Circle())
+                            .accessibilityHidden(true)
+                        VStack(alignment:.leading,spacing:3) {
+                            Text(String(localized:"권한"))
+                            Text(model.notificationStatus).font(.subheadline).foregroundStyle(.secondary)
+                                .accessibilityIdentifier("notification-permission-status")
+                        }
+                        Spacer(minLength:0)
+                        // Once iOS has answered the permission prompt, subsequent changes belong in Settings.
+                        if model.notificationPermissionUndecided {
+                            Button(String(localized:"알림 허용 요청"),systemImage:"bell.badge") {
+                                Task { await model.requestNotifications() }
+                            }
+                            .modifier(IconActionStyle())
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.circle)
+                            .disabled(!model.canRequestNotificationPermission)
+                        } else {
+                            Button(String(localized:"iOS 설정 열기"),systemImage:"gearshape") {
+                                if let url = URL(string:UIApplication.openNotificationSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                            }
+                            .modifier(IconActionStyle())
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.circle)
+                        }
+                    }
+                    if let issue = model.notificationDeliveryIssue {
+                        Text(issue).font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
             }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
             Section(String(localized:"등록된 기기")) {
                 if !model.peers.contains(where:{$0.paired}) { Text(String(localized:"등록된 기기가 없습니다")).foregroundStyle(.secondary) }
@@ -476,10 +524,26 @@ struct SettingsView: View {
                 if let url = AppLegal.supportURL { Link(String(localized:"지원 및 문의"),destination:url) }
                 NavigationLink(String(localized:"오픈소스 고지")) { ThirdPartyNoticesView() }
             }.listRowBackground(Rectangle().fill(.ultraThinMaterial))
-        }.scrollContentBackground(.hidden).background(GlassBackground()).navigationTitle(String(localized:"설정"))
+        }.scrollContentBackground(.hidden).background(GlassBackground()).toolbar(.hidden,for:.navigationBar)
             .confirmationDialog(String(localized:"기기 등록을 해제할까요?"),isPresented:Binding(get:{removing != nil},set:{if !$0 {removing = nil}}),titleVisibility:.visible) {
                 if let peer = removing { Button(String(localized:"등록 해제"),role:.destructive) { Task { await model.unpair(peer); removing = nil } } }
             } message:{ Text(String(localized:"이 기기의 새 전송을 차단합니다. 다시 보내려면 수신자의 등록 승인이 필요합니다.")) }
+    }
+}
+
+// A regular row scrolls out with the content instead of collapsing into a pinned navigation title.
+private struct ScrollingTabTitle: View {
+    let title: String
+
+    var body: some View {
+        Section {
+            Text(title)
+                .font(.largeTitle.bold())
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("scrolling-tab-title")
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+        }
     }
 }
 

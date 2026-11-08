@@ -33,10 +33,10 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.4</string>
+	<string>0.1.6</string>
 	<key>CFBundleVersion</key>
 	<!-- Increment the existing App Store build while preserving bundle identity and user data. -->
-	<string>11</string>
+	<string>12</string>
 	<!-- The owner elected documentation exemption after review. This declares exempt encryption,
 	     not absence of Rustls/ring TLS or an exemption confirmed by Apple or a government. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
